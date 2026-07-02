@@ -1,0 +1,247 @@
+﻿@model IEnumerable<RSDSystem.Models.User>
+@{
+    ViewData["Title"] = "User Management";
+    var sortBy = ViewBag.SortBy as string;
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+
+<div class="page-card">
+    <div class="emp-card-head">
+        <div class="emp-title">All Users</div>
+        <div class="emp-controls">
+            <div class="dropdown">
+                <button class="btn-outline-blue dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <ul class="dropdown-menu filter-menu">
+                    <li>
+                        <a class="dropdown-item @(sortBy == "lastname" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="lastname"
+                           asp-route-search="@ViewBag.Search">Last Name</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "role" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="role"
+                           asp-route-search="@ViewBag.Search">Role</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "email" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="email"
+                           asp-route-search="@ViewBag.Search">Email</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "status" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="status"
+                           asp-route-search="@ViewBag.Search">Status</a>
+                    </li>
+                </ul>
+            </div>
+
+            <form asp-action="Index" method="get" class="search-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
+                <input type="hidden" name="sortBy" value="@sortBy" />
+            </form>
+
+            <a asp-action="Create" class="btn-primary-blue">Add User</a>
+        </div>
+    </div>
+
+    <table class="emp-table">
+        <thead>
+            <tr>
+                <th style="width:40px">
+                    <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
+                </th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>
+                    <div style="display:flex;align-items:center;gap:5px;justify-content:space-evenly">
+                        <span>Action</span>
+                        <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
+                            @Html.AntiForgeryToken()
+                            <div id="bulkIdsContainer"></div>
+                            <button type="button"
+                                    id="bulkDeleteBtn"
+                                    class="action-btn action-delete"
+                                    style="display:none"
+                                    onclick="openBulkDeleteModal()">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </form>
+                    </div>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No users found.</td>
+                </tr>
+            }
+            @foreach (var u in Model)
+            {
+                <tr>
+                    <td><input type="checkbox" class="tbl-check row-cb" /></td>
+                    <td>
+                        <div class="emp-name-cell">
+                            @if (!string.IsNullOrEmpty(u.PhotoPath))
+                            {
+                                <img src="@u.PhotoPath" class="emp-avatar" />
+                            }
+                            else
+                            {
+                                <span class="emp-avatar-initials">
+                                    @u.FirstName.Substring(0, 1)@u.LastName.Substring(0, 1)
+                                </span>
+                            }
+                            <span>@u.FullName</span>
+                        </div>
+                    </td>
+                    <td>@(u.Role == "PayrollStaff" ? "Payroll Staff" : u.Role)</td>
+                    <td>@u.Email</td>
+                    <td>
+                        @if (u.IsActive)
+                        {
+                            <span class="badge-active">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge-inactive">Inactive</span>
+                        }
+                    </td>
+                    <td>
+                        <a asp-action="Edit" asp-route-id="@u.UserId"
+                           class="action-btn action-edit" title="Edit">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+                        <button type="button" class="action-btn action-delete" title="Delete"
+                                onclick="openDeleteModal(@u.UserId, '@u.FullName')">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </td>
+                    
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Overlay -->
+<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(event)">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Are you sure?</div>
+        <div class="del-msg">
+            You are about to permanently delete User:
+            <strong id="deleteUserName"></strong>.
+            This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <form id="deleteForm" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="del-btn-delete">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- Bulk Delete Overlay -->
+<div class="del-overlay" id="bulkDeleteOverlay" onclick="closeBulkDeleteModal(event)">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Are you sure?</div>
+        <div class="del-msg">
+            You are about to permanently delete
+            <strong id="bulkDeleteCount">0</strong> user(s).
+            This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeBulkDeleteModal()">Cancel</button>
+            <button class="del-btn-delete" onclick="document.getElementById('bulkDeleteForm').submit()">
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleAll(src) {
+            document.querySelectorAll('.row-cb').forEach(cb => cb.checked = src.checked);
+            updateBulkBar();
+        }
+
+        document.addEventListener('change', function (e) {
+            if (e.target.classList.contains('row-cb')) updateBulkBar();
+        });
+
+        function updateBulkBar() {
+            const checked = document.querySelectorAll('.row-cb:checked');
+            const btn     = document.getElementById('bulkDeleteBtn');
+
+            if (checked.length > 0) {
+                btn.style.display = 'inline-flex';
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        function openBulkDeleteModal() {
+            const checked   = document.querySelectorAll('.row-cb:checked');
+            const container = document.getElementById('bulkIdsContainer');
+            const count     = document.getElementById('bulkDeleteCount');
+
+            // Populate hidden inputs
+            container.innerHTML = '';
+            checked.forEach(cb => {
+                const input = document.createElement('input');
+                input.type  = 'hidden';
+                input.name  = 'selectedIds';
+                input.value = cb.dataset.id;
+                container.appendChild(input);
+            });
+
+            count.textContent = checked.length;
+            document.getElementById('bulkDeleteOverlay').classList.add('open');
+        }
+
+        function closeBulkDeleteModal(e) {
+            if (!e || e.target === document.getElementById('bulkDeleteOverlay'))
+                document.getElementById('bulkDeleteOverlay').classList.remove('open');
+        }
+
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteEmpName').textContent = name;
+            document.getElementById('deleteForm').action = '/Employee/Delete/' + id;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+
+        function closeDeleteModal(e) {
+            if (!e || e.target === document.getElementById('deleteOverlay'))
+                document.getElementById('deleteOverlay').classList.remove('open');
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeDeleteModal();
+                closeBulkDeleteModal();
+            }
+        });
+    </script>
+}

@@ -1,0 +1,293 @@
+﻿@model RSDSystem.Models.Project
+@{
+    ViewData["Title"] = "Edit Project";
+    var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();
+    var distros = ViewBag.DistributionOptions as string[] ?? Array.Empty<string>();
+    var staffList = ViewBag.PayrollStaffList as List<string> ?? new List<string>();
+    var employees = ViewBag.Employees as List<RSDSystem.Models.Employee> ?? new();
+    var existingBudgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
+                           ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
+}
+
+<div class="page-label">Edit Project</div>
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="Index" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="form-card" style="max-width:680px">
+    <form asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="ProjectId" value="@Model.ProjectId" />
+
+        <!-- Project Name -->
+        <div class="form-row form-row-1">
+            <div>
+                <label class="form-lbl">Project Name</label>
+                <input type="text" name="ProjectName" value="@Model.ProjectName"
+                       class="form-ctrl" required />
+            </div>
+        </div>
+
+        <!-- Location | Type of Service -->
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Location</label>
+                <input type="text" name="Location" value="@Model.Location"
+                       class="form-ctrl" placeholder="Barangay, Municipality/City, Province" />
+            </div>
+            <div>
+                <label class="form-lbl">Type of Service</label>
+                <select name="TypeOfService" class="form-ctrl">
+                    <option value="">Select type</option>
+                    @foreach (var s in services)
+                    {
+                        if (s == Model.TypeOfService)
+                        {
+                            <option value="@s" selected>@s</option>
+                        }
+                        else
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Starting Date | Estimate End Date -->
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Starting Date</label>
+                <input type="date" name="StartingDate" id="startDate" class="form-ctrl"
+                       value="@Model.StartingDate?.ToString("yyyy-MM-dd")"
+                       onchange="generateMonthRows()" />
+            </div>
+            <div>
+                <label class="form-lbl">Estimate End Date</label>
+                <input type="date" name="EstimateEndDate" id="endDate" class="form-ctrl"
+                       value="@Model.EstimateEndDate?.ToString("yyyy-MM-dd")"
+                       onchange="generateMonthRows()" />
+            </div>
+        </div>
+
+        <!-- Payroll Budget -->
+        <div class="form-row form-row-1">
+            <div>
+                <label class="form-lbl">Payroll Budget</label>
+                <div class="proj-budget-input">
+                    <span class="proj-peso">₱</span>
+                    <input type="number" name="PayrollBudget" class="form-ctrl proj-budget-field"
+                           step="0.01" min="0"
+                           value="@Model.PayrollBudget" placeholder="0.00" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Budget — dynamically generated, pre-filled from existing data -->
+        <div class="form-row form-row-1">
+            <label class="form-lbl">Monthly Budget</label>
+
+            <div id="monthBudgetPlaceholder" class="proj-view-field"
+                 style="color:#9ab0d8;font-size:12.5px; @(existingBudgets.Any() ? "display:none" : "")">
+                Select starting and estimate end dates to generate monthly budget rows.
+            </div>
+
+            <div id="monthBudgetSection" style="@(existingBudgets.Any() ? "" : "display:none")">
+                <div class="proj-monthly-table">
+                    <div id="monthRowsContainer">
+                        @foreach (var b in existingBudgets)
+                        {
+                            <div class="proj-month-row">
+                                <span class="proj-month-label">Month of @b.MonthYear</span>
+                                <div class="proj-budget-input proj-month-input">
+                                    <span class="proj-peso">₱</span>
+                                    <input type="number" name="MonthAmounts"
+                                           class="form-ctrl proj-budget-field"
+                                           step="0.01" min="0"
+                                           value="@b.Amount" placeholder="0.00" />
+                                    <input type="hidden" name="MonthYears"
+                                           value="@b.MonthDate.ToString("yyyy-MM-dd")" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="text-end" style="padding:8px 14px">
+                        <button type="button" class="btn-save-budget" onclick="confirmBudget()">
+                            Save Budget
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payroll Distribution -->
+        <div class="form-row form-row-1">
+            <div>
+                <label class="form-lbl">Payroll Distribution</label>
+                <select name="PayrollDistribution" class="form-ctrl">
+                    <option value="">Select distribution</option>
+                    @foreach (var d in distros)
+                    {
+                        if (d == Model.PayrollDistribution)
+                        {
+                            <option value="@d" selected>@d</option>
+                        }
+                        else
+                        {
+                            <option value="@d">@d</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Assigned to Payroll Staff -->
+        <div class="form-row form-row-1">
+            <div>
+                <label class="form-lbl">Assigned to Payroll Staff</label>
+                <select name="AssignedPayrollStaff" class="form-ctrl">
+                    <option value="">Select payroll staff</option>
+                    @foreach (var staff in staffList)
+                    {
+                        if (staff == Model.AssignedPayrollStaff)
+                        {
+                            <option value="@staff" selected>@staff</option>
+                        }
+                        else
+                        {
+                            <option value="@staff">@staff</option>
+                        }
+                    }
+                </select>
+            </div>
+        </div>
+
+        <!-- Assigned Employees Table -->
+        <div class="proj-view-group mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="form-lbl mb-0">Assigned Employees</span>
+                <span class="proj-emp-count">
+                    Total Employees: <strong>@employees.Count</strong>
+                </span>
+            </div>
+            <table class="emp-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Job</th>
+                        <th>Rate</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!employees.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">
+                                No employees assigned.
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var emp in employees)
+                    {
+                        <tr>
+                            <td>@emp.FullName</td>
+                            <td>@emp.JobClassification</td>
+                            <td>₱@emp.DailyRate.ToString("N2")</td>
+                            <td>
+                                @if (emp.IsActive)
+                                {
+                                    <span class="badge-active">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-inactive">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                <a asp-controller="Employee" asp-action="Edit"
+                                   asp-route-id="@emp.EmployeeId"
+                                   class="action-btn action-edit" title="Edit">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </a>
+                                <form asp-action="RemoveEmployee" method="post" class="d-inline"
+                                      onsubmit="return confirm('Remove this employee from project?')">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="employeeId" value="@emp.EmployeeId" />
+                                    <input type="hidden" name="projectId" value="@Model.ProjectId" />
+                                    <button type="submit" class="action-btn action-delete" title="Remove">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <button type="submit" class="btn-primary-blue-block mt-3">Save Changes</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function generateMonthRows() {
+            const start = document.getElementById('startDate').value;
+            const end   = document.getElementById('endDate').value;
+            const container = document.getElementById('monthRowsContainer');
+            const section    = document.getElementById('monthBudgetSection');
+            const placeholder= document.getElementById('monthBudgetPlaceholder');
+
+            if (!start || !end) return;
+
+            const startDt = new Date(start + 'T00:00:00');
+            const endDt   = new Date(end + 'T00:00:00');
+
+            if (startDt > endDt) {
+                alert('Starting Date must be before Estimate End Date.');
+                return;
+            }
+
+            container.innerHTML = '';
+
+            const current   = new Date(startDt.getFullYear(), startDt.getMonth(), 1);
+            const lastMonth = new Date(endDt.getFullYear(), endDt.getMonth(), 1);
+
+            while (current <= lastMonth) {
+                const monthName = current.toLocaleString('default', { month: 'long' });
+                const year       = current.getFullYear();
+                const isoDate    = current.getFullYear() + '-' +
+                                    String(current.getMonth() + 1).padStart(2, '0') + '-01';
+
+                const row = document.createElement('div');
+                row.className = 'proj-month-row';
+                row.innerHTML = `
+                    <span class="proj-month-label">Month of ${monthName} ${year}</span>
+                    <div class="proj-budget-input proj-month-input">
+                        <span class="proj-peso">₱</span>
+                        <input type="number" name="MonthAmounts"
+                               class="form-ctrl proj-budget-field"
+                               step="0.01" min="0" placeholder="0.00" />
+                        <input type="hidden" name="MonthYears" value="${isoDate}" />
+                    </div>`;
+                container.appendChild(row);
+
+                current.setMonth(current.getMonth() + 1);
+            }
+
+            section.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+
+        function confirmBudget() {
+            alert('Monthly budget updated. It will be submitted with the project.');
+        }
+    </script>
+}

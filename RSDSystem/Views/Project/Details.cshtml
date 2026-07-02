@@ -1,0 +1,174 @@
+﻿@model RSDSystem.Models.Project
+@{
+    ViewData["Title"] = "View Project";
+    var employees = ViewBag.Employees as List<RSDSystem.Models.Employee> ?? new();
+    var budgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
+                     ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
+}
+
+<div class="page-label">View Project</div>
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="Index" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="form-card" style="max-width:680px">
+
+    <div class="proj-view-actions">
+        <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
+            <i class="bi bi-pencil-fill"></i>
+        </a>
+        <button type="button" class="action-btn action-delete" title="Delete"
+                onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw(Model.ProjectName.Replace("'", "\\'"))')">
+            <i class="bi bi-trash-fill"></i>
+        </button>
+    </div>
+
+    <div class="proj-view-group">
+        <div class="form-lbl">Project Name</div>
+        <div class="proj-view-field">@Model.ProjectName</div>
+    </div>
+
+    <div class="proj-view-row2">
+        <div class="proj-view-group">
+            <div class="form-lbl">Location</div>
+            <div class="proj-view-field">@(Model.Location ?? "—")</div>
+        </div>
+        <div class="proj-view-group">
+            <div class="form-lbl">Type of Project</div>
+            <div class="proj-view-field">@(Model.TypeOfService ?? "—")</div>
+        </div>
+    </div>
+
+    <div class="proj-view-row2">
+        <div class="proj-view-group">
+            <div class="form-lbl">Starting Date</div>
+            <div class="proj-view-field">@(Model.StartingDate?.ToString("MM/dd/yyyy") ?? "—")</div>
+        </div>
+        <div class="proj-view-group">
+            <div class="form-lbl">Estimate End Date</div>
+            <div class="proj-view-field">@(Model.EstimateEndDate?.ToString("MM/dd/yyyy") ?? "—")</div>
+        </div>
+    </div>
+
+    <div class="proj-view-group">
+        <div class="form-lbl">Payroll Budget</div>
+        <div class="proj-view-field">
+            @(Model.PayrollBudget.HasValue ? "₱" + Model.PayrollBudget.Value.ToString("N2") : "—")
+        </div>
+    </div>
+
+    <!-- Monthly Budget — dynamic, based on actual date range -->
+    <div class="proj-view-group">
+        <div class="form-lbl">Monthly Budget</div>
+        @if (!budgets.Any())
+        {
+            <div class="proj-view-field" style="color:#9ab0d8;font-size:12.5px">
+                No monthly budget set.
+            </div>
+        }
+        else
+        {
+            <div class="proj-monthly-table">
+                @foreach (var b in budgets)
+                {
+                    <div class="proj-month-row">
+                        <span class="proj-month-label">Month of @b.MonthYear</span>
+                        <span class="proj-month-amount">₱@b.Amount.ToString("N2")</span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="proj-view-group">
+        <div class="form-lbl">Payroll Distribution</div>
+        <div class="proj-view-field">@(Model.PayrollDistribution ?? "—")</div>
+    </div>
+
+    <div class="proj-view-group">
+        <div class="form-lbl">Assigned to Payroll Staff</div>
+        <div class="proj-view-field">@(Model.AssignedPayrollStaff ?? "—")</div>
+    </div>
+
+    <div class="proj-view-group mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="form-lbl mb-0">Assigned Employees</span>
+            <span class="proj-emp-count">Total Employees: <strong>@employees.Count</strong></span>
+        </div>
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Job</th>
+                    <th>Rate</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!employees.Any())
+                {
+                    <tr><td colspan="4" class="text-center text-muted py-3">No employees assigned.</td></tr>
+                }
+                @foreach (var emp in employees)
+                {
+                    <tr>
+                        <td>@emp.FullName</td>
+                        <td>@emp.JobClassification</td>
+                        <td>₱@emp.DailyRate.ToString("N2")</td>
+                        <td>
+                            @if (emp.IsActive)
+                            {
+                                <span class="badge-active">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge-inactive">Inactive</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Are you sure?</div>
+        <div class="del-msg">
+            You are about to permanently delete project:
+            <strong id="deleteProjName"></strong>.
+            This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <form id="deleteForm" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="del-btn-delete">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteProjName').textContent = name;
+            document.getElementById('deleteForm').action = '/Project/Delete/' + id;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+        function closeDeleteModal(e) {
+            if (!e || e.target === document.getElementById('deleteOverlay'))
+                document.getElementById('deleteOverlay').classList.remove('open');
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeleteModal(); });
+    </script>
+}

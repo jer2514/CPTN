@@ -1,0 +1,75 @@
+﻿@model IEnumerable<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "Projects";
+}
+
+<div class="page-label">Projects</div>
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="proj-head">
+        <div class="emp-title">Projects</div>
+        <div class="emp-controls">
+            <form asp-action="Index" method="get" class="search-wrap">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search Project" />
+            </form>
+            <a asp-action="Create" class="btn-primary-blue">Add Project</a>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-folder2" style="font-size:48px;color:#C9DAFF"></i>
+            <div class="mt-2" style="font-size:13px">
+                No projects yet. Click Add Project to get started.
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="proj-grid">
+            @foreach (var p in Model)
+            {
+                <div class="proj-folder-card">
+                    <!-- Folder icon — click to view details -->
+                    <a asp-action="Details" asp-route-id="@p.ProjectId"
+                       class="proj-folder-link" title="View Project">
+                        <div class="proj-folder-icon">
+                            <svg width="64" height="54" viewBox="0 0 64 54" fill="none"
+                                 xmlns="http://www.w3.org/2000/svg">
+                                <path d="M0 8C0 3.58 3.58 0 8 0H24L30 8H56C60.42 8 64 11.58 64 16V46C64 50.42 60.42 54 56 54H8C3.58 54 0 50.42 0 46V8Z"
+                                      fill="#C9DAFF" />
+                                <path d="M0 16H64V46C64 50.42 60.42 54 56 54H8C3.58 54 0 50.42 0 46V16Z"
+                                      fill="#A8C4FF" />
+                            </svg>
+                        </div>
+                        <div class="proj-folder-name">@p.ProjectName</div>
+                    </a>                  
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+@section Scripts {
+    <script>
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteProjName').textContent = name;
+            document.getElementById('deleteForm').action = '/Project/Delete/' + id;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+        function closeDeleteModal(e) {
+            if (!e || e.target === document.getElementById('deleteOverlay'))
+                document.getElementById('deleteOverlay').classList.remove('open');
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeDeleteModal();
+        });
+    </script>
+}

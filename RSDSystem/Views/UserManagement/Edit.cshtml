@@ -1,0 +1,216 @@
+﻿@model RSDSystem.Models.User
+@{
+    ViewData["Title"] = "Edit User";
+    var roles = ViewBag.Roles as string[] ?? Array.Empty<string>();
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="Index" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="form-card">
+    <form asp-action="Edit" method="post" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="UserId" value="@Model.UserId" />
+        <input type="hidden" name="IsActive" value="@Model.IsActive.ToString().ToLower()" />
+
+        <div class="edit-layout">
+
+            <!-- LEFT: Photo -->
+            <div class="edit-photo-col">
+                @if (!string.IsNullOrEmpty(Model.PhotoPath))
+                {
+                    <img src="@Model.PhotoPath" class="edit-photo-circle" id="photoPreview" />
+                }
+                else
+                {
+                    <div class="edit-photo-initials" id="photoPreviewPlaceholder">
+                        @Model.FirstName.Substring(0, 1)@Model.LastName.Substring(0, 1)
+                    </div>
+                }
+                <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
+                       onchange="previewPhoto(this)" />
+            </div>
+
+            <!-- RIGHT: Fields -->
+            <div class="edit-fields-col">
+
+                <div class="form-row form-row-3">
+                    <div>
+                        <label class="form-lbl">First Name</label>
+                        <input type="text" name="FirstName" value="@Model.FirstName" class="form-ctrl" required />
+                    </div>
+                    <div>
+                        <label class="form-lbl">Last Name</label>
+                        <input type="text" name="LastName" value="@Model.LastName" class="form-ctrl" required />
+                    </div>
+                    <div>
+                        <label class="form-lbl">M.I</label>
+                        <input type="text" name="MiddleInitial" value="@Model.MiddleInitial"
+                               maxlength="5" class="form-ctrl" />
+                    </div>
+                </div>
+
+                <div class="form-row form-row-3b">
+                    <div>
+                        <label class="form-lbl">Date of Birth</label>
+                        <input type="date" name="DateOfBirth" id="dobInput" class="form-ctrl"
+                               value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")" onchange="calcAge()" />
+                    </div>
+                    <div>
+                        <label class="form-lbl">Age</label>
+                        <input type="text" id="ageInput" class="form-ctrl"
+                               readonly value="@Model.Age" placeholder="—" />
+                    </div>
+                    <div>
+                        <label class="form-lbl">Gender</label>
+                        <select name="Gender" class="form-ctrl">
+                            <option value="">Select</option>
+                            @if (Model.Gender == "Male")
+                            {
+                                <option value="Male" selected>Male</option>
+                                <option value="Female">Female</option>
+                            }
+                            else if (Model.Gender == "Female")
+                            {
+                                <option value="Male">Male</option>
+                                <option value="Female" selected>Female</option>
+                            }
+                            else
+                            {
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row form-row-1">
+                    <div>
+                        <label class="form-lbl">Username</label>
+                        <input type="text" name="Username" value="@Model.Username" class="form-ctrl" required />
+                    </div>
+                </div>
+
+                <div class="form-row form-row-2">
+                    <div>
+                        <label class="form-lbl">New Password <span style="color:#9ab0d8;font-weight:400">(leave blank to keep)</span></label>
+                        <div class="pwd-wrap">
+                            <input type="password" name="NewPassword" id="pwd" class="form-ctrl" />
+                            <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
+                                <i class="bi bi-eye-slash" id="eye1"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-lbl">Confirm Password</label>
+                        <div class="pwd-wrap">
+                            <input type="password" name="ConfirmPassword" id="cpwd" class="form-ctrl" />
+                            <span class="pwd-eye" onclick="togglePwd('cpwd','eye2')">
+                                <i class="bi bi-eye-slash" id="eye2"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row form-row-2">
+                    <div>
+                        <label class="form-lbl">Email</label>
+                        <input type="email" name="Email" value="@Model.Email" class="form-ctrl" />
+                    </div>
+                    <div>
+                        <label class="form-lbl">Contact Number</label>
+                        <input type="text" name="ContactNumber" value="@Model.ContactNumber" class="form-ctrl" />
+                    </div>
+                </div>
+
+                <div class="form-row form-row-1">
+                    <div>
+                        <label class="form-lbl">Address</label>
+                        <input type="text" name="Address" value="@Model.Address" class="form-ctrl"
+                               placeholder="Barangay, Municipality/City, Province" />
+                    </div>
+                </div>
+
+                <div class="form-row form-row-2">
+                    <div>
+                        <label class="form-lbl">Photo</label>
+                        <div class="file-row">
+                            <label class="file-choose-btn" for="photoInput">Choose File</label>
+                            <span class="file-name-lbl" id="fileLabel">
+                                @(string.IsNullOrEmpty(Model.PhotoPath)
+                                                                ? "No File Chosen"
+                                                                : System.IO.Path.GetFileName(Model.PhotoPath))
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-lbl">Role</label>
+                        <select name="Role" class="form-ctrl" required>
+                            <option value="">Select role</option>
+                            @foreach (var r in roles)
+                            {
+                                if (r == Model.Role)
+                                {
+                                    <option value="@r" selected>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
+                                }
+                                else
+                                {
+                                    <option value="@r">@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary-blue-block">Save Changes</button>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function calcAge() {
+            const dob = document.getElementById('dobInput').value;
+            if (!dob) { document.getElementById('ageInput').value = ''; return; }
+            const birth = new Date(dob);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+            document.getElementById('ageInput').value = age >= 0 ? age : '';
+        }
+        function togglePwd(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon  = document.getElementById(iconId);
+            input.type = input.type === 'password' ? 'text' : 'password';
+            icon.className = input.type === 'text' ? 'bi bi-eye' : 'bi bi-eye-slash';
+        }
+        function previewPhoto(input) {
+            document.getElementById('fileLabel').textContent =
+                input.files.length ? input.files[0].name : 'No File Chosen';
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    let img = document.getElementById('photoPreview');
+                    if (!img) {
+                        const ph = document.getElementById('photoPreviewPlaceholder');
+                        img = document.createElement('img');
+                        img.id = 'photoPreview';
+                        img.className = 'edit-photo-circle';
+                        if (ph) ph.replaceWith(img);
+                    }
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+    </script>
+}
