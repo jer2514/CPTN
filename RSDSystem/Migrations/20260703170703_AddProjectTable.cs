@@ -6,61 +6,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace RSDSystem.Migrations
 {
     /// <inheritdoc />
-    public partial class AddProjectMonthlyBudgetsAndEmployeeLink : Migration
+    public partial class AddProjectTable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "Description",
-                table: "Projects");
-
-            migrationBuilder.RenameColumn(
-                name: "StartDate",
-                table: "Projects",
-                newName: "StartingDate");
-
-            migrationBuilder.RenameColumn(
-                name: "EndDate",
-                table: "Projects",
-                newName: "EstimateEndDate");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Status",
-                table: "Projects",
-                type: "nvarchar(max)",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)",
-                oldDefaultValue: "Active");
-
-            migrationBuilder.AddColumn<string>(
-                name: "AssignedPayrollStaff",
-                table: "Projects",
-                type: "nvarchar(150)",
-                maxLength: 150,
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "PayrollBudget",
-                table: "Projects",
-                type: "decimal(18,2)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "PayrollDistribution",
-                table: "Projects",
-                type: "nvarchar(50)",
-                maxLength: 50,
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "TypeOfService",
-                table: "Projects",
-                type: "nvarchar(150)",
-                maxLength: 150,
-                nullable: true);
-
             migrationBuilder.AddColumn<decimal>(
                 name: "DailyRate",
                 table: "Employees",
@@ -82,13 +32,35 @@ namespace RSDSystem.Migrations
                 nullable: true);
 
             migrationBuilder.CreateTable(
+                name: "Projects",
+                columns: table => new
+                {
+                    ProjectId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ProjectName = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Location = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: true),
+                    TypeOfService = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
+                    StartingDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    EstimateEndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    PayrollBudget = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
+                    PayrollDistribution = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    AssignedPayrollStaff = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Projects", x => x.ProjectId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ProjectMonthlyBudgets",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ProjectId = table.Column<int>(type: "int", nullable: false),
-                    MonthYear = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    MonthYear = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
                     MonthDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
                 },
@@ -132,25 +104,12 @@ namespace RSDSystem.Migrations
             migrationBuilder.DropTable(
                 name: "ProjectMonthlyBudgets");
 
+            migrationBuilder.DropTable(
+                name: "Projects");
+
             migrationBuilder.DropIndex(
                 name: "IX_Employees_ProjectId",
                 table: "Employees");
-
-            migrationBuilder.DropColumn(
-                name: "AssignedPayrollStaff",
-                table: "Projects");
-
-            migrationBuilder.DropColumn(
-                name: "PayrollBudget",
-                table: "Projects");
-
-            migrationBuilder.DropColumn(
-                name: "PayrollDistribution",
-                table: "Projects");
-
-            migrationBuilder.DropColumn(
-                name: "TypeOfService",
-                table: "Projects");
 
             migrationBuilder.DropColumn(
                 name: "DailyRate",
@@ -163,32 +122,6 @@ namespace RSDSystem.Migrations
             migrationBuilder.DropColumn(
                 name: "ProjectId",
                 table: "Employees");
-
-            migrationBuilder.RenameColumn(
-                name: "StartingDate",
-                table: "Projects",
-                newName: "StartDate");
-
-            migrationBuilder.RenameColumn(
-                name: "EstimateEndDate",
-                table: "Projects",
-                newName: "EndDate");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Status",
-                table: "Projects",
-                type: "nvarchar(max)",
-                nullable: false,
-                defaultValue: "Active",
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
-
-            migrationBuilder.AddColumn<string>(
-                name: "Description",
-                table: "Projects",
-                type: "nvarchar(500)",
-                maxLength: 500,
-                nullable: true);
         }
     }
 }
