@@ -67,8 +67,8 @@
                     <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
                 </th>
                 <th>User</th>
-                <th>Role</th>
-                <th>Email</th>
+                <th>Job</th>
+                <th>Assigned to</th>
                 <th>Status</th>
                 <th>
                     <div>
@@ -115,7 +115,32 @@
                         </div>
                     </td>
                     <td>@emp.JobClassification</td>
-                    <td>—</td>
+                    <td>@emp.Project?.ProjectName</td>
+                    <form asp-action="ToggleStatus" asp-route-id="@emp.EmployeeId" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        @if (emp.IsActive)
+                        {
+                            <button type="submit" class="status-toggle-btn status-toggle-inactive" title="Set Inactive">
+                                <i class="bi bi-toggle-on"></i>
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="submit" class="status-toggle-btn status-toggle-active" title="Set Active">
+                                <i class="bi bi-toggle-off"></i>
+                            </button>
+                        }
+                    </form>
+                    <td>
+                        @if (emp.IsActive)
+                        {
+                            <span class="badge-active">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge-inactive">Inactive</span>
+                        }
+                    </td>
                     <td><span class="badge-active">Active</span></td>
                     <td>
                         <div class="action-cell">

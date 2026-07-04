@@ -43,10 +43,10 @@ namespace RSDSystem.Models
         [Required]
         public string PasswordHash { get; set; } = string.Empty;
 
-        [MaxLength(100)]
+        [Required, MaxLength(100)]
         public string? Email { get; set; }
 
-        [MaxLength(20)]
+        [Required, MaxLength(20)]
         [Display(Name = "Contact Number")]
         public string? ContactNumber { get; set; }
 

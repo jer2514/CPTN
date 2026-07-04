@@ -191,5 +191,22 @@ namespace RSDSystem.Controllers
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
+
+        // POST /UserManagement/ToggleStatus/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleStatus(int id)
+        {
+            var user = await _db.Users.FindAsync(id);
+            if (user != null)
+            {
+                user.IsActive = !user.IsActive;
+                await _db.SaveChangesAsync();
+                TempData["Success"] = user.IsActive
+                    ? $"{user.FullName} is now Active."
+                    : $"{user.FullName} is now Inactive.";
+            }
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

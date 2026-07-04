@@ -229,8 +229,8 @@
         }
 
         function openDeleteModal(id, name) {
-            document.getElementById('deleteEmpName').textContent = name;
-            document.getElementById('deleteForm').action = '/Employee/Delete/' + id;
+            document.getElementById('deleteUserName').textContent = name;
+            document.getElementById('deleteForm').action = '/UserManagement/Delete/' + id;
             document.getElementById('deleteOverlay').classList.add('open');
         }
 
