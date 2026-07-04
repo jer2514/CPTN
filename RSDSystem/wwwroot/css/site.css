@@ -133,26 +133,27 @@ body {
 .content-topbar {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 55px;
+    margin-top: 20px;
+    margin-bottom:35px;
 }
 
 .bell-btn {
-    width: 40px;
-    height: 40px;
+    width: 45px;
+    height: 45px;
     border-radius: 50%;
-    background: #266DF1;
-    color: #fff;
+    background: #fff;
+    color: #266DF1;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 17px;
+    font-size: 19px;
     border: none;
     cursor: pointer;
     flex-shrink: 0;
 }
 
     .bell-btn:hover {
-        background: #1B52BD;
+        background: #e5e5e5;
     }
 
 /* ── White card (used in all pages) ─────────────────────── */
@@ -176,6 +177,8 @@ body {
     color: #163F8B;
     text-decoration: none;
     margin-bottom: 18px;
+    position:sticky;
+    position: -webkit-sticky;
 }
 
     .btn-back:hover {
@@ -242,6 +245,7 @@ body {
 
     .btn-outline-blue:hover {
         background: #1B52BD;
+        color: #fff
     }
 
 /* ── Employee list card head ─────────────────────────────── */
