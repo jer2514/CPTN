@@ -64,7 +64,7 @@
                 <th>Email</th>
                 <th>Status</th>
                 <th>
-                    <div style="display:flex;align-items:center;gap:5px;justify-content:space-evenly">
+                    <div>
                         <span>Action</span>
                         <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
                             @Html.AntiForgeryToken()
@@ -120,14 +120,16 @@
                         }
                     </td>
                     <td>
-                        <a asp-action="Edit" asp-route-id="@u.UserId"
-                           class="action-btn action-edit" title="Edit">
-                            <i class="bi bi-pencil-fill"></i>
-                        </a>
-                        <button type="button" class="action-btn action-delete" title="Delete"
-                                onclick="openDeleteModal(@u.UserId, '@u.FullName')">
-                            <i class="bi bi-trash-fill"></i>
-                        </button>
+                        <div class="action-cell">
+                            <a asp-action="Edit" asp-route-id="@u.UserId"
+                               class="action-btn action-edit" title="Edit">
+                                <i class="bi bi-pencil-fill"></i>
+                            </a>
+                            <button type="button" class="action-btn action-delete" title="Delete"
+                                    onclick="openDeleteModal(@u.UserId, '@u.FullName')">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
                     </td>
                     
                 </tr>
@@ -137,7 +139,7 @@
 </div>
 
 <!-- Delete Overlay -->
-<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(event)">
+<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
     <div class="del-modal">
         <div class="del-icon-wrap">
             <i class="bi bi-exclamation-triangle-fill del-icon"></i>
@@ -160,7 +162,7 @@
 
 
 <!-- Bulk Delete Overlay -->
-<div class="del-overlay" id="bulkDeleteOverlay" onclick="closeBulkDeleteModal(event)">
+<div class="del-overlay" id="bulkDeleteOverlay" onclick="closeBulkDeleteModal(arguments[0])">
     <div class="del-modal">
         <div class="del-icon-wrap">
             <i class="bi bi-exclamation-triangle-fill del-icon"></i>
