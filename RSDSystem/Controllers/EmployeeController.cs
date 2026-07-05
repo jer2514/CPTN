@@ -97,7 +97,7 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Edit(int id)
         {
             var emp = await _db.Employees.FindAsync(id);
-            if (emp == null) return NotFound();
+            if (emp == null) return View("EmployeeNotFound");
 
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
@@ -212,7 +212,7 @@ namespace RSDSystem.Controllers
                 emp.IsActive = !emp.IsActive;
                 await _db.SaveChangesAsync();
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Edit", new { id });
         }
     }
 }

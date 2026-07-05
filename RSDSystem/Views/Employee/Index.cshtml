@@ -116,7 +116,16 @@
                     </td>
                     <td>@emp.JobClassification</td>
                     <td>@emp.Project?.ProjectName</td>
-                    <td><span class="badge-active">Active</span></td>
+                    <td>
+                        @if (emp.IsActive)
+                        {
+                            <span class="badge-active">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge-inactive">Inactive</span>
+                        }
+                    </td>
                     <td>
                         <div class="action-cell">
                             <a asp-action="Edit" asp-route-id="@emp.EmployeeId"
