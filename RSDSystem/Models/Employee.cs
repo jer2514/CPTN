@@ -17,7 +17,7 @@ namespace RSDSystem.Models
         [Display(Name = "Last Name")]
         public string LastName { get; set; } = string.Empty;
 
-        [MaxLength(5)]
+        [MaxLength(2)]
         [Display(Name = "M.I.")]
         public string? MiddleInitial { get; set; }
 
@@ -41,10 +41,10 @@ namespace RSDSystem.Models
         [Display(Name = "Address")]
         public string? Address { get; set; }
 
-        [MaxLength(100), EmailAddress]
+        [Required, MaxLength(100), EmailAddress]
         public string? Email { get; set; }
 
-        [MaxLength(20)]
+        [Required, MaxLength(20)]
         [Display(Name = "Contact Number")]
         public string? ContactNumber { get; set; }
 
@@ -55,7 +55,6 @@ namespace RSDSystem.Models
         [Display(Name = "Job Classification")]
         public string JobClassification { get; set; } = string.Empty;
 
-        // ── New fields ──────────────────────────────────────
         [Column(TypeName = "decimal(10,2)")]
         [Display(Name = "Daily Rate")]
         public decimal DailyRate { get; set; } = 0;

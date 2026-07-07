@@ -12,8 +12,8 @@ using RSDSystem.Models;
 namespace RSDSystem.Migrations
 {
     [DbContext(typeof(PayrollDbContext))]
-    [Migration("20260701024619_AddProjectMonthlyBudgetsAndEmployeeLink")]
-    partial class AddProjectMonthlyBudgetsAndEmployeeLink
+    [Migration("20260703170703_AddProjectTable")]
+    partial class AddProjectTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,35 +24,6 @@ namespace RSDSystem.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("ProjectMonthlyBudget", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("MonthDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("MonthYear")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("ProjectMonthlyBudgets");
-                });
 
             modelBuilder.Entity("RSDSystem.Models.Employee", b =>
                 {
@@ -169,6 +140,35 @@ namespace RSDSystem.Migrations
                     b.ToTable("Projects");
                 });
 
+            modelBuilder.Entity("RSDSystem.Models.ProjectMonthlyBudget", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("MonthDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MonthYear")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("ProjectMonthlyBudgets");
+                });
+
             modelBuilder.Entity("RSDSystem.Models.User", b =>
                 {
                     b.Property<int>("UserId")
@@ -237,23 +237,23 @@ namespace RSDSystem.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("ProjectMonthlyBudget", b =>
-                {
-                    b.HasOne("RSDSystem.Models.Project", "Project")
-                        .WithMany("MonthlyBudgets")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
             modelBuilder.Entity("RSDSystem.Models.Employee", b =>
                 {
                     b.HasOne("RSDSystem.Models.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("RSDSystem.Models.ProjectMonthlyBudget", b =>
+                {
+                    b.HasOne("RSDSystem.Models.Project", "Project")
+                        .WithMany("MonthlyBudgets")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Project");
                 });

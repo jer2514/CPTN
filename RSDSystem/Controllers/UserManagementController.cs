@@ -21,16 +21,20 @@ namespace RSDSystem.Controllers
         // GET /UserManagement
         public async Task<IActionResult> Index(string? search, string? sortBy)
         {
-            var query = _db.Users.AsQueryable();
+            var query = _db.Users
+                           .Where(u => u.FirstName != null &&
+                                        u.LastName != null &&
+                                        u.Role != null)
+                           .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var s = search.Trim();
                 query = query.Where(u =>
-                    u.FirstName.Contains(s) ||
-                    u.LastName.Contains(s) ||
+                    (u.FirstName != null && u.FirstName.Contains(s)) ||
+                    (u.LastName != null && u.LastName.Contains(s)) ||
                     (u.Email != null && u.Email.Contains(s)) ||
-                    u.Role.Contains(s));
+                    (u.Role != null && u.Role.Contains(s)));
             }
 
             query = sortBy switch
@@ -189,6 +193,19 @@ namespace RSDSystem.Controllers
 
             _db.Employees.RemoveRange(employees);
             await _db.SaveChangesAsync();
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleStatus(int id)
+        {
+            var user = await _db.Users.FindAsync(id);
+            if (user != null)
+            {
+                user.IsActive = !user.IsActive;
+                await _db.SaveChangesAsync();
+            }
             return RedirectToAction(nameof(Index));
         }
     }
