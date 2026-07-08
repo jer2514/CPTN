@@ -35,7 +35,26 @@
                 }
                 <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
                        onchange="previewPhoto(this)" />
+
+                <!-- Status toggle button -->
+                <form asp-controller="UserManagement" asp-action="ToggleStatus"
+                      asp-route-id="@Model.UserId" method="post" class="mt-2">
+                    @Html.AntiForgeryToken()
+                    @if (Model.IsActive)
+                    {
+                        <button type="submit" class="status-toggle-btn status-toggle-inactive">
+                            <i class="bi bi-toggle-on"></i> Active
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="status-toggle-btn status-toggle-active">
+                            <i class="bi bi-toggle-off"></i> Inactive
+                        </button>
+                    }
+                </form>
             </div>
+            
 
             <!-- RIGHT: Fields -->
             <div class="edit-fields-col">

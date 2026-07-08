@@ -25,7 +25,9 @@ namespace RSDSystem.Controllers
         // GET /Employee
         public async Task<IActionResult> Index(string? search, string? sortBy)
         {
-            var query = _db.Employees.AsQueryable();
+            var query = _db.Employees
+                           .Include(e => e.Project)
+                           .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -95,7 +97,7 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Edit(int id)
         {
             var emp = await _db.Employees.FindAsync(id);
-            if (emp == null) return NotFound();
+            if (emp == null) return View("EmployeeNotFound");
 
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
@@ -196,6 +198,21 @@ namespace RSDSystem.Controllers
             _db.Employees.RemoveRange(employees);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
+
+        }
+
+        // POST /UserManagement/ToggleStatus/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleStatus(int id)
+        {
+            var emp = await _db.Employees.FindAsync(id);
+            if (emp != null)
+            {
+                emp.IsActive = !emp.IsActive;
+                await _db.SaveChangesAsync();
+            }
+            return RedirectToAction("Edit", new { id });
         }
     }
 }
