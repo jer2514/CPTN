@@ -19,6 +19,7 @@ namespace RSDSystem.Controllers
             ViewBag.DistributionOptions = PayrollDistributionOptions.All;
             ViewBag.PayrollStaffList = _db.Users
                                               .Where(u => u.Role == "PayrollStaff" && u.IsActive)
+                                              .AsEnumerable()
                                               .Select(u => u.FullName)
                                               .ToList();
         }

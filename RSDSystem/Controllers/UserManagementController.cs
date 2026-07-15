@@ -187,11 +187,11 @@ namespace RSDSystem.Controllers
             if (selectedIds == null || selectedIds.Count == 0)
                 return RedirectToAction(nameof(Index));
 
-            var employees = _db.Employees
-                               .Where(e => selectedIds.Contains(e.EmployeeId))
-                               .ToList();
+            var users = _db.Users
+                           .Where(u => selectedIds.Contains(u.UserId))
+                           .ToList();
 
-            _db.Employees.RemoveRange(employees);
+            _db.Users.RemoveRange(users);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
