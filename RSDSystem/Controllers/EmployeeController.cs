@@ -212,7 +212,7 @@ namespace RSDSystem.Controllers
                 emp.IsActive = !emp.IsActive;
                 await _db.SaveChangesAsync();
             }
-            return RedirectToAction("Edit", new { id });
+            return RedirectToAction(nameof(Index));
         }
     }
 }

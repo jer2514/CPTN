@@ -36,22 +36,22 @@
                 <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
                        onchange="previewPhoto(this)" />
 
-                <form asp-controller="Employee" asp-action="ToggleStatus"
-                      asp-route-id="@Model.EmployeeId" method="post" class="mt-2">
-                    @Html.AntiForgeryToken()
-                    @if (Model.IsActive)
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-inactive">
-                            <i class="bi bi-toggle-on"></i> Active
-                        </button>
-                    }
-                    else
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-active">
-                            <i class="bi bi-toggle-off"></i> Inactive
-                        </button>
-                    }
-                </form>
+                @if (Model.IsActive)
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-inactive"
+                            onclick="toggleEmployeeStatus(@Model.EmployeeId)">
+                        <i class="bi bi-toggle-on"></i> Active
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-active"
+                            onclick="toggleEmployeeStatus(@Model.EmployeeId)">
+                        <i class="bi bi-toggle-off"></i> Inactive
+                    </button>
+                }
+
+               
             </div>
 
             <!-- RIGHT: All form fields -->
@@ -193,6 +193,11 @@
         </div><!-- end edit-layout -->
 
     </form>
+
+    <!-- Hidden form for toggle submission -->
+    <form id="toggleStatusForm" method="post" style="display: none;">
+        @Html.AntiForgeryToken()
+    </form>
 </div>
 
 @section Scripts {
@@ -227,6 +232,12 @@
                 };
                 reader.readAsDataURL(input.files[0]);
             }
+        }
+
+        function toggleEmployeeStatus(employeeId) {
+            const form = document.getElementById('toggleStatusForm');
+            form.action = '/Employee/ToggleStatus/' + employeeId;
+            form.submit();
         }
     </script>
 }

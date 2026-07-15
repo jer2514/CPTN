@@ -140,7 +140,7 @@ namespace RSDSystem.Controllers
             existing.ContactNumber = user.ContactNumber;
             existing.Address = user.Address;
             existing.Role = user.Role;
-            existing.IsActive = user.IsActive;
+            //existing.IsActive = user.IsActive;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
                 existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);

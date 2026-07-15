@@ -17,7 +17,7 @@
     <form asp-action="Edit" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
         <input type="hidden" name="UserId" value="@Model.UserId" />
-        <input type="hidden" name="IsActive" value="@Model.IsActive.ToString().ToLower()" />
+
 
         <div class="edit-layout">
 
@@ -37,24 +37,22 @@
                        onchange="previewPhoto(this)" />
 
                 <!-- Status toggle button -->
-                <form asp-controller="UserManagement" asp-action="ToggleStatus"
-                      asp-route-id="@Model.UserId" method="post" class="mt-2">
-                    @Html.AntiForgeryToken()
-                    @if (Model.IsActive)
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-inactive">
-                            <i class="bi bi-toggle-on"></i> Active
-                        </button>
-                    }
-                    else
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-active">
-                            <i class="bi bi-toggle-off"></i> Inactive
-                        </button>
-                    }
-                </form>
+                @if (Model.IsActive)
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-inactive"
+                            onclick="toggleUserStatus(@Model.UserId)">
+                        <i class="bi bi-toggle-on"></i> Active
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-active"
+                            onclick="toggleUserStatus(@Model.UserId)">
+                        <i class="bi bi-toggle-off"></i> Inactive
+                    </button>
+                }
             </div>
-            
+
 
             <!-- RIGHT: Fields -->
             <div class="edit-fields-col">
@@ -192,6 +190,11 @@
             </div>
         </div>
     </form>
+
+    <!-- Hidden form for toggle submission -->
+    <form id="toggleStatusForm" method="post" style="display: none;">
+        @Html.AntiForgeryToken()
+    </form>
 </div>
 
 @section Scripts {
@@ -230,6 +233,12 @@
                 };
                 reader.readAsDataURL(input.files[0]);
             }
+        }
+
+        function toggleUserStatus(userId) {
+            const form = document.getElementById('toggleStatusForm');
+            form.action = '/UserManagement/ToggleStatus/' + userId;
+            form.submit();
         }
     </script>
 }
