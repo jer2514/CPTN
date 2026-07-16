@@ -1,4 +1,4 @@
-﻿@model RSDSystem.Models.Project
+@model RSDSystem.Models.Project
 @{
     ViewData["Title"] = "Edit Project";
     var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();
@@ -145,8 +145,8 @@
             </div>
         </div>
 
-        <!-- Assigned to Payroll Staff -->
-        <div class="form-row form-row-1">
+        <!-- Assigned to Payroll Staff | Status -->
+        <div class="form-row form-row-2">
             <div>
                 <label class="form-lbl">Assigned to Payroll Staff</label>
                 <select name="AssignedPayrollStaff" class="form-ctrl">
@@ -162,6 +162,15 @@
                             <option value="@staff">@staff</option>
                         }
                     }
+                </select>
+            </div>
+            <div>
+                <label class="form-lbl">Status</label>
+                <select name="Status" class="form-ctrl">
+                    <option value="Active" selected="@(Model.Status == "Active")">Active</option>
+                    <option value="Completed" selected="@(Model.Status == "Completed")">Completed</option>
+                    <option value="On Hold" selected="@(Model.Status == "On Hold")">On Hold</option>
+                    <option value="Cancelled" selected="@(Model.Status == "Cancelled")">Cancelled</option>
                 </select>
             </div>
         </div>
@@ -215,15 +224,10 @@
                                    class="action-btn action-edit" title="Edit">
                                     <i class="bi bi-pencil-fill"></i>
                                 </a>
-                                <form asp-action="RemoveEmployee" method="post" class="d-inline"
-                                      onsubmit="return confirm('Remove this employee from project?')">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="employeeId" value="@emp.EmployeeId" />
-                                    <input type="hidden" name="projectId" value="@Model.ProjectId" />
-                                    <button type="submit" class="action-btn action-delete" title="Remove">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="action-btn action-delete" title="Remove"
+                                        onclick="removeEmployee(@emp.EmployeeId)">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
                             </td>
                         </tr>
                     }
@@ -232,6 +236,13 @@
         </div>
 
         <button type="submit" class="btn-primary-blue-block mt-3">Save Changes</button>
+    </form>
+
+    <!-- Hidden form for employee removal to avoid nested form issue -->
+    <form id="removeEmployeeForm" asp-action="RemoveEmployee" method="post" style="display:none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="employeeId" id="removeEmpId" />
+        <input type="hidden" name="projectId" value="@Model.ProjectId" />
     </form>
 </div>
 
@@ -287,6 +298,13 @@
 
         function confirmBudget() {
             alert('Monthly budget updated. It will be submitted with the project.');
+        }
+
+        function removeEmployee(id) {
+            if (confirm('Remove this employee from project?')) {
+                document.getElementById('removeEmpId').value = id;
+                document.getElementById('removeEmployeeForm').submit();
+            }
         }
     </script>
 }
