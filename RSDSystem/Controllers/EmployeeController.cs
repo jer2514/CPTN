@@ -214,5 +214,11 @@ namespace RSDSystem.Controllers
             }
             return RedirectToAction(nameof(Index));
         }
+
+        public IActionResult Logout()
+        {
+            // TODO: clear auth/session once login is implemented
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

@@ -42,11 +42,14 @@ namespace RSDSystem.Models
 
         public string Status { get; set; } = "Active";
 
+        public bool TaskCompleted { get; set; } = false;   // ← new, drives "Mark as Done"
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // Navigation
         public ICollection<ProjectMonthlyBudget> MonthlyBudgets { get; set; }
             = new List<ProjectMonthlyBudget>();
+
     }
 
     public class ProjectMonthlyBudget

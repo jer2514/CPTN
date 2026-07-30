@@ -27,7 +27,7 @@ Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration
 
 var app = builder.Build();
 
-// Seed demo user so you can login from any device
+// Seed demo users so you can login from any device
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -45,9 +45,11 @@ using (var scope = app.Services.CreateScope())
             // ignore migration errors in local dev if DB unavailable
         }
 
+        var toAdd = new List<User>();
+
         if (!db.Users.Any(u => u.Username == "demo"))
         {
-            var demoUser = new User
+            toAdd.Add(new User
             {
                 FirstName = "Demo",
                 LastName = "User",
@@ -59,10 +61,31 @@ using (var scope = app.Services.CreateScope())
                 Role = "Admin",
                 IsActive = true,
                 CreatedAt = DateTime.Now
-            };
+            });
+        }
 
-            db.Users.Add(demoUser);
+        if (!db.Users.Any(u => u.Username == "payroll"))
+        {
+            toAdd.Add(new User
+            {
+                FirstName = "Payroll",
+                LastName = "Staff",
+                Username = "payroll",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Payroll@123"),
+                Email = "payroll@example.com",
+                ContactNumber = "0000000000",
+                Address = "Payroll demo account",
+                Role = "PayrollStaff",
+                IsActive = true,
+                CreatedAt = DateTime.Now
+            });
+        }
+
+        if (toAdd.Count > 0)
+        {
+            db.Users.AddRange(toAdd);
             db.SaveChanges();
+            Console.WriteLine($"Seeded {toAdd.Count} demo user(s).");
         }
     }
     catch (Exception ex)
