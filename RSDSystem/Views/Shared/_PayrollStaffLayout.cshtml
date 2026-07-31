@@ -9,6 +9,17 @@
     <link href="~/css/site.css" rel="stylesheet" />
 </head>
 <body>
+
+    @{
+        var fullName = Context.Session.GetString("FullName") ?? "Guest";
+        var role = Context.Session.GetString("Role");
+        var photo = Context.Session.GetString("PhotoPath");
+        var displayRole = role == "PayrollStaff" ? "Payroll Staff" : (role ?? "Not logged in");
+        var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2)
+        .Select(w => char.ToUpper(w[0])));
+    }
+
     <div class="app-layout">
 
         <aside class="sidebar">
@@ -44,19 +55,29 @@
                         <li><a href="#">Attendance Records</a></li>
                     </ul>
                 </li>
+
+                <li>
+                    <a asp-controller="Account" asp-action="Logout">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </a>
+                </li>
             </ul>
 
-            <div class="menu-logout">
-                <a asp-controller="Home" asp-action="Logout">
-                    <i class="bi bi-box-arrow-right"></i> Logout
-                </a>
-            </div>
+
 
             <div class="profile-card">
-                <img src="~/images/user.jpg" alt="User">
+                @if (!string.IsNullOrEmpty(photo))
+                {
+                    <img src="@photo" alt="User">
+                }
+                else
+                {
+                    <span class="profile-avatar-initials">@initials</span>
+                }
+
                 <div>
-                    <div class="user-name">Patrick Bateman</div>
-                    <div class="user-role">Payroll Staff</div>
+                    <div class="user-name">@fullName</div>
+                    <div class="user-role">@displayRole</div>
                 </div>
             </div>
         </aside>

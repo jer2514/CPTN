@@ -26,7 +26,7 @@ builder.Services.AddDbContext<PayrollDbContext>(options =>
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.IdleTimeout = TimeSpan.FromMinutes(60);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
 });
@@ -44,14 +44,14 @@ using (var scope = app.Services.CreateScope())
         var db = services.GetRequiredService<PayrollDbContext>();
 
         // Optional: apply migrations automatically in development - remove for production deployments
-        try
-        {
-            db.Database.Migrate();
-        }
-        catch
-        {
-            // ignore migration errors in local dev if DB unavailable
-        }
+        //try
+        //{
+        //    db.Database.Migrate();
+        //}
+        //catch
+        //{
+        //    // ignore migration errors in local dev if DB unavailable
+        //}
 
         var toAdd = new List<User>();
 

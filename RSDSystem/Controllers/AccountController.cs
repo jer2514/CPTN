@@ -36,25 +36,12 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string Username, string Password, string? returnUrl)
         {
-            if (Username == "admin" && Password == "Admin@123")
-            {
-                SignIn(0, "Louis Bloom", "Admin");
-                return RedirectToAction("Index", "Home");
-            }
-
-            if (Username == "payroll.staff" && Password == "Staff@123")
-            {
-                SignIn(0, "Patrick Bateman", "PayrollStaff");
-                return RedirectToAction("Index", "PayrollStaff");
-            }
-
-            // Database authentication
             var user = await _db.Users
                                 .FirstOrDefaultAsync(u => u.Username == Username && u.IsActive);
 
             if (user != null && BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
             {
-                SignIn(user.UserId, user.FullName, user.Role);
+                SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
                 return user.Role == "Admin"
                     ? RedirectToAction("Index", "Home")
                     : RedirectToAction("Index", "PayrollStaff");
@@ -64,19 +51,31 @@ namespace RSDSystem.Controllers
             return View();
         }
 
-        private void SignIn(int userId, string fullName, string role)
+        private void SignIn(int userId, string fullName, string role, string? photoPath)
         {
             HttpContext.Session.SetString("UserId", userId.ToString());
             HttpContext.Session.SetString("FullName", fullName);
             HttpContext.Session.SetString("Role", role);
+
+            if (!string.IsNullOrEmpty(photoPath))
+                HttpContext.Session.SetString("PhotoPath", photoPath);
+            else
+                HttpContext.Session.Remove("PhotoPath");
         }
-        
+
 
         // GET: /Account/Logout
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
+            // Sign out the cookie authentication and clear session data.
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            HttpContext.Session.Clear();
+
+            // Optional: show a message after logout
+            TempData["Success"] = "You have been logged out.";
+
+            // Redirect to the login page if you have one, otherwise to Home/Index.
             return RedirectToAction("Login", "Account");
         }
     }

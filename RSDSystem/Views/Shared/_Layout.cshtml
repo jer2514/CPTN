@@ -74,14 +74,29 @@
             </ul>
 
             <div class="profile-card">
+                @{
+                    var fullName = Context.Session.GetString("FullName") ?? "Guest";
+                    var role = Context.Session.GetString("Role");
+                    var photo = Context.Session.GetString("PhotoPath");
+                    var displayRole = role == "PayrollStaff" ? "Payroll Staff" : (role ?? "Not logged in");
+                    var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Take(2)
+                    .Select(w => char.ToUpper(w[0])));
+                }
 
-                <img src="~/images/user.jpg" alt="User">
+                @if (!string.IsNullOrEmpty(photo))
+                {
+                    <img src="@photo" alt="User">
+                }
+                else
+                {
+                    <span class="profile-avatar-initials">@initials</span>
+                }
 
                 <div>
-                    <div class="user-name">Louis Bloom</div>
-                    <div class="user-role">Admin</div>
+                    <div class="user-name">@fullName</div>
+                    <div class="user-role">@displayRole</div>
                 </div>
-
             </div>
 
         </aside>
@@ -96,6 +111,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
-
+    @await Html.PartialAsync("_ProfileCard")
 </body>
 </html>
