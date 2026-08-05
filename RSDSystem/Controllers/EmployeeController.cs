@@ -214,5 +214,27 @@ namespace RSDSystem.Controllers
             }
             return RedirectToAction(nameof(Index));
         }
+
+        // POST /Employee/ToggleStatusAjax/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleStatusAjax(int id)
+        {
+            var emp = await _db.Employees.FindAsync(id);
+            if (emp == null)
+                return Json(new { success = false, message = "Employee not found." });
+
+            emp.IsActive = !emp.IsActive;
+            await _db.SaveChangesAsync();
+
+            return Json(new { success = true, isActive = emp.IsActive });
+        }
+
+
+        public IActionResult Logout()
+        {
+            // TODO: clear auth/session once login is implemented
+            return RedirectToAction(nameof(Index));
+        }
     }
 }

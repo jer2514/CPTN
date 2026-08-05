@@ -55,6 +55,7 @@ namespace RSDSystem.Models
         [Display(Name = "Job Classification")]
         public string JobClassification { get; set; } = string.Empty;
 
+
         [Column(TypeName = "decimal(10,2)")]
         [Display(Name = "Daily Rate")]
         public decimal DailyRate { get; set; } = 0;
