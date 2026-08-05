@@ -107,11 +107,10 @@ namespace RSDSystem.Controllers
             return View(user);
         }
 
-        // POST /UserManagement/Edit
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(User user, string? NewPassword,
-            string? ConfirmPassword, IFormFile? photo)
+    string? ConfirmPassword, IFormFile? photo)
         {
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
@@ -140,7 +139,6 @@ namespace RSDSystem.Controllers
             existing.ContactNumber = user.ContactNumber;
             existing.Address = user.Address;
             existing.Role = user.Role;
-            //existing.IsActive = user.IsActive;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
                 existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
@@ -149,6 +147,21 @@ namespace RSDSystem.Controllers
                 existing.PhotoPath = await SavePhotoAsync(photo);
 
             await _db.SaveChangesAsync();
+
+            // If the account being edited is the one currently logged in,
+            // refresh Session so the sidebar reflects the change immediately.
+            var sessionUserId = HttpContext.Session.GetString("UserId");
+            if (sessionUserId == existing.UserId.ToString())
+            {
+                HttpContext.Session.SetString("FullName", existing.FullName);
+                HttpContext.Session.SetString("Role", existing.Role);
+
+                if (!string.IsNullOrEmpty(existing.PhotoPath))
+                    HttpContext.Session.SetString("PhotoPath", existing.PhotoPath);
+                else
+                    HttpContext.Session.Remove("PhotoPath");
+            }
+
             TempData["Success"] = "User updated successfully.";
             return RedirectToAction(nameof(Index));
         }

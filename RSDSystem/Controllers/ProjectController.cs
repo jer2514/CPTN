@@ -47,8 +47,8 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Details(int id)
         {
             var project = await _db.Projects
-                                   .Include(p => p.MonthlyBudgets)
-                                   .FirstOrDefaultAsync(p => p.ProjectId == id);
+                           .Include(p => p.MonthlyBudgets)
+                           .FirstOrDefaultAsync(p => p.ProjectId == id);
 
             if (project == null) return NotFound();
 
@@ -56,7 +56,13 @@ namespace RSDSystem.Controllers
                                      .Where(e => e.ProjectId == id)
                                      .ToListAsync();
 
+            var unassignedEmployees = await _db.Employees
+                                     .Where(e => e.ProjectId == null)
+                                     .OrderBy(e => e.FirstName)
+                                     .ToListAsync();
+
             ViewBag.Employees = employees;
+            ViewBag.UnassignedEmployees = unassignedEmployees;
             ViewBag.PageTitle = "View Project";
             return View(project);
         }
@@ -207,6 +213,57 @@ namespace RSDSystem.Controllers
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Edit), new { id = projectId });
+        }
+
+
+        // POST /Project/AssignEmployee
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AssignEmployee(int employeeId, int projectId)
+        {
+            var emp = await _db.Employees.FindAsync(employeeId);
+            if (emp == null)
+                return Json(new { success = false, message = "Employee not found." });
+
+            emp.ProjectId = projectId;
+            await _db.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                employee = new
+                {
+                    id = emp.EmployeeId,
+                    name = emp.FullName,
+                    job = emp.JobClassification,
+                    rate = emp.DailyRate.ToString("N2"),
+                    status = emp.IsActive ? "Active" : "Inactive"
+                }
+            });
+        }
+
+        // POST /Project/RemoveEmployeeAjax
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveEmployeeAjax(int employeeId, int projectId)
+        {
+            var emp = await _db.Employees.FindAsync(employeeId);
+            if (emp == null)
+                return Json(new { success = false, message = "Employee not found." });
+
+            emp.ProjectId = null;
+            await _db.SaveChangesAsync();
+
+            return Json(new
+            {
+                success = true,
+                employee = new
+                {
+                    id = emp.EmployeeId,
+                    name = emp.FullName,
+                    job = emp.JobClassification
+                }
+            });
         }
     }
 }

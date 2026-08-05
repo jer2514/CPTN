@@ -101,6 +101,21 @@ body {
         border: 2px solid #266DF1;
     }
 
+.profile-avatar-initials {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: #C9DAFF;
+    color: #163F8B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    border: 2px solid #266DF1;
+    flex-shrink: 0;
+}
+
 .user-name {
     font-weight: 600;
     font-size: 13px;
@@ -1177,3 +1192,307 @@ select.form-ctrl {
     font-size: 12px;
     color: #6b87c0;
 }
+
+/* ── Assigned Employees action buttons ─────────────────── */
+.emp-action-btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+/* ── Wide overlay modal (employee lists) ─────────────────── */
+.emp-modal {
+    width: 640px;
+    max-width: 94vw;
+    max-height: 82vh;
+    overflow-y: auto;
+    text-align: left;
+    padding: 28px 30px 30px;
+}
+
+.emp-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.emp-modal-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #000;
+}
+
+/* Close button — circular, top-right of header row */
+.emp-modal-close {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    background: #EEF3FF;
+    color: #266DF1;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    flex-shrink: 0;
+}
+
+    .emp-modal-close:hover {
+        background: #e53935;
+        color: #fff;
+    }
+
+.emp-search {
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+    .emp-search input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+/* ── Employee tables inside modal — fixed layout so columns fit ── */
+.emp-table-view,
+.emp-table-add {
+    table-layout: fixed;
+    width: 100%;
+}
+
+    .emp-table-view td,
+    .emp-table-view th,
+    .emp-table-add td,
+    .emp-table-add th {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .emp-table-view th:nth-child(1),
+        .emp-table-view td:nth-child(1) {
+            width: 34%;
+        }
+
+        .emp-table-view th:nth-child(2),
+        .emp-table-view td:nth-child(2) {
+            width: 24%;
+        }
+
+        .emp-table-view th:nth-child(3),
+        .emp-table-view td:nth-child(3) {
+            width: 16%;
+        }
+
+        .emp-table-view th:nth-child(4),
+        .emp-table-view td:nth-child(4) {
+            width: 15%;
+        }
+
+        .emp-table-view th:nth-child(5),
+        .emp-table-view td:nth-child(5) {
+            width: 11%;
+        }
+
+        .emp-table-add th:nth-child(1),
+        .emp-table-add td:nth-child(1) {
+            width: 50%;
+        }
+
+        .emp-table-add th:nth-child(2),
+        .emp-table-add td:nth-child(2) {
+            width: 30%;
+        }
+
+        .emp-table-add th:nth-child(3),
+        .emp-table-add td:nth-child(3) {
+            width: 20%;
+        }
+
+/* ── Add button ───────────────────────────────────────────── */
+button.add-emp-btn {
+    background: #266DF1;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+    white-space: nowrap;
+}
+
+    button.add-emp-btn:hover {
+        background: #1B52BD;
+    }
+
+    button.add-emp-btn:disabled {
+        opacity: .6;
+        cursor: default;
+    }
+
+/* ── Remove button ────────────────────────────────────────── */
+button.remove-emp-btn {
+    background: #fde8e8;
+    color: #e53935;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+}
+
+    button.remove-emp-btn:hover {
+        background: #e53935;
+        color: #fff;
+    }
+
+    button.remove-emp-btn:disabled {
+        opacity: .6;
+        cursor: default;
+    }
+
+/* ── Clickable status badge (toggle Active/Inactive) ─────── */
+button.badge-btn {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-block;
+}
+
+    button.badge-btn:hover {
+        opacity: .8;
+    }
+
+    button.badge-btn:disabled {
+        opacity: .5;
+        cursor: default;
+    }
+
+/* ── Sidebar submenu (Payroll Staff) ─────────────────────── */
+.menu-dropdown-toggle {
+    position: relative;
+    cursor: pointer;
+}
+
+.menu-chevron {
+    margin-left: auto;
+    font-size: 11px;
+    transition: transform .15s;
+}
+
+.menu-dropdown-toggle[aria-expanded="true"] .menu-chevron {
+    transform: rotate(180deg);
+}
+
+.submenu {
+    list-style: none;
+    padding-left: 34px;
+    margin: 2px 0 6px;
+}
+
+    .submenu li a {
+        display: block;
+        padding: 8px 10px;
+        font-size: 13px;
+        color: #6b87c0;
+        text-decoration: none;
+        border-radius: 6px;
+    }
+
+        .submenu li a:hover {
+            background: #f5f8ff;
+            color: #163F8B;
+        }
+
+.menu-logout {
+    padding: 0 10px 10px;
+}
+
+    .menu-logout a {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 12px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: #333;
+        font-size: 14px;
+    }
+
+        .menu-logout a:hover {
+            background: #f5f8ff;
+            color: #163F8B;
+        }
+
+
+
+
+/* ── To-do task card ─────────────────────────────────────── */
+.task-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-bottom: 16px;
+}
+
+.task-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+    .task-table thead tr {
+        background: #DCE5FF;
+    }
+
+    .task-table th {
+        padding: 12px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #163F8B;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .task-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #f0f4ff;
+        color: #000;
+    }
+
+    .task-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .task-table tbody tr:hover td {
+        background: #f8fbff;
+    }
+
+.task-check-btn {
+    border: 1.5px solid #163F8B;
+    background: #fff;
+    color: #163F8B;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+}
+
+    .task-check-btn.checked {
+        background: #163F8B;
+        color: #fff;
+        border-color: #163F8B;
+    }

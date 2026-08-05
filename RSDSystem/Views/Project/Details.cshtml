@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "View Project";
     var employees = ViewBag.Employees as List<RSDSystem.Models.Employee> ?? new();
+    var unassigned = ViewBag.UnassignedEmployees as List<RSDSystem.Models.Employee> ?? new();
     var budgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
                      ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
 }
@@ -94,47 +95,142 @@
         <div class="proj-view-field">@(Model.AssignedPayrollStaff ?? "—")</div>
     </div>
 
+    <!-- Assigned Employees — buttons that open overlays -->
     <div class="proj-view-group mt-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="form-lbl mb-0">Assigned Employees</span>
-            <span class="proj-emp-count">Total Employees: <strong>@employees.Count</strong></span>
+            <span class="proj-emp-count">
+                Total Employees: <strong id="empTotalCount">@employees.Count</strong>
+            </span>
         </div>
-        <table class="emp-table">
+        <div class="emp-action-btns">
+            <button type="button" class="btn-outline-blue" onclick="openViewEmpModal()">
+                <i class="bi bi-people-fill"></i> View Employees
+            </button>
+            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
+                <i class="bi bi-person-plus-fill"></i> Add Employees
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ VIEW EMPLOYEES OVERLAY ============ -->
+<div class="del-overlay" id="viewEmpOverlay" onclick="closeViewEmpModal(arguments[0])">
+    <div class="del-modal emp-modal">
+        <div class="emp-modal-head">
+            <span class="emp-modal-title">Assigned Employees</span>
+            <button type="button" class="emp-modal-close" onclick="closeViewEmpModal()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="search-wrap emp-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="viewEmpSearch" placeholder="Search employee..."
+                   onkeyup="filterEmpTable('viewEmpSearch','viewEmpTableBody')" />
+        </div>
+
+        <table class="emp-table emp-table-view">
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Job</th>
                     <th>Rate</th>
                     <th>Status</th>
+                    <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="viewEmpTableBody">
                 @if (!employees.Any())
                 {
-                    <tr><td colspan="4" class="text-center text-muted py-3">No employees assigned.</td></tr>
+                    <tr class="empty-row"><td colspan="5" class="text-center text-muted py-3">No employees assigned.</td></tr>
                 }
                 @foreach (var emp in employees)
                 {
-                    <tr>
+                    <tr data-name="@emp.FullName.ToLower()" data-id="@emp.EmployeeId">
                         <td>@emp.FullName</td>
                         <td>@emp.JobClassification</td>
                         <td>₱@emp.DailyRate.ToString("N2")</td>
                         <td>
-                            @if (emp.IsActive)
-                            {
-                                <span class="badge-active">Active</span>
-                            }
-                            else
-                            {
-                                <span class="badge-inactive">Inactive</span>
-                            }
+                            <button type="button"
+                                    class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
+                                    onclick="toggleEmpStatus(this, @emp.EmployeeId)">
+                                @(emp.IsActive ? "Active" : "Inactive")
+                            </button>
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="remove-emp-btn"
+                                    data-id="@emp.EmployeeId"
+                                    data-name="@emp.FullName"
+                                    data-job="@emp.JobClassification"
+                                    onclick="removeEmployee(this)">
+                                Remove
+                            </button>
                         </td>
                     </tr>
                 }
+                <tr class="no-result-row" style="display:none">
+                    <td colspan="5" class="text-center text-muted py-3">No matching employees.</td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
+
+<!-- ============ ADD EMPLOYEES OVERLAY ============ -->
+<div class="del-overlay" id="addEmpOverlay" onclick="closeAddEmpModal(arguments[0])">
+    <div class="del-modal emp-modal">
+        <div class="emp-modal-head">
+            <span class="emp-modal-title">Add Employees</span>
+            <button type="button" class="emp-modal-close" onclick="closeAddEmpModal()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="search-wrap emp-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="addEmpSearch" placeholder="Search employee..."
+                   onkeyup="filterEmpTable('addEmpSearch','addEmpTableBody')" />
+        </div>
+
+        <table class="emp-table emp-table-add">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Job</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="addEmpTableBody">
+                @if (!unassigned.Any())
+                {
+                    <tr class="empty-row"><td colspan="3" class="text-center text-muted py-3">No available employees.</td></tr>
+                }
+                @foreach (var emp in unassigned)
+                {
+                    <tr data-name="@emp.FullName.ToLower()" data-id="@emp.EmployeeId">
+                        <td>@emp.FullName</td>
+                        <td>@emp.JobClassification</td>
+                        <td class="text-end">
+                            <button type="button" class="add-emp-btn" data-id="@emp.EmployeeId"
+                                    onclick="assignEmployee(this)">
+                                Add
+                            </button>
+                        </td>
+                    </tr>
+                }
+                <tr class="no-result-row" style="display:none">
+                    <td colspan="3" class="text-center text-muted py-3">No matching employees.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Hidden token source for AJAX calls -->
+<form id="tokenForm" style="display:none">
+    @Html.AntiForgeryToken()
+</form>
 
 <div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
     <div class="del-modal">
@@ -159,6 +255,13 @@
 
 @section Scripts {
     <script>
+        const PROJECT_ID = '@Model.ProjectId';
+
+        function getToken() {
+            return document.querySelector('#tokenForm input[name="__RequestVerificationToken"]').value;
+        }
+
+        // ── Delete project modal ──────────────────────────
         function openDeleteModal(id, name) {
             document.getElementById('deleteProjName').textContent = name;
             document.getElementById('deleteForm').action = '/Project/Delete/' + id;
@@ -168,6 +271,193 @@
             if (!e || e.target === document.getElementById('deleteOverlay'))
                 document.getElementById('deleteOverlay').classList.remove('open');
         }
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDeleteModal(); });
+
+        // ── View Employees modal ──────────────────────────
+        function openViewEmpModal() {
+            document.getElementById('viewEmpOverlay').classList.add('open');
+        }
+        function closeViewEmpModal(e) {
+            if (!e || e.target === document.getElementById('viewEmpOverlay'))
+                document.getElementById('viewEmpOverlay').classList.remove('open');
+        }
+
+        // ── Add Employees modal ───────────────────────────
+        function openAddEmpModal() {
+            document.getElementById('addEmpOverlay').classList.add('open');
+        }
+        function closeAddEmpModal(e) {
+            if (!e || e.target === document.getElementById('addEmpOverlay'))
+                document.getElementById('addEmpOverlay').classList.remove('open');
+        }
+
+        // ── Search filter (shared by both modals) ─────────
+        function filterEmpTable(inputId, tbodyId) {
+            const term = document.getElementById(inputId).value.trim().toLowerCase();
+            const tbody = document.getElementById(tbodyId);
+            const rows = tbody.querySelectorAll('tr[data-name]');
+            let visibleCount = 0;
+
+            rows.forEach(r => {
+                const match = r.dataset.name.includes(term);
+                r.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
+
+            const noResult = tbody.querySelector('.no-result-row');
+            if (noResult) noResult.style.display = visibleCount === 0 ? '' : 'none';
+        }
+
+        function clearEmptyRow(tbody) {
+            const empty = tbody.querySelector('.empty-row');
+            if (empty) empty.remove();
+        }
+
+        function addEmptyRowIfNeeded(tbody, colspan, message) {
+            if (!tbody.querySelector('tr[data-name]') && !tbody.querySelector('.empty-row')) {
+                tbody.insertAdjacentHTML('afterbegin',
+                    `<tr class="empty-row"><td colspan="${colspan}" class="text-center text-muted py-3">${message}</td></tr>`);
+            }
+        }
+
+        // ── Toggle Active/Inactive from the modal ─────────
+        async function toggleEmpStatus(btn, employeeId) {
+            btn.disabled = true;
+            try {
+                const formData = new FormData();
+                formData.append('id', employeeId);
+                formData.append('__RequestVerificationToken', getToken());
+
+                const res = await fetch('/Employee/ToggleStatusAjax', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    btn.classList.remove('badge-active', 'badge-inactive');
+                    btn.classList.add(data.isActive ? 'badge-active' : 'badge-inactive');
+                    btn.textContent = data.isActive ? 'Active' : 'Inactive';
+                } else {
+                    alert(data.message || 'Could not update status.');
+                }
+            } catch (err) {
+                alert('Something went wrong. Please try again.');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // ── Add employee via AJAX ──────────────────────────
+        async function assignEmployee(btn) {
+            const employeeId = btn.dataset.id;
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            try {
+                const formData = new FormData();
+                formData.append('employeeId', employeeId);
+                formData.append('projectId', PROJECT_ID);
+                formData.append('__RequestVerificationToken', getToken());
+
+                const res = await fetch('/Project/AssignEmployee', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    const addBody = document.getElementById('addEmpTableBody');
+                    btn.closest('tr').remove();
+                    addEmptyRowIfNeeded(addBody, 3, 'No available employees.');
+
+                    const viewBody = document.getElementById('viewEmpTableBody');
+                    clearEmptyRow(viewBody);
+
+                    const tr = document.createElement('tr');
+                    tr.dataset.name = data.employee.name.toLowerCase();
+                    tr.dataset.id = data.employee.id;
+                    tr.innerHTML = `
+                        <td>${data.employee.name}</td>
+                        <td>${data.employee.job}</td>
+                        <td>₱${data.employee.rate}</td>
+                        <td>
+                            <button type="button" class="badge-btn ${data.employee.status === 'Active' ? 'badge-active' : 'badge-inactive'}"
+                                    onclick="toggleEmpStatus(this, ${data.employee.id})">
+                                ${data.employee.status}
+                            </button>
+                        </td>
+                        <td class="text-end">
+                            <button type="button" class="remove-emp-btn"
+                                    data-id="${data.employee.id}" data-name="${data.employee.name}" data-job="${data.employee.job}"
+                                    onclick="removeEmployee(this)">Remove</button>
+                        </td>`;
+                    viewBody.insertBefore(tr, viewBody.querySelector('.no-result-row'));
+
+                    const countEl = document.getElementById('empTotalCount');
+                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                } else {
+                    alert(data.message || 'Could not add employee.');
+                    btn.disabled = false;
+                    btn.textContent = 'Add';
+                }
+            } catch (err) {
+                alert('Something went wrong. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Add';
+            }
+        }
+
+        // ── Remove employee via AJAX ───────────────────────
+        async function removeEmployee(btn) {
+            if (!confirm('Remove this employee from the project?')) return;
+
+            const employeeId = btn.dataset.id;
+            btn.disabled = true;
+            btn.textContent = 'Removing...';
+
+            try {
+                const formData = new FormData();
+                formData.append('employeeId', employeeId);
+                formData.append('projectId', PROJECT_ID);
+                formData.append('__RequestVerificationToken', getToken());
+
+                const res = await fetch('/Project/RemoveEmployeeAjax', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    const viewBody = document.getElementById('viewEmpTableBody');
+                    btn.closest('tr').remove();
+                    addEmptyRowIfNeeded(viewBody, 5, 'No employees assigned.');
+
+                    const addBody = document.getElementById('addEmpTableBody');
+                    clearEmptyRow(addBody);
+
+                    const tr = document.createElement('tr');
+                    tr.dataset.name = data.employee.name.toLowerCase();
+                    tr.dataset.id = data.employee.id;
+                    tr.innerHTML = `
+                        <td>${data.employee.name}</td>
+                        <td>${data.employee.job}</td>
+                        <td class="text-end">
+                            <button type="button" class="add-emp-btn" data-id="${data.employee.id}"
+                                    onclick="assignEmployee(this)">Add</button>
+                        </td>`;
+                    addBody.insertBefore(tr, addBody.querySelector('.no-result-row'));
+
+                    const countEl = document.getElementById('empTotalCount');
+                    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                } else {
+                    alert(data.message || 'Could not remove employee.');
+                    btn.disabled = false;
+                    btn.textContent = 'Remove';
+                }
+            } catch (err) {
+                alert('Something went wrong. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Remove';
+            }
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeDeleteModal();
+                closeViewEmpModal();
+                closeAddEmpModal();
+            }
+        });
     </script>
 }
