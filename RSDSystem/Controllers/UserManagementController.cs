@@ -70,6 +70,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
 
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
@@ -86,6 +87,7 @@ namespace RSDSystem.Controllers
             user.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password);
             user.UserId = 0;
+            user.UserCode = GenerateUserCode();
 
             if (photo != null && photo.Length > 0)
                 user.PhotoPath = await SavePhotoAsync(photo);
@@ -115,6 +117,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
 
             if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
@@ -220,6 +223,27 @@ namespace RSDSystem.Controllers
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
+        }
+
+        private string GenerateUserCode()
+        {
+            string yearPrefix = DateTime.Now.ToString("yy");
+
+            var lastCode = _db.Users
+                .Where(u => u.UserCode.StartsWith(yearPrefix))
+                .OrderByDescending(u => u.UserCode)
+                .Select(u => u.UserCode)
+                .FirstOrDefault();
+
+            int nextSeq = 1;
+            if (lastCode != null && lastCode.Length == 6)
+            {
+                var seqPart = lastCode.Substring(2);
+                if (int.TryParse(seqPart, out int lastSeq))
+                    nextSeq = lastSeq + 1;
+            }
+
+            return yearPrefix + nextSeq.ToString("D4");
         }
     }
 }

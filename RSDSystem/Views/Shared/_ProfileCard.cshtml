@@ -1,0 +1,25 @@
+﻿@{
+    var fullName = Context.Session.GetString("FullName") ?? "Guest";
+    var role = Context.Session.GetString("Role");
+    var photo = Context.Session.GetString("PhotoPath");
+    var displayRole = role == "PayrollStaff" ? "Payroll Staff" : (role ?? "Not logged in");
+    var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                             .Take(2)
+                                             .Select(w => char.ToUpper(w[0])));
+}
+
+<div class="profile-card">
+    @if (!string.IsNullOrEmpty(photo))
+    {
+        <img src="@photo" alt="User">
+    }
+    else
+    {
+        <span class="profile-avatar-initials">@initials</span>
+    }
+
+    <div>
+        <div class="user-name">@fullName</div>
+        <div class="user-role">@displayRole</div>
+    </div>
+</div>

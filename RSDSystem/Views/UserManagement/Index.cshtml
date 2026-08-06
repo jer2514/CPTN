@@ -59,6 +59,7 @@
                 <th style="width:40px">
                     <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
                 </th>
+                <th>Staff ID</th>
                 <th>User</th>
                 <th>Role</th>
                 <th>Email</th>
@@ -92,6 +93,7 @@
             {
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" /></td>
+                    <td>@u.UserCode</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(u.PhotoPath))

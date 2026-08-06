@@ -242,15 +242,16 @@ namespace RSDSystem.Controllers
             });
         }
 
-        // POST /Project/RemoveEmployeeAjax
+        // POST /Project/DeactivateAndRemove
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RemoveEmployeeAjax(int employeeId, int projectId)
+        public async Task<IActionResult> DeactivateAndRemove(int employeeId, int projectId)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
 
+            emp.IsActive = false;
             emp.ProjectId = null;
             await _db.SaveChangesAsync();
 

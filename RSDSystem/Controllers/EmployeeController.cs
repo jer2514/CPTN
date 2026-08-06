@@ -70,6 +70,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
+            ModelState.Remove("EmployeeCode");
 
             if (!ModelState.IsValid)
             {
@@ -82,6 +83,7 @@ namespace RSDSystem.Controllers
             }
 
             emp.EmployeeId = 0;
+            emp.EmployeeCode = GenerateEmployeeCode();
             CapitalizeEmployee(emp);
 
             if (photo != null && photo.Length > 0)
@@ -115,6 +117,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
+            ModelState.Remove("EmployeeCode");
 
             if (!ModelState.IsValid)
             {
@@ -138,6 +141,8 @@ namespace RSDSystem.Controllers
             existing.Email = emp.Email;
             existing.ContactNumber = emp.ContactNumber;
             existing.JobClassification = emp.JobClassification;
+            existing.DailyRate = emp.DailyRate;        
+            existing.RatePerHour = emp.RatePerHour;  
             existing.ProjectId = emp.ProjectId;  // ← saves project assignment
 
             if (photo != null && photo.Length > 0)
@@ -235,6 +240,27 @@ namespace RSDSystem.Controllers
         {
             // TODO: clear auth/session once login is implemented
             return RedirectToAction(nameof(Index));
+        }
+
+        private string GenerateEmployeeCode()
+        {
+            string yearPrefix = DateTime.Now.ToString("yy");
+
+            var lastCode = _db.Employees
+                .Where(e => e.EmployeeCode.StartsWith(yearPrefix))
+                .OrderByDescending(e => e.EmployeeCode)
+                .Select(e => e.EmployeeCode)
+                .FirstOrDefault();
+
+            int nextSeq = 1;
+            if (lastCode != null && lastCode.Length == 6)
+            {
+                var seqPart = lastCode.Substring(2);
+                if (int.TryParse(seqPart, out int lastSeq))
+                    nextSeq = lastSeq + 1;
+            }
+
+            return yearPrefix + nextSeq.ToString("D4");
         }
     }
 }
