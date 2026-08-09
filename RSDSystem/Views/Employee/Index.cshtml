@@ -11,11 +11,16 @@
 
 
 <div class="page-card">
-    <div class="emp-card-head">
-        <div class="emp-title">All Employee</div>
+    <div class="emp-title mb-3">All Employee</div>
 
-        <div class="emp-controls">
-            <!-- Filter dropdown -->
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+        </form>
+
+        <div class="list-controls-actions">
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-funnel"></i> Filter
@@ -48,14 +53,6 @@
                 </ul>
             </div>
 
-            <!-- Search -->
-            <form asp-action="Index" method="get" class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
-                <input type="hidden" name="sortBy" value="@sortBy" />
-            </form>
-
-            <!-- Add Employee -->
             <a asp-action="Create" class="btn-primary-blue">Add Employee</a>
         </div>
     </div>
@@ -63,39 +60,17 @@
     <table class="emp-table">
         <thead>
             <tr>
-                <th style="width:40px">
-                    <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
-                </th>
+                <th style="width:40px"><input type="checkbox" class="tbl-check" onclick="toggleAll(this)" /></th>
                 <th>Employee ID</th>
                 <th>User</th>
                 <th>Job</th>
                 <th>Assigned to</th>
+                <th>Date Added</th>
                 <th>Status</th>
-                <th>
-                    <div>
-                        <span>Action</span>
-                        <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
-                            @Html.AntiForgeryToken()
-                            <div id="bulkIdsContainer"></div>
-                            <button type="button"
-                                    id="bulkDeleteBtn"
-                                    class="action-btn action-delete"
-                                    style="display:none"
-                                    onclick="openBulkDeleteModal()">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </form>
-                    </div>
-                </th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
-            @if (!Model.Any())
-            {
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No employees found.</td>
-                </tr>
-            }
             @foreach (var emp in Model)
             {
                 <tr>
@@ -118,6 +93,7 @@
                     </td>
                     <td>@emp.JobClassification</td>
                     <td>@emp.Project?.ProjectName</td>
+                    <td>@emp.DateAdded.ToString("MMM d, yyyy")</td>
                     <td>
                         @if (emp.IsActive)
                         {
@@ -125,18 +101,18 @@
                         }
                         else
                         {
+
                             <span class="badge-inactive">Inactive</span>
                         }
                     </td>
                     <td>
                         <div class="action-cell">
-                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId"
-                                 class="action-btn action-edit" title="Edit">
-                                 <i class="bi bi-pencil-fill"></i>
+                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId" class="action-btn action-edit" title="Edit">
+                                <i class="bi bi-pencil-fill"></i>
                             </a>
                             <button type="button" class="action-btn action-delete" title="Delete"
-                                 onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName')">
-                                 <i class="bi bi-trash-fill"></i>
+                                    onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName')">
+                                <i class="bi bi-trash-fill"></i>
                             </button>
                         </div>
                     </td>
@@ -144,6 +120,7 @@
             }
         </tbody>
     </table>
+    @await Html.PartialAsync("_Pagination")
 </div>
 
 <!-- Delete Confirmation Modal -->

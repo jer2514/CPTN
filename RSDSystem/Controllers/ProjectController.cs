@@ -222,24 +222,13 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> AssignEmployee(int employeeId, int projectId)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
-            if (emp == null)
-                return Json(new { success = false, message = "Employee not found." });
+            if (emp == null) return Json(new { success = false });
 
             emp.ProjectId = projectId;
+            emp.IsActive = true;   // force active, never toggle here
             await _db.SaveChangesAsync();
 
-            return Json(new
-            {
-                success = true,
-                employee = new
-                {
-                    id = emp.EmployeeId,
-                    name = emp.FullName,
-                    job = emp.JobClassification,
-                    rate = emp.DailyRate.ToString("N2"),
-                    status = emp.IsActive ? "Active" : "Inactive"
-                }
-            });
+            return Json(new { success = true });
         }
 
         // POST /Project/DeactivateAndRemove

@@ -23,11 +23,11 @@ namespace RSDSystem.Controllers
         };
 
         // GET /Employee
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
-            var query = _db.Employees
-                           .Include(e => e.Project)
-                           .AsQueryable();
+            const int pageSize = 10;
+
+            var query = _db.Employees.Include(e => e.Project).AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -42,13 +42,21 @@ namespace RSDSystem.Controllers
             {
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
-                _ => query.OrderBy(e => e.EmployeeId)
+                _ => query.OrderByDescending(e => e.DateAdded)
             };
+
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /Employee/Create
@@ -83,6 +91,7 @@ namespace RSDSystem.Controllers
             }
 
             emp.EmployeeId = 0;
+            emp.DateAdded = DateTime.Now;
             emp.EmployeeCode = GenerateEmployeeCode();
             CapitalizeEmployee(emp);
 

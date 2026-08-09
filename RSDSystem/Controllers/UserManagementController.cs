@@ -19,12 +19,12 @@ namespace RSDSystem.Controllers
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
 
         // GET /UserManagement
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
+            const int pageSize = 10;
+
             var query = _db.Users
-                           .Where(u => u.FirstName != null &&
-                                        u.LastName != null &&
-                                        u.Role != null)
+                           .Where(u => u.FirstName != null && u.LastName != null && u.Role != null)
                            .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -43,14 +43,22 @@ namespace RSDSystem.Controllers
                 "role" => query.OrderBy(u => u.Role),
                 "email" => query.OrderBy(u => u.Email),
                 "status" => query.OrderByDescending(u => u.IsActive),
-                _ => query.OrderBy(u => u.UserId)
+                _ => query.OrderByDescending(u => u.CreatedAt)
             };
+
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
             ViewBag.PageTitle = "User Management";
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /UserManagement/Create

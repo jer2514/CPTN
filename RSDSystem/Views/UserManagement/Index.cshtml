@@ -11,9 +11,16 @@
 
 
 <div class="page-card">
-    <div class="emp-card-head">
-        <div class="emp-title">All Users</div>
-        <div class="emp-controls">
+    <div class="emp-title mb-3">All Users</div>
+
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+        </form>
+
+        <div class="list-controls-actions">
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -42,12 +49,6 @@
                     </li>
                 </ul>
             </div>
-
-            <form asp-action="Index" method="get" class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
-                <input type="hidden" name="sortBy" value="@sortBy" />
-            </form>
 
             <a asp-action="Create" class="btn-primary-blue">Add User</a>
         </div>
@@ -138,6 +139,7 @@
             }
         </tbody>
     </table>
+    @await Html.PartialAsync("_Pagination")
 </div>
 
 <!-- Delete Overlay -->

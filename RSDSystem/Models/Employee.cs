@@ -69,7 +69,10 @@ namespace RSDSystem.Models
 
         public bool IsActive { get; set; } = true;
 
-        // FK to Project (nullable — employee may not be assigned yet)
+        [Display(Name = "Date Added")]
+        [DataType(DataType.DateTime)]
+        public DateTime DateAdded { get; set; } = DateTime.Now;
+
         public int? ProjectId { get; set; }
         public Project? Project { get; set; }
     }
