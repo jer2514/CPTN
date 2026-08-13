@@ -23,11 +23,11 @@ namespace RSDSystem.Controllers
         };
 
         // GET /Employee
-        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
+        public async Task<IActionResult> Index(string? search, string? sortBy)
         {
-            const int pageSize = 10;
-
-            var query = _db.Employees.Include(e => e.Project).AsQueryable();
+            var query = _db.Employees
+                           .Include(e => e.Project)
+                           .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -42,21 +42,13 @@ namespace RSDSystem.Controllers
             {
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
-                _ => query.OrderByDescending(e => e.DateAdded)
+                _ => query.OrderBy(e => e.EmployeeId)
             };
-
-            var totalCount = await query.CountAsync();
-            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-            page = Math.Clamp(page, 1, totalPages);
-
-            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
-            ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = totalPages;
 
-            return View(items);
+            return View(await query.ToListAsync());
         }
 
         // GET /Employee/Create
@@ -78,7 +70,14 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
-            ModelState.Remove("EmployeeCode");
+
+            CapitalizeEmployee(emp);
+
+            if (await IsDuplicateEmployeeAsync(emp))
+            {
+                ModelState.AddModelError(string.Empty,
+                    "This employee already exists. An employee with the same name and date of birth, or the same email, is already in the system.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -91,9 +90,6 @@ namespace RSDSystem.Controllers
             }
 
             emp.EmployeeId = 0;
-            emp.DateAdded = DateTime.Now;
-            emp.EmployeeCode = GenerateEmployeeCode();
-            CapitalizeEmployee(emp);
 
             if (photo != null && photo.Length > 0)
                 emp.PhotoPath = await SavePhotoAsync(photo);
@@ -126,7 +122,14 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
-            ModelState.Remove("EmployeeCode");
+
+            CapitalizeEmployee(emp);
+
+            if (await IsDuplicateEmployeeAsync(emp, emp.EmployeeId))
+            {
+                ModelState.AddModelError(string.Empty,
+                    "This employee already exists. Another employee with the same name and date of birth, or the same email, is already in the system.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -143,15 +146,13 @@ namespace RSDSystem.Controllers
 
             existing.FirstName = emp.FirstName;
             existing.LastName = emp.LastName;
-            existing.MiddleInitial = emp.MiddleInitial?.Trim().ToUpper();
+            existing.MiddleInitial = emp.MiddleInitial;
             existing.DateOfBirth = emp.DateOfBirth;
             existing.Gender = emp.Gender;
             existing.Address = emp.Address;
             existing.Email = emp.Email;
             existing.ContactNumber = emp.ContactNumber;
             existing.JobClassification = emp.JobClassification;
-            existing.DailyRate = emp.DailyRate;        
-            existing.RatePerHour = emp.RatePerHour;  
             existing.ProjectId = emp.ProjectId;  // ← saves project assignment
 
             if (photo != null && photo.Length > 0)
@@ -168,6 +169,31 @@ namespace RSDSystem.Controllers
             emp.FirstName = ti.ToTitleCase(emp.FirstName.Trim().ToLower());
             emp.LastName = ti.ToTitleCase(emp.LastName.Trim().ToLower());
             emp.MiddleInitial = emp.MiddleInitial?.Trim().ToUpper();
+        }
+
+        // Returns true if another employee already has the same
+        // (FirstName + LastName + DateOfBirth) OR the same Email.
+        private async Task<bool> IsDuplicateEmployeeAsync(Employee emp, int excludeId = 0)
+        {
+            var query = _db.Employees.Where(e => e.EmployeeId != excludeId);
+
+            bool nameDobMatch = await query.AnyAsync(e =>
+                e.FirstName == emp.FirstName &&
+                e.LastName == emp.LastName &&
+                e.DateOfBirth == emp.DateOfBirth);
+
+            if (nameDobMatch) return true;
+
+            if (!string.IsNullOrWhiteSpace(emp.Email))
+            {
+                var email = emp.Email.Trim().ToLower();
+                bool emailMatch = await query.AnyAsync(e =>
+                    e.Email != null && e.Email.ToLower() == email);
+
+                if (emailMatch) return true;
+            }
+
+            return false;
         }
 
         // POST /Employee/Delete/{id}
@@ -196,7 +222,6 @@ namespace RSDSystem.Controllers
             return $"/uploads/employees/{fileName}";
         }
 
-
         //delete multiple employees
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -212,7 +237,6 @@ namespace RSDSystem.Controllers
             _db.Employees.RemoveRange(employees);
             await _db.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
-
         }
 
         // POST /UserManagement/ToggleStatus/{id}
@@ -227,49 +251,6 @@ namespace RSDSystem.Controllers
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
-        }
-
-        // POST /Employee/ToggleStatusAjax/{id}
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleStatusAjax(int id)
-        {
-            var emp = await _db.Employees.FindAsync(id);
-            if (emp == null)
-                return Json(new { success = false, message = "Employee not found." });
-
-            emp.IsActive = !emp.IsActive;
-            await _db.SaveChangesAsync();
-
-            return Json(new { success = true, isActive = emp.IsActive });
-        }
-
-
-        public IActionResult Logout()
-        {
-            // TODO: clear auth/session once login is implemented
-            return RedirectToAction(nameof(Index));
-        }
-
-        private string GenerateEmployeeCode()
-        {
-            string yearPrefix = DateTime.Now.ToString("yy");
-
-            var lastCode = _db.Employees
-                .Where(e => e.EmployeeCode.StartsWith(yearPrefix))
-                .OrderByDescending(e => e.EmployeeCode)
-                .Select(e => e.EmployeeCode)
-                .FirstOrDefault();
-
-            int nextSeq = 1;
-            if (lastCode != null && lastCode.Length == 6)
-            {
-                var seqPart = lastCode.Substring(2);
-                if (int.TryParse(seqPart, out int lastSeq))
-                    nextSeq = lastSeq + 1;
-            }
-
-            return yearPrefix + nextSeq.ToString("D4");
         }
     }
 }

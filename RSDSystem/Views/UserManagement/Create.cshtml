@@ -15,15 +15,26 @@
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:13px">
+                <ul class="mb-0 ps-3">
+                    @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <li>@err.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
 
         <div class="form-row form-row-3">
             <div>
                 <label class="form-lbl">First Name</label>
-                <input type="text" name="FirstName" class="form-ctrl" required />
+                <input type="text" name="FirstName" value="@Model.FirstName" class="form-ctrl" required />
             </div>
             <div>
                 <label class="form-lbl">Last Name</label>
-                <input type="text" name="LastName" class="form-ctrl" required />
+                <input type="text" name="LastName" value="@Model.LastName" class="form-ctrl" required />
             </div>
             <div>
                 <label class="form-lbl">M.I</label>

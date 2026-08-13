@@ -58,12 +58,33 @@
                     <th>Action</th>
                 </tr>
             </thead>
+            @{
+                var pendingApprovals = ViewBag.PendingApprovals as IEnumerable<dynamic>;
+            }
             <tbody>
-                <tr>
-                    <td colspan="4" class="text-center text-muted py-4">
-                        No pending approvals yet.
-                    </td>
-                </tr>
+                @if (pendingApprovals == null || !pendingApprovals.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            No pending approvals yet.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in pendingApprovals)
+                    {
+                        <tr>
+                            <td>@p.StaffName</td>
+                            <td>@p.ProjectName</td>
+                            <td>@(((DateTime)p.Date).ToString("MM-dd-yy"))</td>
+                            <td>
+                                <a href="@Url.Action("View", "Payroll", new { id = p.PayrollId })"
+                                   class="pill-btn pill-view">Review</a>
+                            </td>
+                        </tr>
+                    }
+                }
             </tbody>
         </table>
     </div>

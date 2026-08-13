@@ -18,6 +18,9 @@
         var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Take(2)
         .Select(w => char.ToUpper(w[0])));
+
+        var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+        var isPayrollSection = currentAction == "GeneratePayroll" || currentAction == "PendingPayroll";
     }
 
     <div class="app-layout">
@@ -28,20 +31,26 @@
             </div>
 
             <ul class="menu">
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "PayrollStaff" ? "active" : "")">
+                <li class="@(currentAction == "Index" ? "active" : "")">
                     <a asp-controller="PayrollStaff" asp-action="Index">
                         <i class="bi bi-clipboard2-check-fill"></i> Task
                     </a>
                 </li>
 
                 <li>
-                    <a href="#staffPayrollMenu" data-bs-toggle="collapse" class="menu-dropdown-toggle" role="button" aria-expanded="false">
+                    <a href="#staffPayrollMenu" data-bs-toggle="collapse"
+                       class="menu-dropdown-toggle @(isPayrollSection ? "active" : "")"
+                       role="button" aria-expanded="@(isPayrollSection ? "true" : "false")">
                         <i class="bi bi-cash-coin"></i> Payroll
                         <i class="bi bi-chevron-down menu-chevron"></i>
                     </a>
-                    <ul class="collapse submenu" id="staffPayrollMenu">
-                        <li><a href="#">My Payslip</a></li>
-                        <li><a href="#">Process Payroll</a></li>
+                    <ul class="collapse submenu @(isPayrollSection ? "show" : "")" id="staffPayrollMenu">
+                        <li class="@(currentAction == "GeneratePayroll" ? "active" : "")">
+                            <a asp-controller="PayrollStaff" asp-action="GeneratePayroll">Generate Payroll</a>
+                        </li>
+                        <li class="@(currentAction == "PendingPayroll" ? "active" : "")">
+                            <a asp-controller="PayrollStaff" asp-action="PendingPayroll">Pending Payroll</a>
+                        </li>
                     </ul>
                 </li>
 

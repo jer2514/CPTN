@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using RSDSystem.Helpers;
 using RSDSystem.Models;
 
 namespace RSDSystem.Controllers
@@ -13,10 +14,68 @@ namespace RSDSystem.Controllers
             _db = db;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            return View();
+            var submitted = await _db.Payrolls
+                                     .Include(p => p.Employee)
+                                     .Include(p => p.Project)
+                                     .Where(p => p.Status == PayrollStatusOptions.Submitted)
+                                     .OrderByDescending(p => p.GeneratedDate)
+                                     .ToListAsync();
+
+            ViewBag.PageTitle = "Payroll";
+            return View(submitted);
         }
+
+        // GET /Payroll/View/{id}
+        public async Task<IActionResult> View(int id)
+        {
+            var payroll = await _db.Payrolls
+                                   .Include(p => p.Employee)
+                                   .Include(p => p.Project)
+                                   .FirstOrDefaultAsync(p => p.PayrollId == id);
+
+            if (payroll == null) return NotFound();
+
+            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            return View(payroll);
+        }
+
+        // POST /Payroll/Approve/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Approve(int id)
+        {
+            var payroll = await _db.Payrolls.FindAsync(id);
+            if (payroll == null)
+                return Json(new { success = false, message = "Payroll record not found." });
+
+            payroll.Status = PayrollStatusOptions.Approved;
+            payroll.CorrectionReason = null;
+            await _db.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Payroll has been approved." });
+        }
+
+        // POST /Payroll/ReturnForCorrection/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReturnForCorrection(int id, string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return Json(new { success = false, message = "Please provide a reason for correction." });
+
+            var payroll = await _db.Payrolls.FindAsync(id);
+            if (payroll == null)
+                return Json(new { success = false, message = "Payroll record not found." });
+
+            payroll.Status = PayrollStatusOptions.Correction;
+            payroll.CorrectionReason = reason.Trim();
+            await _db.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Payroll has been returned for correction." });
+        }
+
 
         // POST /Payroll/AddSchedule
         [HttpPost]

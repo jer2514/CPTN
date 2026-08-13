@@ -18,28 +18,39 @@ namespace RSDSystem.Controllers
 
         public async Task<IActionResult> Index()
         {
+            // Stat cards
             ViewBag.ActiveProjects = await _db.Projects.CountAsync(p => p.Status == "Active");
             ViewBag.ActiveEmployees = await _db.Employees.CountAsync(e => e.IsActive);
-            ViewBag.ActivePayrollStaff = await _db.Users
-                                                   .CountAsync(u => u.Role == "PayrollStaff" && u.IsActive);
+            ViewBag.ActivePayrollStaff = await _db.Users.CountAsync(u => u.Role == "PayrollStaff" && u.IsActive);
 
-            // TODO: replace with real query once Payroll Approval module exists
-            ViewBag.PendingApprovals = new List<object>();
+            // For the Add/Edit Schedule modal dropdowns
+            var activeProjects = await _db.Projects
+                                          .Where(p => p.Status == "Active")
+                                          .OrderBy(p => p.ProjectName)
+                                          .ToListAsync();
+            ViewBag.ActiveProjectsList = activeProjects;
+            ViewBag.TypeOfServiceOptions = TypeOfServiceOptions.All;
+            ViewBag.ProjectTypeMap = activeProjects.ToDictionary(p => p.ProjectId, p => p.TypeOfService ?? "");
 
+            // Payroll schedules list
             ViewBag.PayrollSchedules = await _db.PayrollSchedules
                                                 .Include(s => s.Project)
                                                 .OrderBy(s => s.StartingDate)
                                                 .ToListAsync();
 
-            var activeProjectsList = await _db.Projects
-                                              .Where(p => p.Status == "Active")
-                                              .OrderBy(p => p.ProjectName)
-                                              .ToListAsync();
-
-            ViewBag.ActiveProjectsList = activeProjectsList;
-            ViewBag.TypeOfServiceOptions = TypeOfServiceOptions.All;
-            ViewBag.ProjectTypeMap = activeProjectsList
-                .ToDictionary(p => p.ProjectId, p => p.TypeOfService ?? "");
+            // Pending Payroll Approval table
+            ViewBag.PendingApprovals = await _db.Payrolls
+                                                .Include(p => p.Project)
+                                                .Where(p => p.Status == PayrollStatusOptions.Submitted)
+                                                .OrderByDescending(p => p.GeneratedDate)
+                                                .Select(p => new
+                                                {
+                                                    p.PayrollId,
+                                                    StaffName = p.GeneratedBy,
+                                                    ProjectName = p.Project != null ? p.Project.ProjectName : "—",
+                                                    Date = p.GeneratedDate
+                                                })
+                                                .ToListAsync();
 
             return View();
         }

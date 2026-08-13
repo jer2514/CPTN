@@ -16,6 +16,15 @@
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="form-error-box">
+                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
 
         <!-- First Name | Last Name | M.I. -->
         <div class="form-row form-row-3">

@@ -83,6 +83,16 @@ namespace RSDSystem.Controllers
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
 
+            var usernameTaken = await _db.Users
+                .AnyAsync(u => u.Username == user.Username.Trim());
+            if (usernameTaken)
+                ModelState.AddModelError("Username", "This username is already taken.");
+
+            var emailTaken = await _db.Users
+                .AnyAsync(u => u.Email == user.Email.Trim());
+            if (emailTaken)
+                ModelState.AddModelError("Email", "This email is already registered.");
+
             if (!ModelState.IsValid)
             {
                 ViewBag.Roles = Roles;
@@ -96,14 +106,24 @@ namespace RSDSystem.Controllers
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password);
             user.UserId = 0;
             user.UserCode = GenerateUserCode();
+            user.CreatedAt = DateTime.Now;
 
             if (photo != null && photo.Length > 0)
                 user.PhotoPath = await SavePhotoAsync(photo);
 
             _db.Users.Add(user);
+            user.UserCode = await GenerateUserCodeAsync();
             await _db.SaveChangesAsync();
             TempData["Success"] = "User added successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<string> GenerateUserCodeAsync()
+        {
+            var year = DateTime.Now.ToString("yy");
+            var count = await _db.Users.CountAsync(u => u.UserCode != null && u.UserCode.StartsWith(year));
+            var seq = (count + 1).ToString().PadLeft(4, '0');
+            return $"{year}{seq}";
         }
 
         // GET /UserManagement/Edit/{id}
@@ -129,6 +149,16 @@ namespace RSDSystem.Controllers
 
             if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            var usernameTaken = await _db.Users
+                .AnyAsync(u => u.Username == user.Username.Trim() && u.UserId != user.UserId);
+            if (usernameTaken)
+                ModelState.AddModelError("Username", "This username is already taken.");
+
+            var emailTaken = await _db.Users
+                .AnyAsync(u => u.Email == user.Email.Trim() && u.UserId != user.UserId);
+            if (emailTaken)
+                ModelState.AddModelError("Email", "This email is already registered.");
 
             if (!ModelState.IsValid)
             {
@@ -211,12 +241,13 @@ namespace RSDSystem.Controllers
             if (selectedIds == null || selectedIds.Count == 0)
                 return RedirectToAction(nameof(Index));
 
-            var employees = _db.Employees
-                               .Where(e => selectedIds.Contains(e.EmployeeId))
-                               .ToList();
+            var users = _db.Users
+                           .Where(u => selectedIds.Contains(u.UserId))
+                           .ToList();
 
-            _db.Employees.RemoveRange(employees);
+            _db.Users.RemoveRange(users);
             await _db.SaveChangesAsync();
+            TempData["Success"] = "Users deleted.";
             return RedirectToAction(nameof(Index));
         }
 

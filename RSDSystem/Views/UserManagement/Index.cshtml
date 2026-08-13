@@ -1,4 +1,5 @@
-﻿@model IEnumerable<RSDSystem.Models.User>
+﻿@using RSDSystem.Helpers
+@model IEnumerable<RSDSystem.Models.User>
 @{
     ViewData["Title"] = "User Management";
     var sortBy = ViewBag.SortBy as string;
@@ -64,6 +65,7 @@
                 <th>User</th>
                 <th>Role</th>
                 <th>Email</th>
+                <th>Date Added</th>
                 <th>Status</th>
                 <th>
                     <div>
@@ -87,14 +89,14 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No users found.</td>
+                    <td colspan="8" class="text-center text-muted py-4">No users found.</td>
                 </tr>
             }
             @foreach (var u in Model)
             {
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" /></td>
-                    <td>@u.UserCode</td>
+                    <td>@IdFormatter.Format(u.UserCode)</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(u.PhotoPath))
@@ -112,6 +114,7 @@
                     </td>
                     <td>@(u.Role == "PayrollStaff" ? "Payroll Staff" : u.Role)</td>
                     <td>@u.Email</td>
+                    <td>@u.CreatedAt.ToString("MMM d, yyyy")</td>
                     <td>
                         @if (u.IsActive)
                         {
@@ -134,11 +137,11 @@
                             </button>
                         </div>
                     </td>
-                    
                 </tr>
             }
         </tbody>
     </table>
+
     @await Html.PartialAsync("_Pagination")
 </div>
 

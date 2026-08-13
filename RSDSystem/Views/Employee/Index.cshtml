@@ -1,4 +1,5 @@
-﻿@model IEnumerable<RSDSystem.Models.Employee>
+﻿@using RSDSystem.Helpers
+@model IEnumerable<RSDSystem.Models.Employee>
 @{
     ViewData["Title"] = "Employee";
     var sortBy = ViewBag.SortBy as string;
@@ -75,7 +76,7 @@
             {
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" /></td>
-                    <td>@emp.EmployeeCode</td>
+                    <td>@IdFormatter.Format(emp.EmployeeCode)</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(emp.PhotoPath))

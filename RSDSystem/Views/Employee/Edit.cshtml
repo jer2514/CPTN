@@ -16,6 +16,15 @@
 <div class="form-card">
     <form asp-action="Edit" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="form-error-box">
+                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
         <input type="hidden" name="EmployeeId" value="@Model.EmployeeId" />
 
         <!-- Main layout: photo left + fields right -->
