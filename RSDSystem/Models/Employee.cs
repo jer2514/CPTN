@@ -9,6 +9,10 @@ namespace RSDSystem.Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int EmployeeId { get; set; }
 
+        [Required, MaxLength(10)]
+        [Display(Name = "Employee ID")]
+        public string EmployeeCode { get; set; } = string.Empty;
+
         [Required, MaxLength(80)]
         [Display(Name = "First Name")]
         public string FirstName { get; set; } = string.Empty;
@@ -55,14 +59,20 @@ namespace RSDSystem.Models
         [Display(Name = "Job Classification")]
         public string JobClassification { get; set; } = string.Empty;
 
+        [Column(TypeName = "decimal(10,2)")]
+        [Display(Name = "Rate per Day")]
+        public decimal DailyRate { get; set; } = 0;
 
         [Column(TypeName = "decimal(10,2)")]
-        [Display(Name = "Daily Rate")]
-        public decimal DailyRate { get; set; } = 0;
+        [Display(Name = "Rate per Hour")]
+        public decimal RatePerHour { get; set; } = 0;
 
         public bool IsActive { get; set; } = true;
 
-        // FK to Project (nullable — employee may not be assigned yet)
+        [Display(Name = "Date Added")]
+        [DataType(DataType.DateTime)]
+        public DateTime DateAdded { get; set; } = DateTime.Now;
+
         public int? ProjectId { get; set; }
         public Project? Project { get; set; }
     }

@@ -9,6 +9,10 @@ namespace RSDSystem.Models
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         public int UserId { get; set; }
 
+        [Required, MaxLength(10)]
+        [Display(Name = "Staff ID")]
+        public string UserCode { get; set; } = string.Empty;
+
         [Required, MaxLength(80)]
         [Display(Name = "First Name")]
         public string FirstName { get; set; } = string.Empty;

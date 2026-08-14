@@ -16,6 +16,15 @@
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data">
         @Html.AntiForgeryToken()
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="form-error-box">
+                @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
 
         <!-- First Name | Last Name | M.I. -->
         <div class="form-row form-row-3">
@@ -89,18 +98,8 @@
             </div>
         </div>
 
-        <!-- Photo | Job Classification -->
-        <div class="form-row form-row-2">
-            <div>
-                <label class="form-lbl">Photo</label>
-                <div class="file-row">
-                    <label class="file-choose-btn" for="photoInput">Choose File</label>
-                    <span class="file-name-lbl" id="fileLabel">No File Chosen</span>
-                </div>
-                <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
-                       onchange="document.getElementById('fileLabel').textContent =
-                           this.files.length ? this.files[0].name : 'No File Chosen'" />
-            </div>
+        <!-- Job Classification | Rate per Day | Rate per Hour -->
+        <div class="form-row form-row-eq3">
             <div>
                 <label class="form-lbl">Job Classification</label>
                 <select name="JobClassification" class="form-ctrl" required>
@@ -110,6 +109,30 @@
                         <option value="@j">@j</option>
                     }
                 </select>
+            </div>
+            <div>
+                <label class="form-lbl">Rate per Day</label>
+                <input type="number" name="DailyRate" class="form-ctrl"
+                       step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div>
+                <label class="form-lbl">Rate per Hour</label>
+                <input type="number" name="RatePerHour" class="form-ctrl"
+                       step="0.01" min="0" placeholder="0.00" />
+            </div>
+        </div>
+
+        <!-- Photo -->
+        <div class="form-row form-row-1">
+            <div>
+                <label class="form-lbl">Photo</label>
+                <div class="file-row">
+                    <label class="file-choose-btn" for="photoInput">Choose File</label>
+                    <span class="file-name-lbl" id="fileLabel">No File Chosen</span>
+                </div>
+                <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
+                       onchange="document.getElementById('fileLabel').textContent =
+                           this.files.length ? this.files[0].name : 'No File Chosen'" />
             </div>
         </div>
 

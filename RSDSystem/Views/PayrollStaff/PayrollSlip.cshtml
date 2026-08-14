@@ -1,0 +1,153 @@
+﻿@model RSDSystem.Models.Employee
+@{
+    ViewData["Title"] = "Generate Payroll Slip";
+    Layout = "_PayrollStaffLayout";
+    var project = ViewBag.Project as RSDSystem.Models.Project;
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="GeneratePayroll" asp-route-projectId="@project?.ProjectId" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="slip-card">
+    <div class="slip-title">Generate Payroll Slip</div>
+
+    <form id="payrollSlipForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="employeeId" value="@Model.EmployeeId" />
+        <input type="hidden" name="projectId" value="@project?.ProjectId" />
+
+        <div class="slip-row3">
+            <div>
+                <div class="form-lbl">Employee ID</div>
+                <div class="slip-value">@ViewBag.DisplayId</div>
+            </div>
+            <div>
+                <div class="form-lbl">Employee Name</div>
+                <div class="slip-value">@Model.FullName</div>
+            </div>
+            <div>
+                <div class="form-lbl">Project Assigned</div>
+                <div class="slip-value">@(project?.ProjectName ?? "—")</div>
+            </div>
+        </div>
+
+        <div class="slip-row3">
+            <div>
+                <div class="form-lbl">Job Classification</div>
+                <div class="slip-value">@Model.JobClassification</div>
+            </div>
+            <div>
+                <div class="form-lbl">Rate per day</div>
+                <div class="slip-value">₱@Model.DailyRate.ToString("N2")</div>
+            </div>
+            <div>
+                <div class="form-lbl">Rate per hour</div>
+                <div class="slip-value">₱@Model.RatePerHour.ToString("N2")</div>
+            </div>
+        </div>
+
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Pay Period Starting Date</label>
+                <input type="date" name="payPeriodStart" class="form-ctrl"
+                       value="@ViewBag.DefaultStart" required />
+            </div>
+            <div>
+                <label class="form-lbl">Pay Period Ending Date</label>
+                <input type="date" name="payPeriodEnd" class="form-ctrl"
+                       value="@ViewBag.DefaultEnd" required />
+            </div>
+        </div>
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Regular Days Worked</label>
+                <input type="number" name="regularDaysWorked" class="form-ctrl"
+                       step="1" min="0" value="0" required />
+            </div>
+            <div>
+                <label class="form-lbl">Absent Days</label>
+                <input type="number" name="absentDays" class="form-ctrl"
+                       step="1" min="0" value="0" />
+            </div>
+        </div>
+
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Overtime (Hours)</label>
+                <input type="number" name="overtimeHours" class="form-ctrl"
+                       step="0.5" min="0" value="0" />
+            </div>
+            <div>
+                <label class="form-lbl">Cash Advance</label>
+                <input type="number" name="cashAdvance" class="form-ctrl"
+                       step="0.01" min="0" value="0" />
+            </div>
+        </div>
+
+        <button type="submit" id="generateBtn" class="btn-primary-blue-block">Generate Payroll</button>
+    </form>
+</div>
+
+<!-- Success Confirmation Modal -->
+<div class="del-overlay" id="successOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap" style="background:#d4f7e0">
+            <i class="bi bi-check-circle-fill" style="color:#0d7a3e;font-size:28px"></i>
+        </div>
+        <div class="del-title">Saved</div>
+        <div class="del-msg" id="successMsg">Payroll has been saved.</div>
+        <div class="del-actions">
+            <button class="del-btn-delete" style="background:#266DF1" id="successOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const slipForm   = document.getElementById('payrollSlipForm');
+        const generateBtn = document.getElementById('generateBtn');
+        const successOverlay = document.getElementById('successOverlay');
+        const successMsg  = document.getElementById('successMsg');
+        const successOkBtn = document.getElementById('successOkBtn');
+        let redirectProjectId = null;
+
+        slipForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+
+            try {
+                const res = await fetch('/PayrollStaff/GeneratePayrollSlip', {
+                    method: 'POST',
+                    body: new FormData(slipForm)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    successMsg.textContent = data.message;
+                    redirectProjectId = data.projectId;
+                    successOverlay.classList.add('open');
+                } else {
+                    alert(data.message || 'Failed to generate payroll.');
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'Generate Payroll';
+                }
+            } catch (err) {
+                alert('Something went wrong.');
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Payroll';
+            }
+        });
+
+        successOkBtn.addEventListener('click', function () {
+            window.location.href = '/PayrollStaff/GeneratePayroll?projectId=' + redirectProjectId;
+        });
+    </script>
+}

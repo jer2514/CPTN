@@ -62,7 +62,6 @@
         </div>
     </div>
 
-    <!-- Monthly Budget — dynamic, based on actual date range -->
     <div class="proj-view-group">
         <div class="form-lbl">Monthly Budget</div>
         @if (!budgets.Any())
@@ -95,7 +94,6 @@
         <div class="proj-view-field">@(Model.AssignedPayrollStaff ?? "—")</div>
     </div>
 
-    <!-- Assigned Employees — buttons that open overlays -->
     <div class="proj-view-group mt-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="form-lbl mb-0">Assigned Employees</span>
@@ -137,13 +135,12 @@
                     <th>Job</th>
                     <th>Rate</th>
                     <th>Status</th>
-                    <th></th>
                 </tr>
             </thead>
             <tbody id="viewEmpTableBody">
                 @if (!employees.Any())
                 {
-                    <tr class="empty-row"><td colspan="5" class="text-center text-muted py-3">No employees assigned.</td></tr>
+                    <tr class="empty-row"><td colspan="4" class="text-center text-muted py-3">No employees assigned.</td></tr>
                 }
                 @foreach (var emp in employees)
                 {
@@ -154,26 +151,38 @@
                         <td>
                             <button type="button"
                                     class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
-                                    onclick="toggleEmpStatus(this, @emp.EmployeeId)">
-                                @(emp.IsActive ? "Active" : "Inactive")
-                            </button>
-                        </td>
-                        <td class="text-end">
-                            <button type="button" class="remove-emp-btn"
                                     data-id="@emp.EmployeeId"
                                     data-name="@emp.FullName"
-                                    data-job="@emp.JobClassification"
-                                    onclick="removeEmployee(this)">
-                                Remove
+                                    onclick="handleStatusClick(this)">
+                                @(emp.IsActive ? "Active" : "Inactive")
                             </button>
                         </td>
                     </tr>
                 }
                 <tr class="no-result-row" style="display:none">
-                    <td colspan="5" class="text-center text-muted py-3">No matching employees.</td>
+                    <td colspan="4" class="text-center text-muted py-3">No matching employees.</td>
                 </tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- ============ DEACTIVATE CONFIRM OVERLAY ============ -->
+<div class="del-overlay" id="deactivateOverlay" onclick="closeDeactivateModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Set as Inactive?</div>
+        <div class="del-msg">
+            Marking <strong id="deactivateEmpName"></strong> as inactive will also
+            remove them from this project. You can add them back later from
+            <strong>Add Employees</strong>.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeDeactivateModal()">Cancel</button>
+            <button class="del-btn-delete" onclick="confirmDeactivate()">Set Inactive</button>
+        </div>
     </div>
 </div>
 
@@ -255,7 +264,8 @@
 
 @section Scripts {
     <script>
-        const PROJECT_ID = '@Model.ProjectId';
+        const PROJECT_ID = @Model.ProjectId;
+        let pendingDeactivate = null;
 
         function getToken() {
             return document.querySelector('#tokenForm input[name="__RequestVerificationToken"]').value;
@@ -290,6 +300,14 @@
                 document.getElementById('addEmpOverlay').classList.remove('open');
         }
 
+        // ── Deactivate confirm modal ───────────────────────
+        function closeDeactivateModal(e) {
+            if (!e || e.target === document.getElementById('deactivateOverlay')) {
+                document.getElementById('deactivateOverlay').classList.remove('open');
+                pendingDeactivate = null;
+            }
+        }
+
         // ── Search filter (shared by both modals) ─────────
         function filterEmpTable(inputId, tbodyId) {
             const term = document.getElementById(inputId).value.trim().toLowerCase();
@@ -319,8 +337,22 @@
             }
         }
 
-        // ── Toggle Active/Inactive from the modal ─────────
-        async function toggleEmpStatus(btn, employeeId) {
+        // ── Status badge click — routes based on current state ─
+        function handleStatusClick(btn) {
+            const isActive = btn.classList.contains('badge-active');
+            const employeeId = btn.dataset.id;
+
+            if (isActive) {
+                pendingDeactivate = { btn: btn, employeeId: employeeId };
+                document.getElementById('deactivateEmpName').textContent = btn.dataset.name;
+                document.getElementById('deactivateOverlay').classList.add('open');
+            } else {
+                activateEmployee(btn, employeeId);
+            }
+        }
+
+        // ── Inactive → Active (direct, stays in project) ──
+        async function activateEmployee(btn, employeeId) {
             btn.disabled = true;
             try {
                 const formData = new FormData();
@@ -330,11 +362,11 @@
                 const res = await fetch('/Employee/ToggleStatusAjax', { method: 'POST', body: formData });
                 const data = await res.json();
 
-                if (data.success) {
-                    btn.classList.remove('badge-active', 'badge-inactive');
-                    btn.classList.add(data.isActive ? 'badge-active' : 'badge-inactive');
-                    btn.textContent = data.isActive ? 'Active' : 'Inactive';
-                } else {
+                if (data.success && data.isActive) {
+                    btn.classList.remove('badge-inactive');
+                    btn.classList.add('badge-active');
+                    btn.textContent = 'Active';
+                } else if (!data.success) {
                     alert(data.message || 'Could not update status.');
                 }
             } catch (err) {
@@ -344,7 +376,54 @@
             }
         }
 
-        // ── Add employee via AJAX ──────────────────────────
+        // ── Active → Inactive (confirmed): deactivate + remove ──
+        async function confirmDeactivate() {
+            if (!pendingDeactivate) return;
+            const btn = pendingDeactivate.btn;
+            const employeeId = pendingDeactivate.employeeId;
+
+            btn.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('employeeId', employeeId);
+                formData.append('projectId', PROJECT_ID);
+                formData.append('__RequestVerificationToken', getToken());
+
+                const res = await fetch('/Project/DeactivateAndRemove', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    const viewBody = document.getElementById('viewEmpTableBody');
+                    btn.closest('tr').remove();
+                    addEmptyRowIfNeeded(viewBody, 4, 'No employees assigned.');
+
+                    const addBody = document.getElementById('addEmpTableBody');
+                    clearEmptyRow(addBody);
+
+                    const tr = document.createElement('tr');
+                    tr.dataset.name = data.employee.name.toLowerCase();
+                    tr.dataset.id = data.employee.id;
+                    tr.innerHTML = '<td>' + data.employee.name + '</td>' +
+                        '<td>' + data.employee.job + '</td>' +
+                        '<td class="text-end"><button type="button" class="add-emp-btn" data-id="' + data.employee.id + '" onclick="assignEmployee(this)">Add</button></td>';
+                    addBody.insertBefore(tr, addBody.querySelector('.no-result-row'));
+
+                    const countEl = document.getElementById('empTotalCount');
+                    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                } else {
+                    alert(data.message || 'Could not update employee.');
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                alert('Something went wrong. Please try again.');
+                btn.disabled = false;
+            }
+
+            closeDeactivateModal();
+        }
+
+                // ── Add employee via AJAX ──────────────────────────
         async function assignEmployee(btn) {
             const employeeId = btn.dataset.id;
             btn.disabled = true;
@@ -370,21 +449,11 @@
                     const tr = document.createElement('tr');
                     tr.dataset.name = data.employee.name.toLowerCase();
                     tr.dataset.id = data.employee.id;
-                    tr.innerHTML = `
-                        <td>${data.employee.name}</td>
-                        <td>${data.employee.job}</td>
-                        <td>₱${data.employee.rate}</td>
-                        <td>
-                            <button type="button" class="badge-btn ${data.employee.status === 'Active' ? 'badge-active' : 'badge-inactive'}"
-                                    onclick="toggleEmpStatus(this, ${data.employee.id})">
-                                ${data.employee.status}
-                            </button>
-                        </td>
-                        <td class="text-end">
-                            <button type="button" class="remove-emp-btn"
-                                    data-id="${data.employee.id}" data-name="${data.employee.name}" data-job="${data.employee.job}"
-                                    onclick="removeEmployee(this)">Remove</button>
-                        </td>`;
+                    const statusClass = data.employee.status === 'Active' ? 'badge-active' : 'badge-inactive';
+                    tr.innerHTML = '<td>' + data.employee.name + '</td>' +
+                        '<td>' + data.employee.job + '</td>' +
+                        '<td>₱' + data.employee.rate + '</td>' +
+                        '<td><button type="button" class="badge-btn ' + statusClass + '" data-id="' + data.employee.id + '" data-name="' + data.employee.name + '" onclick="handleStatusClick(this)">' + data.employee.status + '</button></td>';
                     viewBody.insertBefore(tr, viewBody.querySelector('.no-result-row'));
 
                     const countEl = document.getElementById('empTotalCount');
@@ -395,60 +464,10 @@
                     btn.textContent = 'Add';
                 }
             } catch (err) {
+                console.error('assignEmployee error:', err);
                 alert('Something went wrong. Please try again.');
                 btn.disabled = false;
                 btn.textContent = 'Add';
-            }
-        }
-
-        // ── Remove employee via AJAX ───────────────────────
-        async function removeEmployee(btn) {
-            if (!confirm('Remove this employee from the project?')) return;
-
-            const employeeId = btn.dataset.id;
-            btn.disabled = true;
-            btn.textContent = 'Removing...';
-
-            try {
-                const formData = new FormData();
-                formData.append('employeeId', employeeId);
-                formData.append('projectId', PROJECT_ID);
-                formData.append('__RequestVerificationToken', getToken());
-
-                const res = await fetch('/Project/RemoveEmployeeAjax', { method: 'POST', body: formData });
-                const data = await res.json();
-
-                if (data.success) {
-                    const viewBody = document.getElementById('viewEmpTableBody');
-                    btn.closest('tr').remove();
-                    addEmptyRowIfNeeded(viewBody, 5, 'No employees assigned.');
-
-                    const addBody = document.getElementById('addEmpTableBody');
-                    clearEmptyRow(addBody);
-
-                    const tr = document.createElement('tr');
-                    tr.dataset.name = data.employee.name.toLowerCase();
-                    tr.dataset.id = data.employee.id;
-                    tr.innerHTML = `
-                        <td>${data.employee.name}</td>
-                        <td>${data.employee.job}</td>
-                        <td class="text-end">
-                            <button type="button" class="add-emp-btn" data-id="${data.employee.id}"
-                                    onclick="assignEmployee(this)">Add</button>
-                        </td>`;
-                    addBody.insertBefore(tr, addBody.querySelector('.no-result-row'));
-
-                    const countEl = document.getElementById('empTotalCount');
-                    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
-                } else {
-                    alert(data.message || 'Could not remove employee.');
-                    btn.disabled = false;
-                    btn.textContent = 'Remove';
-                }
-            } catch (err) {
-                alert('Something went wrong. Please try again.');
-                btn.disabled = false;
-                btn.textContent = 'Remove';
             }
         }
 
@@ -457,6 +476,7 @@
                 closeDeleteModal();
                 closeViewEmpModal();
                 closeAddEmpModal();
+                closeDeactivateModal();
             }
         });
     </script>

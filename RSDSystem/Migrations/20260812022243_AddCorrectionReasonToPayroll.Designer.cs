@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RSDSystem.Models;
 
@@ -11,9 +12,11 @@ using RSDSystem.Models;
 namespace RSDSystem.Migrations
 {
     [DbContext(typeof(PayrollDbContext))]
-    partial class PayrollDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260812022243_AddCorrectionReasonToPayroll")]
+    partial class AddCorrectionReasonToPayroll
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -95,14 +98,7 @@ namespace RSDSystem.Migrations
 
                     b.HasKey("EmployeeId");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
-
                     b.HasIndex("ProjectId");
-
-                    b.HasIndex("FirstName", "LastName", "DateOfBirth")
-                        .IsUnique()
-                        .HasFilter("[DateOfBirth] IS NOT NULL");
 
                     b.ToTable("Employees");
                 });

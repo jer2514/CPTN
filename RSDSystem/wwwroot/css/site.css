@@ -127,6 +127,99 @@ body {
     color: #888;
 }
 
+/* ── Dashboard ────────────────────────────────────────── */
+.dash-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 25px;
+    margin-bottom: 38px;
+}
+
+.dash-welcome {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.dash-stat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+}
+
+.dash-stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #EEF3FF;
+    color: #266DF1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.dash-stat-number {
+    font-size: 20px;
+    font-weight: 700;
+    color: #163F8B;
+    line-height: 1.2;
+}
+
+.dash-stat-label {
+    font-size: 12.5px;
+    color: #555;
+}
+
+.dash-panels-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.dash-panel {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+}
+
+.dash-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.dash-panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.dash-add-schedule-btn {
+    padding: 6px 16px;
+    font-size: 12.5px;
+}
+
+.dash-schedule-modal {
+    width: 460px;
+    text-align: left;
+}
+
 /* ── Main content area ──────────────────────────────────── */
 .content-area {
     flex: 1;
@@ -289,7 +382,49 @@ body {
     flex-wrap: wrap;
 }
 
+
 /* ── Search box ──────────────────────────────────────────── */
+.list-controls-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.list-controls-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+    .list-controls-actions .dropdown,
+    .list-controls-actions .btn-primary-blue {
+        flex-shrink: 0;
+    }
+
+.search-wrap-wide {
+    flex: 1 1 200px;
+    max-width: 320px;
+    min-width: 160px;
+}
+
+    .search-wrap-wide input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+.mb-3 {
+    margin-bottom: 18px;
+}
+
+/* ── Search box (base) ───────────────────────────────────── */
 .search-wrap {
     position: relative;
 }
@@ -485,6 +620,31 @@ body {
     white-space: nowrap;
 }
 
+/* ── Toast notifications ─────────────────────────────────── */
+.rsd-toast {
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    min-width: 300px;
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.rsd-toast-success {
+    background: #0d7a3e;
+}
+
+.rsd-toast-error {
+    background: #c0392b;
+}
+
+.rsd-toast .toast-body {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+}
+
 /* ── Action icon buttons ─────────────────────────────────── */
 .action-btn {
     width: 30px;
@@ -560,6 +720,10 @@ body {
 
 .form-row-3b {
     grid-template-columns: 5fr 3fr 4fr;
+}
+
+.form-row-eq3 {
+    grid-template-columns: 1fr 1fr 1fr;
 }
 
 .form-row-2 {
@@ -691,6 +855,50 @@ select.form-ctrl {
     min-width: 0;
 }
 
+/*Pagination*/
+.pagination-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 20px;
+}
+
+.page-link {
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #163F8B;
+    text-decoration: none;
+    padding: 0 6px;
+    transition: background .15s;
+}
+
+    .page-link:hover {
+        background: #EEF3FF;
+    }
+
+    .page-link.active {
+        background: #266DF1;
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .page-link.disabled {
+        pointer-events: none;
+        color: #c9d6ee;
+    }
+
+.page-ellipsis {
+    color: #9ab0d8;
+    font-size: 13px;
+    padding: 0 2px;
+}
+
 /* ── Delete confirmation overlay ─────────────────────────── */
 .del-overlay {
     display: none;
@@ -801,6 +1009,21 @@ select.form-ctrl {
     .del-btn-delete:hover {
         background: #c0392b;
     }
+
+
+
+/* ── Form-level error banner ─────────────────────────────── */
+.form-error-box {
+    background: #fde8e8;
+    border: 1.5px solid #f5b5b5;
+    color: #c0392b;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 16px;
+}
+
 
 /* ── Password input with eye toggle ─────────────────────── */
 .pwd-wrap {
@@ -1496,3 +1719,465 @@ button.badge-btn {
         color: #fff;
         border-color: #163F8B;
     }
+
+
+/*payroll staff*/
+/* ── Generate Payroll — project search + employee table ─── */
+.genpay-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    margin-bottom: 10px;
+}
+
+.genpay-select-wrap {
+    max-width: 320px;
+    flex: 1;
+    position: relative;
+}
+
+/* ── Generate Payroll — custom autocomplete ─────────────── */
+.genpay-autocomplete {
+    position: relative;
+}
+
+.genpay-suggest-list {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1.5px solid #C9DAFF;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(38, 109, 241, .15);
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 40;
+}
+
+.genpay-suggest-list li {
+    padding: 9px 14px;
+    font-size: 13px;
+    color: #163F8B;
+    cursor: pointer;
+    transition: background .12s;
+}
+
+.genpay-suggest-list li:hover {
+    background: #EEF3FF;
+}
+
+.genpay-suggest-list li.genpay-suggest-empty {
+    color: #9ab0d8;
+    cursor: default;
+}
+
+.genpay-suggest-list li.genpay-suggest-empty:hover {
+    background: none;
+}
+
+.genpay-fallback-note {
+    background: #FFF8E1;
+    color: #8a6d00;
+    border: 1px solid #ffe58a;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    margin-bottom: 16px;
+}
+
+.btn-primary-blue-solid {
+    background: #266DF1;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 26px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    height: 38px;
+    transition: background .15s;
+}
+
+.btn-primary-blue-solid:hover {
+    background: #1B52BD;
+}
+
+.btn-generate-pill {
+    background: #266DF1;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    padding: 5px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    transition: background .15s;
+}
+
+.btn-generate-pill:hover {
+    background: #1B52BD;
+    color: #fff;
+    text-decoration: none;
+}
+
+ .btn-generate-pill:disabled {
+    opacity: .7;
+    cursor: default;
+ }
+
+.btn-generate-done {
+    background: #0d7a3e !important;
+}
+
+/* ── Payroll slip card ───────────────────────────────────── */
+.slip-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px;
+    max-width: 560px;
+    margin: 0 auto;
+}
+
+.slip-title {
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-bottom: 20px;
+}
+
+.slip-row3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+
+.slip-value {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #266DF1;
+}
+
+/* ── Pending Payroll — status rows & pills ──────────────── */
+.row-correction td {
+    background: #ffe4c4 !important;
+}
+
+.row-draft td {
+    background: #eef0f2 !important;
+}
+
+.row-submitted td {
+    background: #d4f7e0 !important;
+}
+
+.status-pill {
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+.status-correction {
+    background: #ffdca0;
+    color: #a15c00;
+}
+
+.status-draft {
+    background: #e2e5ea;
+    color: #444;
+}
+
+.status-submitted {
+    background: #b6f0c9;
+    color: #0d7a3e;
+}
+
+.pill-btn {
+    display: inline-flex;
+    align-items: center;
+    border: none;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    margin-left: 4px;
+}
+
+.pill-submit {
+    background: #0d7a3e;
+    color: #fff;
+}
+
+    .pill-submit:hover {
+        background: #0a5c2f;
+        color: #fff;
+    }
+
+.pill-view {
+    background: #266DF1;
+    color: #fff;
+}
+
+    .pill-view:hover {
+        background: #1B52BD;
+        color: #fff;
+    }
+
+/* ── View Payroll page ───────────────────────────────────── */
+.viewpay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.payslip-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 34px;
+    max-width: 620px;
+    margin: 0 auto;
+}
+
+.payslip-title {
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    color: #266DF1;
+}
+
+.payslip-subtitle {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #000;
+    margin-bottom: 16px;
+}
+
+.payslip-section-lbl {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0d7a3e;
+    border-bottom: 1px solid #eef0f2;
+    padding-bottom: 6px;
+    margin: 16px 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.payslip-period {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #266DF1;
+}
+
+.payslip-row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.payslip-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+}
+
+.payslip-line-strong {
+    border-top: 1px solid #eef0f2;
+    padding-top: 8px;
+    font-weight: 700;
+}
+
+.payslip-lbl {
+    color: #444;
+}
+
+.payslip-val {
+    color: #266DF1;
+    font-weight: 600;
+}
+
+.payslip-footer {
+    margin-top: 18px;
+    font-size: 11.5px;
+    color: #266DF1;
+    font-weight: 600;
+}
+
+/* ── Admin payslip approve / return actions ─────────────── */
+.payslip-approve-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    margin-top: 22px;
+}
+
+.btn-approve {
+    background: #0d7a3e;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 32px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .btn-approve:hover {
+        background: #0a5c2f;
+    }
+
+.btn-return {
+    background: #E1962B;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .btn-return:hover {
+        background: #c07d1c;
+    }
+
+.correction-modal {
+    text-align: left;
+}
+
+.correction-textarea {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    margin: 14px 0;
+}
+
+/* ── Admin dashboard ──────────────────────────────────────── */
+.dash-welcome {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 20px 0 18px;
+}
+
+.dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 20px;
+}
+
+.dash-stat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.dash-stat-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #EEF3FF;
+    color: #266DF1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    flex-shrink: 0;
+}
+
+.dash-stat-num {
+    font-size: 18px;
+    font-weight: 700;
+    color: #000;
+}
+
+.dash-stat-lbl {
+    font-size: 11.5px;
+    color: #6b87c0;
+}
+
+.dash-panels-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.dash-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+}
+
+.dash-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #163F8B;
+    margin-bottom: 12px;
+}
+
+.dash-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+    .dash-mini-table th {
+        text-align: left;
+        color: #6b87c0;
+        font-weight: 600;
+        padding: 6px 8px;
+        border-bottom: 1px solid #eef0f2;
+    }
+
+    .dash-mini-table td {
+        padding: 8px;
+        border-bottom: 1px solid #f5f7fb;
+    }
+
+/* ── Correction reason banner ────────────────────────────── */
+.correction-banner {
+    background: #FFF3E0;
+    border: 1px solid #FFD59A;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-top: 18px;
+}
+
+.correction-banner-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #A15C00;
+    margin-bottom: 6px;
+}
+
+.correction-banner-text {
+    font-size: 13px;
+    color: #6b4d00;
+    line-height: 1.5;
+}
+

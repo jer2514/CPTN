@@ -19,12 +19,12 @@ namespace RSDSystem.Controllers
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
 
         // GET /UserManagement
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
+            const int pageSize = 10;
+
             var query = _db.Users
-                           .Where(u => u.FirstName != null &&
-                                        u.LastName != null &&
-                                        u.Role != null)
+                           .Where(u => u.FirstName != null && u.LastName != null && u.Role != null)
                            .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -43,14 +43,22 @@ namespace RSDSystem.Controllers
                 "role" => query.OrderBy(u => u.Role),
                 "email" => query.OrderBy(u => u.Email),
                 "status" => query.OrderByDescending(u => u.IsActive),
-                _ => query.OrderBy(u => u.UserId)
+                _ => query.OrderByDescending(u => u.CreatedAt)
             };
+
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
             ViewBag.PageTitle = "User Management";
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /UserManagement/Create
@@ -70,9 +78,20 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
 
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            var usernameTaken = await _db.Users
+                .AnyAsync(u => u.Username == user.Username.Trim());
+            if (usernameTaken)
+                ModelState.AddModelError("Username", "This username is already taken.");
+
+            var emailTaken = await _db.Users
+                .AnyAsync(u => u.Email == user.Email.Trim());
+            if (emailTaken)
+                ModelState.AddModelError("Email", "This email is already registered.");
 
             if (!ModelState.IsValid)
             {
@@ -86,14 +105,25 @@ namespace RSDSystem.Controllers
             user.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password);
             user.UserId = 0;
+            user.UserCode = GenerateUserCode();
+            user.CreatedAt = DateTime.Now;
 
             if (photo != null && photo.Length > 0)
                 user.PhotoPath = await SavePhotoAsync(photo);
 
             _db.Users.Add(user);
+            user.UserCode = await GenerateUserCodeAsync();
             await _db.SaveChangesAsync();
             TempData["Success"] = "User added successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<string> GenerateUserCodeAsync()
+        {
+            var year = DateTime.Now.ToString("yy");
+            var count = await _db.Users.CountAsync(u => u.UserCode != null && u.UserCode.StartsWith(year));
+            var seq = (count + 1).ToString().PadLeft(4, '0');
+            return $"{year}{seq}";
         }
 
         // GET /UserManagement/Edit/{id}
@@ -115,9 +145,20 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
 
             if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            var usernameTaken = await _db.Users
+                .AnyAsync(u => u.Username == user.Username.Trim() && u.UserId != user.UserId);
+            if (usernameTaken)
+                ModelState.AddModelError("Username", "This username is already taken.");
+
+            var emailTaken = await _db.Users
+                .AnyAsync(u => u.Email == user.Email.Trim() && u.UserId != user.UserId);
+            if (emailTaken)
+                ModelState.AddModelError("Email", "This email is already registered.");
 
             if (!ModelState.IsValid)
             {
@@ -206,6 +247,7 @@ namespace RSDSystem.Controllers
 
             _db.Users.RemoveRange(users);
             await _db.SaveChangesAsync();
+            TempData["Success"] = "Users deleted.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -220,6 +262,27 @@ namespace RSDSystem.Controllers
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
+        }
+
+        private string GenerateUserCode()
+        {
+            string yearPrefix = DateTime.Now.ToString("yy");
+
+            var lastCode = _db.Users
+                .Where(u => u.UserCode.StartsWith(yearPrefix))
+                .OrderByDescending(u => u.UserCode)
+                .Select(u => u.UserCode)
+                .FirstOrDefault();
+
+            int nextSeq = 1;
+            if (lastCode != null && lastCode.Length == 6)
+            {
+                var seqPart = lastCode.Substring(2);
+                if (int.TryParse(seqPart, out int lastSeq))
+                    nextSeq = lastSeq + 1;
+            }
+
+            return yearPrefix + nextSeq.ToString("D4");
         }
     }
 }

@@ -1,0 +1,68 @@
+﻿@model RSDSystem.Models.Payroll
+@{
+    ViewData["Title"] = "View Payroll";
+    Layout = "_PayrollStaffLayout";
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="viewpay-header">
+    <a asp-action="PendingPayroll" asp-route-projectId="@Model.ProjectId" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+
+    @if (Model.Status != "Submitted")
+    {
+        <a asp-action="PayrollSlip" asp-route-employeeId="@Model.EmployeeId" asp-route-projectId="@Model.ProjectId"
+           class="btn-primary-blue">Edit</a>
+    }
+</div>
+
+<div class="payslip-card">
+    <div class="payslip-title">RSD Construction Services</div>
+    <div class="payslip-subtitle">Employee Payslip</div>
+
+    <div class="payslip-section-lbl">Employee Information</div>
+    <div class="payslip-row2">
+        <div><span class="payslip-lbl">Employee ID: </span><span class="payslip-val">@ViewBag.DisplayId</span></div>
+        <div><span class="payslip-lbl">Project Assigned: </span><span class="payslip-val">@(Model.Project?.ProjectName ?? "—")</span></div>
+    </div>
+    <div class="payslip-row2">
+        <div><span class="payslip-lbl">Employee Name: </span><span class="payslip-val">@Model.Employee?.FullName</span></div>
+        <div><span class="payslip-lbl">Rate per day: </span><span class="payslip-val">₱@Model.Employee?.DailyRate.ToString("N2")</span></div>
+    </div>
+    <div class="payslip-row2">
+        <div><span class="payslip-lbl">Job Classification: </span><span class="payslip-val">@Model.Employee?.JobClassification</span></div>
+        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@Model.Employee?.RatePerHour.ToString("N2")</span></div>
+    </div>
+
+    <div class="payslip-section-lbl">
+        Attendance Summary
+        <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy") - @Model.PayPeriodEnd.ToString("MMMM dd, yyyy")</span>
+    </div>
+    <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
+    <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours hours</span></div>
+    <div class="payslip-line"><span>Absent:</span><span class="payslip-val">@Model.AbsentDays Days</span></div>
+
+    <div class="payslip-section-lbl">Payroll Computation</div>
+    <div class="payslip-line"><span>Regular Pay:</span><span class="payslip-val">₱@Model.RegularPay.ToString("N2")</span></div>
+    <div class="payslip-line"><span>Overtime Pay:</span><span class="payslip-val">₱@Model.OvertimePay.ToString("N2")</span></div>
+    <div class="payslip-line payslip-line-strong"><span>Gross Pay:</span><span class="payslip-val">₱@Model.GrossPay.ToString("N2")</span></div>
+    <div class="payslip-line"><span>Cash Advance:</span><span class="payslip-val">₱@Model.CashAdvance.ToString("N2")</span></div>
+    <div class="payslip-line payslip-line-strong"><span>Net Pay:</span><span class="payslip-val">₱@Model.NetPay.ToString("N2")</span></div>
+
+    @if (Model.Status == "Correction" && !string.IsNullOrWhiteSpace(Model.CorrectionReason))
+    {
+        <div class="correction-banner">
+            <div class="correction-banner-title">
+                <i class="bi bi-exclamation-circle-fill"></i> Returned for Correction
+            </div>
+            <div class="correction-banner-text">@Model.CorrectionReason</div>
+        </div>
+    }
+
+    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy")</div>
+</div>

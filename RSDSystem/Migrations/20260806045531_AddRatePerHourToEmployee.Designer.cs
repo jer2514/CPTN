@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using RSDSystem.Models;
 
@@ -11,9 +12,11 @@ using RSDSystem.Models;
 namespace RSDSystem.Migrations
 {
     [DbContext(typeof(PayrollDbContext))]
-    partial class PayrollDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260806045531_AddRatePerHourToEmployee")]
+    partial class AddRatePerHourToEmployee
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -41,9 +44,6 @@ namespace RSDSystem.Migrations
 
                     b.Property<decimal>("DailyRate")
                         .HasColumnType("decimal(10,2)");
-
-                    b.Property<DateTime>("DateAdded")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("DateOfBirth")
                         .HasColumnType("datetime2");
@@ -95,116 +95,12 @@ namespace RSDSystem.Migrations
 
                     b.HasKey("EmployeeId");
 
-                    b.HasIndex("Email")
+                    b.HasIndex("EmployeeCode")
                         .IsUnique();
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("FirstName", "LastName", "DateOfBirth")
-                        .IsUnique()
-                        .HasFilter("[DateOfBirth] IS NOT NULL");
-
                     b.ToTable("Employees");
-                });
-
-            modelBuilder.Entity("RSDSystem.Models.Payroll", b =>
-                {
-                    b.Property<int>("PayrollId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PayrollId"));
-
-                    b.Property<int>("AbsentDays")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("CashAdvance")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<string>("CorrectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("GeneratedBy")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<DateTime>("GeneratedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("GrossPay")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<decimal>("NetPay")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<decimal>("OvertimeHours")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("OvertimePay")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<DateTime>("PayPeriodEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("PayPeriodStart")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RegularDaysWorked")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("RegularPay")
-                        .HasColumnType("decimal(12,2)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.HasKey("PayrollId");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("Payrolls");
-                });
-
-            modelBuilder.Entity("RSDSystem.Models.PayrollSchedule", b =>
-                {
-                    b.Property<int>("PayrollScheduleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PayrollScheduleId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("StartingDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("TypeOfService")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("PayrollScheduleId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("PayrollSchedules");
                 });
 
             modelBuilder.Entity("RSDSystem.Models.Project", b =>
@@ -361,10 +257,7 @@ namespace RSDSystem.Migrations
 
                     b.HasKey("UserId");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.HasIndex("Username")
+                    b.HasIndex("UserCode")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -376,36 +269,6 @@ namespace RSDSystem.Migrations
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("RSDSystem.Models.Payroll", b =>
-                {
-                    b.HasOne("RSDSystem.Models.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("RSDSystem.Models.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("RSDSystem.Models.PayrollSchedule", b =>
-                {
-                    b.HasOne("RSDSystem.Models.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("Project");
                 });
