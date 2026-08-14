@@ -423,7 +423,7 @@
             closeDeactivateModal();
         }
 
-        // ── Add employee via AJAX ──────────────────────────
+                // ── Add employee via AJAX ──────────────────────────
         async function assignEmployee(btn) {
             const employeeId = btn.dataset.id;
             btn.disabled = true;
@@ -464,6 +464,7 @@
                     btn.textContent = 'Add';
                 }
             } catch (err) {
+                console.error('assignEmployee error:', err);
                 alert('Something went wrong. Please try again.');
                 btn.disabled = false;
                 btn.textContent = 'Add';

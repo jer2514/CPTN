@@ -43,6 +43,11 @@ namespace RSDSystem.Controllers
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
                 _ => query.OrderBy(e => e.EmployeeId)
+            }; query = sortBy switch
+            {
+                "lastname" => query.OrderBy(e => e.LastName),
+                "job" => query.OrderBy(e => e.JobClassification),
+                _ => query.OrderByDescending(e => e.DateAdded).ThenByDescending(e => e.EmployeeId)
             };
 
             ViewBag.Search = search;
@@ -70,6 +75,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
+            ModelState.Remove("EmployeeCode");
 
             CapitalizeEmployee(emp);
 
@@ -90,6 +96,13 @@ namespace RSDSystem.Controllers
             }
 
             emp.EmployeeId = 0;
+            emp.DateAdded = DateTime.Now;
+
+            var newCode = await GenerateEmployeeCodeAsync();
+            if (string.IsNullOrWhiteSpace(newCode))
+                throw new InvalidOperationException("GenerateEmployeeCodeAsync returned an empty code — check the method logic.");
+
+            emp.EmployeeCode = newCode;
 
             if (photo != null && photo.Length > 0)
                 emp.PhotoPath = await SavePhotoAsync(photo);
@@ -122,6 +135,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("Project");
+            ModelState.Remove("EmployeeCode");
 
             CapitalizeEmployee(emp);
 
@@ -153,7 +167,10 @@ namespace RSDSystem.Controllers
             existing.Email = emp.Email;
             existing.ContactNumber = emp.ContactNumber;
             existing.JobClassification = emp.JobClassification;
-            existing.ProjectId = emp.ProjectId;  // ← saves project assignment
+            existing.DailyRate = emp.DailyRate;
+            existing.RatePerHour = emp.RatePerHour;
+            existing.ProjectId = emp.ProjectId;
+            // existing.EmployeeCode intentionally untouched — never re-generated on edit
 
             if (photo != null && photo.Length > 0)
                 existing.PhotoPath = await SavePhotoAsync(photo);
@@ -204,9 +221,17 @@ namespace RSDSystem.Controllers
             var emp = await _db.Employees.FindAsync(id);
             if (emp != null)
             {
-                _db.Employees.Remove(emp);
-                await _db.SaveChangesAsync();
-                TempData["Success"] = "Employee deleted.";
+                try
+                {
+                    _db.Employees.Remove(emp);
+                    await _db.SaveChangesAsync();
+                    TempData["Success"] = "Employee deleted.";
+                }
+                catch (DbUpdateException)
+                {
+                    TempData["Error"] = $"{emp.FullName} cannot be deleted because they have existing payroll records. " +
+                                         "Set their status to Inactive instead to keep payroll history intact.";
+                }
             }
             return RedirectToAction(nameof(Index));
         }
@@ -222,6 +247,32 @@ namespace RSDSystem.Controllers
             return $"/uploads/employees/{fileName}";
         }
 
+        // Generate a unique EmployeeCode in the same format used by the
+        // migration: YY + 4-digit zero-padded sequence (e.g. 26 0001 => "260001").
+        private async Task<string> GenerateEmployeeCodeAsync()
+        {
+            var year = DateTime.Now.Year % 100;
+            var prefix = year.ToString("D2");
+
+            var codes = await _db.Employees
+                                 .Where(e => e.EmployeeCode != null && e.EmployeeCode.StartsWith(prefix))
+                                 .Select(e => e.EmployeeCode!)
+                                 .ToListAsync();
+
+            int maxSeq = 0;
+            foreach (var code in codes)
+            {
+                if (code.Length >= 6)
+                {
+                    var tail = code.Substring(code.Length - 4);
+                    if (int.TryParse(tail, out var n) && n > maxSeq) maxSeq = n;
+                }
+            }
+
+            var next = maxSeq + 1;
+            return prefix + next.ToString("D4");
+        }
+
         //delete multiple employees
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -234,8 +285,26 @@ namespace RSDSystem.Controllers
                                .Where(e => selectedIds.Contains(e.EmployeeId))
                                .ToList();
 
-            _db.Employees.RemoveRange(employees);
-            await _db.SaveChangesAsync();
+            var blocked = new List<string>();
+
+            foreach (var emp in employees)
+            {
+                _db.Employees.Remove(emp);
+                try
+                {
+                    await _db.SaveChangesAsync();
+                }
+                catch (DbUpdateException)
+                {
+                    _db.Entry(emp).State = EntityState.Unchanged;
+                    blocked.Add(emp.FullName);
+                }
+            }
+
+            TempData[blocked.Any() ? "Error" : "Success"] = blocked.Any()
+                ? $"Could not delete: {string.Join(", ", blocked)} — they have existing payroll records."
+                : "Selected employees deleted.";
+
             return RedirectToAction(nameof(Index));
         }
 

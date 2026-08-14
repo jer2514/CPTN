@@ -620,6 +620,31 @@ body {
     white-space: nowrap;
 }
 
+/* ── Toast notifications ─────────────────────────────────── */
+.rsd-toast {
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    min-width: 300px;
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.rsd-toast-success {
+    background: #0d7a3e;
+}
+
+.rsd-toast-error {
+    background: #c0392b;
+}
+
+.rsd-toast .toast-body {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+}
+
 /* ── Action icon buttons ─────────────────────────────────── */
 .action-btn {
     width: 30px;
@@ -984,6 +1009,8 @@ select.form-ctrl {
     .del-btn-delete:hover {
         background: #c0392b;
     }
+
+
 
 /* ── Form-level error banner ─────────────────────────────── */
 .form-error-box {
