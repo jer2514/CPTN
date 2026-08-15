@@ -265,24 +265,42 @@ namespace RSDSystem.Controllers
         }
 
         // POST /PayrollStaff/SubmitPayroll/{id}
-[HttpPost]
-[ValidateAntiForgeryToken]
-public async Task<IActionResult> SubmitPayroll(int id)
-{
-    var payroll = await _db.Payrolls.FindAsync(id);
-    if (payroll == null)
-        return Json(new { success = false, message = "Payroll record not found." });
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SubmitPayroll(int id)
+        {
+             var payroll = await _db.Payrolls.FindAsync(id);
+             if (payroll == null)
+             return Json(new { success = false, message = "Payroll record not found." });
 
-    payroll.Status = PayrollStatusOptions.Submitted;
-    await _db.SaveChangesAsync();
+             payroll.Status = PayrollStatusOptions.Submitted;
+             await _db.SaveChangesAsync();
 
-    return Json(new { success = true, message = "Payroll has been submitted for admin review." });
-}
+             return Json(new { success = true, message = "Payroll has been submitted for admin review." });
+        }
+
+        // POST /PayrollStaff/DeletePayroll/{id}
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePayroll(int id)
+        {
+            var payroll = await _db.Payrolls.FindAsync(id);
+            if (payroll == null)
+                return Json(new { success = false, message = "Payroll record not found." });
+
+            if (payroll.Status != PayrollStatusOptions.Draft)
+                return Json(new { success = false, message = "Only draft payroll records can be deleted." });
+
+            _db.Payrolls.Remove(payroll);
+            await _db.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Draft payroll deleted." });
+        }
 
         public IActionResult Logout()
         {
-            // TODO: clear auth/session once login is implemented
-            return RedirectToAction(nameof(Index));
+             // TODO: clear auth/session once login is implemented
+             return RedirectToAction(nameof(Index));
         }
     }
 }

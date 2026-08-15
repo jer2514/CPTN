@@ -629,6 +629,14 @@ body {
     min-width: 300px;
     font-size: 13.5px;
     font-weight: 500;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 5s ease, transform 0.3s ease;
+}
+
+.rsd-toast.show {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .rsd-toast-success {
@@ -1931,6 +1939,16 @@ button.badge-btn {
 
     .pill-view:hover {
         background: #1B52BD;
+        color: #fff;
+    }
+
+.pill-delete {
+    background: #e53935;
+    color: #fff;
+}
+
+    .pill-delete:hover {
+        background: #c0392b;
         color: #fff;
     }
 
