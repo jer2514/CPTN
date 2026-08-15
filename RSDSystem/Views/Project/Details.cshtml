@@ -6,7 +6,6 @@
     var budgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
                      ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
     var statusLabel = ProjectStatusOptions.Normalize(Model.Status);
-    var statusClass = ProjectStatusOptions.BadgeClass(Model.Status);
 }
 
 
@@ -19,27 +18,47 @@
 </a>
 
 <style>
-    .badge-ongoing { background: #d4f7e0; color: #0d7a3e; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 600; }
-    .badge-finished { background: #d6e4ff; color: #163F8B; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 600; }
-    .badge-hold { background: #ffdca0; color: #a15c00; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 600; }
+    .proj-view-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+    .proj-view-toolbar .proj-view-actions { margin-bottom: 0; }
+    .proj-status-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .proj-status-pills .form-lbl { display: inline; margin-bottom: 0; }
+    .proj-status-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; padding: 6px 16px; border-radius: 20px; font-size: 12.5px; font-weight: 600; line-height: 1.2; opacity: .55; cursor: default; }
+    .proj-status-pill.is-current { opacity: 1; }
+    .badge-ongoing { background: #c6f6d5; color: #0d7a3e; }
+    .badge-ongoing.is-current { background: #22c55e; color: #111; }
+    .badge-hold { background: #ffe0b3; color: #a15c00; }
+    .badge-hold.is-current { background: #f59e0b; color: #111; }
+    .badge-finished { background: #d6e4ff; color: #163F8B; }
+    .badge-finished.is-current { background: #266DF1; color: #111; }
+    .proj-emp-table-wrap { border: 1.5px solid #C9DAFF; border-radius: 8px; overflow: hidden; max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
 </style>
 
 <div class="form-card" style="max-width:680px">
 
-    <div class="proj-view-actions">
-        <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
-            <i class="bi bi-pencil-fill"></i>
-        </a>
-        <button type="button" class="action-btn action-delete" title="Delete"
-                onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw((Model.ProjectName ?? "").Replace("'", "\\'"))')">
-            <i class="bi bi-trash-fill"></i>
-        </button>
-    </div>
-
-    <div class="proj-view-group">
-        <div class="form-lbl">Status</div>
-        <div class="proj-view-field">
-            <span class="@statusClass">@statusLabel</span>
+    <div class="proj-view-toolbar">
+        <div class="proj-status-pills">
+            <span class="form-lbl">Status:</span>
+            @foreach (var option in ProjectStatusOptions.All)
+            {
+                var pillClass = "proj-status-pill " + ProjectStatusOptions.BadgeClass(option);
+                if (statusLabel == option)
+                {
+                    <span class="@pillClass is-current">@option</span>
+                }
+                else
+                {
+                    <span class="@pillClass">@option</span>
+                }
+            }
+        </div>
+        <div class="proj-view-actions">
+            <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
+                <i class="bi bi-pencil-fill"></i>
+            </a>
+            <button type="button" class="action-btn action-delete" title="Delete"
+                    onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw((Model.ProjectName ?? "").Replace("'", "\\'"))')">
+                <i class="bi bi-trash-fill"></i>
+            </button>
         </div>
     </div>
 
@@ -91,7 +110,7 @@
                 @foreach (var b in budgets)
                 {
                     <div class="proj-month-row">
-                        <span class="proj-month-label">Month of @b.MonthYear</span>
+                        <span class="proj-month-label">Month of @b.MonthDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</span>
                         <span class="proj-month-amount">₱@b.Amount.ToString("N2")</span>
                     </div>
                 }
@@ -116,33 +135,7 @@
                 Total Employees: <strong id="empTotalCount">@employees.Count</strong>
             </span>
         </div>
-        <div class="emp-action-btns">
-            <button type="button" class="btn-outline-blue" onclick="openViewEmpModal()">
-                <i class="bi bi-people-fill"></i> View Employees
-            </button>
-            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
-                <i class="bi bi-person-plus-fill"></i> Add Employees
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- ============ VIEW EMPLOYEES OVERLAY ============ -->
-<div class="del-overlay" id="viewEmpOverlay" onclick="closeViewEmpModal(arguments[0])">
-    <div class="del-modal emp-modal">
-        <div class="emp-modal-head">
-            <span class="emp-modal-title">Assigned Employees</span>
-            <button type="button" class="emp-modal-close" onclick="closeViewEmpModal()">
-                <i class="bi bi-x-lg"></i>
-            </button>
-        </div>
-
-        <div class="search-wrap emp-search">
-            <i class="bi bi-search"></i>
-            <input type="text" id="viewEmpSearch" placeholder="Search employee..."
-                   onkeyup="filterEmpTable('viewEmpSearch','viewEmpTableBody')" />
-        </div>
-
+        <div class="proj-emp-table-wrap">
         <table class="emp-table emp-table-view">
             <thead>
                 <tr>
@@ -175,10 +168,15 @@
                     </tr>
                 }
                 <tr class="no-result-row" style="display:none">
-                    <td colspan="4" class="text-center text-muted py-3">No matching employees.</td>
-                </tr>
+                    <td colspan="4" class="text-center text-muted py-3">No matching employees.</td></tr>
             </tbody>
         </table>
+        </div>
+        <div class="emp-action-btns">
+            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
+                <i class="bi bi-person-plus-fill"></i> Add Employees
+            </button>
+        </div>
     </div>
 </div>
 
@@ -295,15 +293,6 @@
         function closeDeleteModal(e) {
             if (!e || e.target === document.getElementById('deleteOverlay'))
                 document.getElementById('deleteOverlay').classList.remove('open');
-        }
-
-        // ── View Employees modal ──────────────────────────
-        function openViewEmpModal() {
-            document.getElementById('viewEmpOverlay').classList.add('open');
-        }
-        function closeViewEmpModal(e) {
-            if (!e || e.target === document.getElementById('viewEmpOverlay'))
-                document.getElementById('viewEmpOverlay').classList.remove('open');
         }
 
         // ── Add Employees modal ───────────────────────────
@@ -438,7 +427,7 @@
             closeDeactivateModal();
         }
 
-                // ── Add employee via AJAX ──────────────────────────
+        // ── Add employee via AJAX ──────────────────────────
         async function assignEmployee(btn) {
             const employeeId = btn.dataset.id;
             btn.disabled = true;
@@ -489,7 +478,6 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 closeDeleteModal();
-                closeViewEmpModal();
                 closeAddEmpModal();
                 closeDeactivateModal();
             }
