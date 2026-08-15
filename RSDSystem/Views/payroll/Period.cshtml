@@ -1,10 +1,7 @@
 @model List<RSDSystem.Models.PayrollPeriodEmployeeRow>
 @{
     ViewData["Title"] = "View Payroll";
-    var projectId = (int)ViewBag.ProjectId;
     var projectName = ViewBag.ProjectName as string ?? "Project";
-    var start = (DateTime)ViewBag.Start;
-    var end = (DateTime)ViewBag.End;
     var startLabel = ViewBag.StartLabel as string ?? "";
     var endLabel = ViewBag.EndLabel as string ?? "";
 }
