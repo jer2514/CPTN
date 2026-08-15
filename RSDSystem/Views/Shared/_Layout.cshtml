@@ -10,7 +10,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=13" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css?v=14" rel="stylesheet" asp-append-version="true" />
 </head>
 
 <body>
@@ -28,6 +28,8 @@
                 var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
                 var isPayrollSection = currentController == "Payroll";
                 var isPayrollPrediction = isPayrollSection && currentAction == "Prediction";
+                var isProjectSection = currentController == "Project";
+                var isAddProject = isProjectSection && currentAction == "Create";
             }
             <ul class="menu">
                 <li class="@(currentController == "Home" ? "active" : "")">
@@ -78,10 +80,21 @@
                     </ul>
                 </li>
 
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Project" ? "active" : "")">
-                    <a asp-controller="Project" asp-action="Index">
+                <li>
+                    <a href="#adminProjectMenu" data-bs-toggle="collapse"
+                       class="menu-dropdown-toggle @(isProjectSection ? "active" : "")"
+                       role="button" aria-expanded="@(isProjectSection ? "true" : "false")">
                         <i class="bi bi-kanban-fill"></i> Projects
+                        <i class="bi bi-chevron-down menu-chevron"></i>
                     </a>
+                    <ul class="collapse submenu @(isProjectSection ? "show" : "")" id="adminProjectMenu">
+                        <li class="@(!isAddProject && isProjectSection ? "active" : "")">
+                            <a asp-controller="Project" asp-action="Index">View Projects</a>
+                        </li>
+                        <li class="@(isAddProject ? "active" : "")">
+                            <a asp-controller="Project" asp-action="Create">Add Project</a>
+                        </li>
+                    </ul>
                 </li>
 
                 <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Report" ? "active" : "")">

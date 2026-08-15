@@ -6,6 +6,7 @@
     var budgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
                      ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
     var statusLabel = ProjectStatusOptions.Normalize(Model.Status);
+    var statusClass = ProjectStatusOptions.BadgeClass(Model.Status);
 }
 
 
@@ -22,15 +23,11 @@
     .proj-view-toolbar .proj-view-actions { margin-bottom: 0; }
     .proj-status-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .proj-status-pills .form-lbl { display: inline; margin-bottom: 0; }
-    .proj-status-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; padding: 6px 16px; border-radius: 20px; font-size: 12.5px; font-weight: 600; line-height: 1.2; opacity: .55; cursor: default; }
-    .proj-status-pill.is-current { opacity: 1; }
-    .badge-ongoing { background: #c6f6d5; color: #0d7a3e; }
-    .badge-ongoing.is-current { background: #22c55e; color: #111; }
-    .badge-hold { background: #ffe0b3; color: #a15c00; }
-    .badge-hold.is-current { background: #f59e0b; color: #111; }
-    .badge-finished { background: #d6e4ff; color: #163F8B; }
-    .badge-finished.is-current { background: #266DF1; color: #111; }
-    .proj-emp-table-wrap { border: 1.5px solid #C9DAFF; border-radius: 8px; overflow: hidden; max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
+    .proj-status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; padding: 6px 18px; border-radius: 20px; font-size: 12.5px; font-weight: 600; line-height: 1.2; }
+    .proj-status-badge.badge-ongoing { background: #22c55e; color: #111; }
+    .proj-status-badge.badge-hold { background: #f59e0b; color: #111; }
+    .proj-status-badge.badge-finished { background: #266DF1; color: #fff; }
+    .proj-emp-table-wrap { border: 1.5px solid #C9DAFF; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
 </style>
 
 <div class="form-card" style="max-width:680px">
@@ -38,18 +35,7 @@
     <div class="proj-view-toolbar">
         <div class="proj-status-pills">
             <span class="form-lbl">Status:</span>
-            @foreach (var option in ProjectStatusOptions.All)
-            {
-                var pillClass = "proj-status-pill " + ProjectStatusOptions.BadgeClass(option);
-                if (statusLabel == option)
-                {
-                    <span class="@pillClass is-current">@option</span>
-                }
-                else
-                {
-                    <span class="@pillClass">@option</span>
-                }
-            }
+            <span class="proj-status-badge @statusClass">@statusLabel</span>
         </div>
         <div class="proj-view-actions">
             <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
@@ -110,7 +96,7 @@
                 @foreach (var b in budgets)
                 {
                     <div class="proj-month-row">
-                        <span class="proj-month-label">Month of @b.MonthDate.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</span>
+                        <span class="proj-month-label">Month of @b.MonthDate.ToString("MMMM", System.Globalization.CultureInfo.InvariantCulture)</span>
                         <span class="proj-month-amount">₱@b.Amount.ToString("N2")</span>
                     </div>
                 }

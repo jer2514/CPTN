@@ -1504,45 +1504,37 @@ select.form-ctrl {
     margin-bottom: 0;
 }
 
-.proj-status-pill {
+.proj-status-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 88px;
-    padding: 6px 16px;
+    padding: 6px 18px;
     border-radius: 20px;
     font-size: 12.5px;
     font-weight: 600;
     line-height: 1.2;
-    opacity: .55;
-    cursor: default;
 }
 
-.proj-status-pill.is-current {
-    opacity: 1;
-}
-
-.badge-ongoing.is-current {
+.proj-status-badge.badge-ongoing {
     background: #22c55e;
     color: #111;
 }
 
-.badge-hold.is-current {
+.proj-status-badge.badge-hold {
     background: #f59e0b;
     color: #111;
 }
 
-.badge-finished.is-current {
+.proj-status-badge.badge-finished {
     background: #266DF1;
-    color: #111;
+    color: #fff;
 }
 
 .proj-emp-table-wrap {
     border: 1.5px solid #C9DAFF;
     border-radius: 8px;
     overflow: hidden;
-    max-height: 320px;
-    overflow-y: auto;
     margin-bottom: 10px;
 }
 
