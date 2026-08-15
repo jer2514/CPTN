@@ -135,8 +135,13 @@
         sync();
     }
 
+    function hasRule(el, rule) {
+        return (el.getAttribute('data-validate') || '').split('|').indexOf(rule) !== -1;
+    }
+
     function bindPhone(form) {
-        form.querySelectorAll('[data-validate*="phone"]').forEach(function (el) {
+        form.querySelectorAll('[data-validate]').forEach(function (el) {
+            if (!hasRule(el, 'phone')) return;
             el.addEventListener('input', function () {
                 el.value = el.value.replace(/\D/g, '').slice(0, 11);
             });
@@ -144,7 +149,8 @@
     }
 
     function bindMi(form) {
-        form.querySelectorAll('[data-validate*="mi"]').forEach(function (el) {
+        form.querySelectorAll('[data-validate]').forEach(function (el) {
+            if (!hasRule(el, 'mi')) return;
             el.addEventListener('input', function () {
                 el.value = el.value.replace(/[^A-Za-zÑñ]/g, '').slice(0, 2).toUpperCase();
             });
