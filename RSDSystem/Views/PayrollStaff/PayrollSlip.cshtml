@@ -117,8 +117,9 @@ else
                 <label class="form-lbl">Pay Period Starting Date <span class="req-star">*</span></label>
                 <input type="date" name="payPeriodStart" id="payPeriodStart" class="form-ctrl"
                        value="@defaultStart"
-                       min="@minDate" max="@maxDate"
-                       data-validate="required|dateWithin" data-label="Pay period starting date"
+                       min="@(string.IsNullOrEmpty(minDate) ? "2000-01-01" : minDate)"
+                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
+                       data-validate="required|dateYear|dateWithin" data-label="Pay period starting date"
                        data-min="@minDate" data-max="@maxDate" />
                 <span class="field-error" data-error-for="payPeriodStart"></span>
             </div>
@@ -126,8 +127,9 @@ else
                 <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
                 <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
                        value="@defaultEnd"
-                       min="@endMin" max="@maxDate"
-                       data-validate="required|dateAfter|dateWithin" data-after="payPeriodStart"
+                       min="@(string.IsNullOrEmpty(endMin) ? "2000-01-01" : endMin)"
+                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
+                       data-validate="required|dateAfter|dateYear|dateWithin" data-after="payPeriodStart"
                        data-label="Pay period ending date"
                        data-min="@endMin" data-max="@maxDate" />
                 <span class="field-error" data-error-for="payPeriodEnd"></span>

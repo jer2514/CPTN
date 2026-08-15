@@ -85,8 +85,17 @@ namespace RSDSystem.Validation
             }
         }
 
+        public const int MinCalendarYear = 2000;
+        public const int MaxCalendarYear = 2099;
+
+        public static bool IsMissingDate(DateTime? value) =>
+            !value.HasValue || value.Value == default || value.Value.Year < 1000;
+
         public static bool IsUsableDate(DateTime? value) =>
-            value.HasValue && value.Value.Year > 1900;
+            value.HasValue
+            && !IsMissingDate(value)
+            && value.Value.Year >= MinCalendarYear
+            && value.Value.Year <= MaxCalendarYear;
 
         public static int InclusiveDays(DateTime start, DateTime end) =>
             (end.Date - start.Date).Days + 1;
@@ -102,6 +111,8 @@ namespace RSDSystem.Validation
             return days;
         }
 
+        public const string CalendarYearMessage = "Enter a valid date with a 4-digit year (2000–2099).";
+
         public static IEnumerable<ValidationResult> ValidateDateRange(
             DateTime? start,
             DateTime? end,
@@ -110,11 +121,15 @@ namespace RSDSystem.Validation
             string startLabel = "Starting date",
             string endLabel = "End date")
         {
-            if (!IsUsableDate(start))
+            if (IsMissingDate(start))
                 yield return new ValidationResult($"{startLabel} is required.", new[] { startField });
+            else if (!IsUsableDate(start))
+                yield return new ValidationResult(CalendarYearMessage, new[] { startField });
 
-            if (!IsUsableDate(end))
+            if (IsMissingDate(end))
                 yield return new ValidationResult($"{endLabel} is required.", new[] { endField });
+            else if (!IsUsableDate(end))
+                yield return new ValidationResult(CalendarYearMessage, new[] { endField });
 
             if (IsUsableDate(start) && IsUsableDate(end) && end!.Value.Date < start!.Value.Date)
             {

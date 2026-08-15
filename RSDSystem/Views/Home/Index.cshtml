@@ -189,13 +189,15 @@
                 <div>
                     <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
                     <input type="date" name="StartingDate" id="scheduleStartDate" class="form-ctrl"
-                           data-validate="required|dateWithin" data-label="Starting date" />
+                           min="2000-01-01" max="2099-12-31"
+                           data-validate="required|dateYear|dateWithin" data-label="Starting date" />
                     <span class="field-error" data-error-for="StartingDate"></span>
                 </div>
                 <div>
                     <label class="form-lbl">End Date <span class="req-star">*</span></label>
                     <input type="date" name="EndDate" id="scheduleEndDate" class="form-ctrl"
-                           data-validate="required|dateAfter|dateWithin" data-after="scheduleStartDate"
+                           min="2000-01-01" max="2099-12-31"
+                           data-validate="required|dateAfter|dateYear|dateWithin" data-after="scheduleStartDate"
                            data-label="End date" />
                     <span class="field-error" data-error-for="EndDate"></span>
                 </div>
@@ -256,14 +258,19 @@
 
         function applyProjectDateBounds(projectId) {
             const range = projectDateMap[projectId] || {};
+            const calendarMin = '2000-01-01';
+            const calendarMax = '2099-12-31';
+            let rangeStart = range.start || calendarMin;
+            let rangeEnd = range.end || calendarMax;
+            if (rangeStart > rangeEnd) rangeEnd = rangeStart;
             ['scheduleStartDate', 'scheduleEndDate'].forEach(function (id) {
                 const el = document.getElementById(id);
                 if (range.start) el.setAttribute('data-min', range.start);
                 else el.removeAttribute('data-min');
                 if (range.end) el.setAttribute('data-max', range.end);
                 else el.removeAttribute('data-max');
-                el.min = range.start || '';
-                el.max = range.end || '';
+                el.min = rangeStart;
+                el.max = rangeEnd;
             });
             const hint = document.getElementById('scheduleProjectDateHint');
             if (hint) {

@@ -86,7 +86,8 @@
                 <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
                 <input type="date" name="StartingDate" id="startDate"
                        value="@Model.StartingDate?.ToString("yyyy-MM-dd")"
-                       class="@Ctrl("StartingDate")" data-validate="required" data-label="Starting date"
+                       min="2000-01-01" max="2099-12-31"
+                       class="@Ctrl("StartingDate")" data-validate="required|dateYear" data-label="Starting date"
                        onchange="generateMonthRows()" />
                 <span class="field-error" data-error-for="StartingDate">@Err("StartingDate")</span>
             </div>
@@ -94,7 +95,8 @@
                 <label class="form-lbl">Estimate End Date <span class="req-star">*</span></label>
                 <input type="date" name="EstimateEndDate" id="endDate"
                        value="@Model.EstimateEndDate?.ToString("yyyy-MM-dd")"
-                       class="@Ctrl("EstimateEndDate")" data-validate="required|dateAfter" data-after="startDate"
+                       min="2000-01-01" max="2099-12-31"
+                       class="@Ctrl("EstimateEndDate")" data-validate="required|dateAfter|dateYear" data-after="startDate"
                        data-label="Estimate end date"
                        onchange="generateMonthRows()" />
                 <span class="field-error" data-error-for="EstimateEndDate">@Err("EstimateEndDate")</span>
@@ -208,6 +210,15 @@
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
+        function isUsableProjectDate(iso) {
+            if (!iso) return false;
+            const yearPart = String(iso).split('-')[0] || '';
+            const year = parseInt(yearPart, 10);
+            if (yearPart.length !== 4 || Number.isNaN(year) || year < 2000 || year > 2099) return false;
+            const dt = new Date(iso + 'T00:00:00');
+            return !Number.isNaN(dt.getTime());
+        }
+
         function generateMonthRows() {
             const start = document.getElementById('startDate').value;
             const end   = document.getElementById('endDate').value;
@@ -222,6 +233,13 @@
             if (!start || !end) {
                 section.style.display = 'none';
                 placeholder.style.display = 'block';
+                return;
+            }
+
+            if (!isUsableProjectDate(start) || !isUsableProjectDate(end)) {
+                section.style.display = 'none';
+                placeholder.style.display = 'block';
+                if (monthError) monthError.textContent = 'Use dates between 2000 and 2099 to generate monthly budget rows.';
                 return;
             }
 
@@ -244,8 +262,10 @@
 
             const current  = new Date(startDt.getFullYear(), startDt.getMonth(), 1);
             const lastMonth = new Date(endDt.getFullYear(), endDt.getMonth(), 1);
+            let safety = 0;
 
-            while (current <= lastMonth) {
+            while (current <= lastMonth && safety < 120) {
+                safety++;
                 const monthName = current.toLocaleString('default', { month: 'long' });
                 const year       = current.getFullYear();
                 const isoDate    = current.getFullYear() + '-' +
