@@ -5,7 +5,10 @@
     var activeProjects = ViewBag.ActiveProjectsList as List<RSDSystem.Models.Project> ?? new();
     var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();
     var projectTypeMap = ViewBag.ProjectTypeMap as Dictionary<int, string> ?? new();
-    var schedules = ViewBag.PayrollSchedules as List<RSDSystem.Models.PayrollSchedule> ?? new();
+    var projectDateMap = ViewBag.ProjectDateMap as Dictionary<int, RSDSystem.Models.ProjectDateBounds>
+        ?? new Dictionary<int, RSDSystem.Models.ProjectDateBounds>();
+    var schedules = (ViewBag.PayrollSchedules as IEnumerable<RSDSystem.Models.PayrollSchedule>)?.ToList()
+        ?? new List<RSDSystem.Models.PayrollSchedule>();
 }
 
 <div class="dash-header">
@@ -59,7 +62,7 @@
                 </tr>
             </thead>
             @{
-                var pendingApprovals = ViewBag.PendingApprovals as IEnumerable<dynamic>;
+                var pendingApprovals = ViewBag.PendingApprovals as IEnumerable<RSDSystem.Models.PendingApprovalRow>;
             }
             <tbody>
                 @if (pendingApprovals == null || !pendingApprovals.Any())
@@ -77,7 +80,7 @@
                         <tr>
                             <td>@p.StaffName</td>
                             <td>@p.ProjectName</td>
-                            <td>@(((DateTime)p.Date).ToString("MM-dd-yy"))</td>
+                            <td>@p.Date.ToString("MM-dd-yy")</td>
                             <td>
                                 <a href="@Url.Action("View", "Payroll", new { id = p.PayrollId })"
                                    class="pill-btn pill-view">Review</a>
@@ -235,7 +238,7 @@
     <partial name="_FormValidationScripts" />
     <script>
         const projectTypeMap = @Html.Raw(JsonSerializer.Serialize(projectTypeMap));
-        const projectDateMap = @Html.Raw(JsonSerializer.Serialize(ViewBag.ProjectDateMap));
+        const projectDateMap = @Html.Raw(JsonSerializer.Serialize(projectDateMap, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 
         function clearScheduleErrors() {
             const form = document.getElementById('scheduleForm');

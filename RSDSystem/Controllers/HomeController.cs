@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -33,13 +34,13 @@ namespace RSDSystem.Controllers
             ViewBag.ProjectTypeMap = activeProjects.ToDictionary(p => p.ProjectId, p => p.TypeOfService ?? "");
             ViewBag.ProjectDateMap = activeProjects.ToDictionary(
                 p => p.ProjectId,
-                p => new
+                p => new ProjectDateBounds
                 {
-                    start = p.StartingDate.HasValue && p.StartingDate.Value.Year > 1900
-                        ? p.StartingDate.Value.ToString("yyyy-MM-dd")
+                    Start = InputRules.IsUsableDate(p.StartingDate)
+                        ? p.StartingDate!.Value.ToString("yyyy-MM-dd")
                         : "",
-                    end = p.EstimateEndDate.HasValue && p.EstimateEndDate.Value.Year > 1900
-                        ? p.EstimateEndDate.Value.ToString("yyyy-MM-dd")
+                    End = InputRules.IsUsableDate(p.EstimateEndDate)
+                        ? p.EstimateEndDate!.Value.ToString("yyyy-MM-dd")
                         : ""
                 });
 
@@ -54,9 +55,9 @@ namespace RSDSystem.Controllers
                                                 .Include(p => p.Project)
                                                 .Where(p => p.Status == PayrollStatusOptions.Submitted)
                                                 .OrderByDescending(p => p.GeneratedDate)
-                                                .Select(p => new
+                                                .Select(p => new PendingApprovalRow
                                                 {
-                                                    p.PayrollId,
+                                                    PayrollId = p.PayrollId,
                                                     StaffName = p.GeneratedBy,
                                                     ProjectName = p.Project != null ? p.Project.ProjectName : "—",
                                                     Date = p.GeneratedDate
