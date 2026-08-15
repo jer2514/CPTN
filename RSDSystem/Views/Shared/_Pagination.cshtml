@@ -1,0 +1,50 @@
+﻿@{
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    string search = ViewBag.Search;
+    string sortBy = ViewBag.SortBy;
+}
+
+@if (totalPages > 1)
+{
+    int startPage = Math.Max(1, currentPage - 2);
+    int endPage = Math.Min(totalPages, currentPage + 2);
+
+    <div class="pagination-wrap">
+        <a class="page-link @(currentPage == 1 ? "disabled" : "")"
+           asp-action="Index" asp-route-page="@(currentPage - 1)"
+           asp-route-search="@search" asp-route-sortBy="@sortBy">&lsaquo;</a>
+
+        @if (startPage > 1)
+        {
+            <a class="page-link" asp-action="Index" asp-route-page="1"
+               asp-route-search="@search" asp-route-sortBy="@sortBy">1</a>
+            if (startPage > 2)
+            {
+
+                <span class="page-ellipsis">…</span>
+            }
+        }
+
+        @for (int i = startPage; i <= endPage; i++)
+        {
+            <a class="page-link @(i == currentPage ? "active" : "")"
+               asp-action="Index" asp-route-page="@i"
+               asp-route-search="@search" asp-route-sortBy="@sortBy">@i</a>
+        }
+
+        @if (endPage < totalPages)
+        {
+            if (endPage < totalPages - 1)
+            {
+                <span class="page-ellipsis">…</span>
+            }
+            <a class="page-link" asp-action="Index" asp-route-page="@totalPages"
+               asp-route-search="@search" asp-route-sortBy="@sortBy">@totalPages</a>
+        }
+
+        <a class="page-link @(currentPage == totalPages ? "disabled" : "")"
+           asp-action="Index" asp-route-page="@(currentPage + 1)"
+           asp-route-search="@search" asp-route-sortBy="@sortBy">&rsaquo;</a>
+    </div>
+}

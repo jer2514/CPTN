@@ -14,10 +14,11 @@ namespace RSDSystem.Models
         public DbSet<User> Users { get; set; }
         public DbSet<Project> Projects { get; set; }
         public DbSet<ProjectMonthlyBudget> ProjectMonthlyBudgets { get; set; }
-         
+        public DbSet<PayrollSchedule> PayrollSchedules { get; set; }
+        public DbSet<Payroll> Payrolls { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // FullName and Age are computed properties — not stored in DB  
             modelBuilder.Entity<Employee>()
                 .HasOne(e => e.Project)
                 .WithMany()
@@ -25,18 +26,49 @@ namespace RSDSystem.Models
                 .OnDelete(DeleteBehavior.SetNull)
                 .IsRequired(false);
 
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => new { e.FirstName, e.LastName, e.DateOfBirth })
+                .IsUnique();
+
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.Email)
+                .IsUnique();
+
             modelBuilder.Entity<User>()
                 .Ignore(u => u.FullName)
                 .Ignore(u => u.Age);
 
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
             modelBuilder.Entity<ProjectMonthlyBudget>()
-            .HasOne(m => m.Project)
-            .WithMany(p => p.MonthlyBudgets)
-            .HasForeignKey(m => m.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
+                .HasOne(m => m.Project)
+                .WithMany(p => p.MonthlyBudgets)
+                .HasForeignKey(m => m.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<PayrollSchedule>()
+                .HasOne(s => s.Project)
+                .WithMany()
+                .HasForeignKey(s => s.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Payroll>()
+                .HasOne(pr => pr.Employee)
+                .WithMany()
+                .HasForeignKey(pr => pr.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Payroll>()
+                .HasOne(pr => pr.Project)
+                .WithMany()
+                .HasForeignKey(pr => pr.ProjectId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

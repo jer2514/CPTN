@@ -1,0 +1,340 @@
+﻿@{
+    ViewData["Title"] = "Pending Payroll";
+    Layout = "_PayrollStaffLayout";
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="emp-title mb-3">Pending Payroll</div>
+
+    @if (ViewBag.ShowingAllProjects == true)
+    {
+        <div class="genpay-fallback-note">
+            Showing all active projects — none are currently assigned to your account specifically.
+        </div>
+    }
+
+    <div class="genpay-controls">
+        <div class="genpay-select-wrap">
+            <label class="form-lbl">Project Name</label>
+            <div class="genpay-autocomplete">
+                <input type="text" id="projectInput" class="form-ctrl"
+                       placeholder="Type to search project..." autocomplete="off" />
+                <input type="hidden" id="projectIdInput" />
+                <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+            </div>
+        </div>
+        <button type="button" id="loadPayrollsBtn" class="btn-primary-blue-solid">Load</button>
+    </div>
+
+    <div id="payrollSection" style="display:none">
+        <div class="emp-card-head" style="margin-top:6px">
+            <div></div>
+            <div class="emp-controls">
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="payrollSearch" placeholder="Search Employee" oninput="filterPayrolls()" />
+                </div>
+            </div>
+        </div>
+
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Employee Name</th>
+                    <th>Job</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="payrollTableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="payrollEmpty" class="text-center text-muted py-5">
+        Select a project and click Load to view its payroll records.
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const allProjects = [
+            @foreach (var p in Model)
+            {
+                                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
+            }
+        ];
+
+        const projectInput   = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList    = document.getElementById('projectSuggestions');
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = '';
+            const q = projectInput.value.trim().toLowerCase();
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+        });
+
+        projectInput.addEventListener('focus', function () {
+            const q = projectInput.value.trim().toLowerCase();
+            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+        });
+
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
+        });
+
+        let currentPayrolls = [];
+        let currentProjectId = null;
+
+        document.getElementById('loadPayrollsBtn').addEventListener('click', loadPayrolls);
+
+        async function loadPayrolls() {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+            currentProjectId = projectIdInput.value;
+
+            const emptyBox = document.getElementById('payrollEmpty');
+            const section  = document.getElementById('payrollSection');
+
+            section.style.display = 'none';
+            emptyBox.style.display = 'block';
+            emptyBox.textContent = 'Loading payroll records...';
+
+            try {
+                const res  = await fetch('/PayrollStaff/GetProjectPayrolls?projectId=' + currentProjectId);
+                const data = await res.json();
+
+                if (!data.success) { emptyBox.textContent = data.message; return; }
+
+                currentPayrolls = data.payrolls;
+
+                if (currentPayrolls.length === 0) {
+                    emptyBox.textContent = 'No payroll records for this project yet.';
+                    return;
+                }
+
+                emptyBox.style.display = 'none';
+                section.style.display = 'block';
+                renderPayrolls(currentPayrolls);
+            } catch (err) {
+                emptyBox.textContent = 'Something went wrong while loading payroll records.';
+            }
+        }
+
+        function statusClass(status) {
+            if (status === 'Correction') return 'row-correction';
+            if (status === 'Draft') return 'row-draft';
+            if (status === 'Submitted') return 'row-submitted';
+            return '';
+        }
+
+        // ── Build the action buttons per row based on status ─────────
+        // Draft       -> Submit, View, Delete
+        // Correction  -> Submit, View
+        // Submitted   -> View only
+        // Approved    -> View only
+        function actionButtons(p) {
+            let btns = '';
+
+            if (p.status === 'Draft') {
+                // Submit first
+                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
+                // View next
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+                // Delete last
+                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            } else if (p.status === 'Correction') {
+                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            } else {
+                // Submitted / Approved / other statuses -> View only
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            }
+
+            return btns;
+        }
+
+        function renderPayrolls(list) {
+            const tbody = document.getElementById('payrollTableBody');
+
+            tbody.innerHTML = list.map(p => `
+                <tr class="${statusClass(p.status)}">
+                    <td>${p.displayId}</td>
+                    <td>${p.employeeName}</td>
+                    <td>${p.job}</td>
+                    <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
+                    <td>
+                        <div class="action-cell">
+                            ${actionButtons(p)}
+                        </div>
+                    </td>
+                </tr>`).join('');
+        }
+
+        function filterPayrolls() {
+            const q = document.getElementById('payrollSearch').value.toLowerCase();
+            renderPayrolls(currentPayrolls.filter(p =>
+                p.employeeName.toLowerCase().includes(q) || p.job.toLowerCase().includes(q)));
+        }
+
+        function getToken() {
+            return document.querySelector('#submitTokenForm input[name="__RequestVerificationToken"]').value;
+        }
+
+        // ── Submit confirmation ─────────────────────────────────────
+        let pendingSubmitId = null;
+
+        function confirmSubmit(payrollId) {
+            pendingSubmitId = payrollId;
+            document.getElementById('submitOverlay').classList.add('open');
+        }
+
+        document.getElementById('submitCancelBtn').addEventListener('click', function () {
+            document.getElementById('submitOverlay').classList.remove('open');
+            pendingSubmitId = null;
+        });
+
+        document.getElementById('submitConfirmBtn').addEventListener('click', async function () {
+            if (!pendingSubmitId) return;
+
+            const form = new FormData();
+            form.append('id', pendingSubmitId);
+            form.append('__RequestVerificationToken', getToken());
+
+            try {
+                const res  = await fetch('/PayrollStaff/SubmitPayroll/' + pendingSubmitId, { method: 'POST', body: form });
+                const data = await res.json();
+
+                document.getElementById('submitOverlay').classList.remove('open');
+
+                if (data.success) {
+                    loadPayrolls(); // refresh list so status/order updates
+                } else {
+                    alert(data.message || 'Failed to submit payroll.');
+                }
+            } catch (err) {
+                document.getElementById('submitOverlay').classList.remove('open');
+                alert('Something went wrong.');
+            }
+
+            pendingSubmitId = null;
+        });
+
+        // ── Delete confirmation (Draft only) ─────────────────────────
+        let pendingDeleteId = null;
+
+        function confirmDelete(payrollId) {
+            pendingDeleteId = payrollId;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+
+        document.getElementById('deleteCancelBtn').addEventListener('click', function () {
+            document.getElementById('deleteOverlay').classList.remove('open');
+            pendingDeleteId = null;
+        });
+
+        document.getElementById('deleteConfirmBtn').addEventListener('click', async function () {
+            if (!pendingDeleteId) return;
+
+            const form = new FormData();
+            form.append('id', pendingDeleteId);
+            form.append('__RequestVerificationToken', getToken());
+
+            try {
+                const res  = await fetch('/PayrollStaff/DeletePayroll/' + pendingDeleteId, { method: 'POST', body: form });
+                const data = await res.json();
+
+                document.getElementById('deleteOverlay').classList.remove('open');
+
+                if (data.success) {
+                    loadPayrolls();
+                } else {
+                    alert(data.message || 'Failed to delete payroll.');
+                }
+            } catch (err) {
+                document.getElementById('deleteOverlay').classList.remove('open');
+                alert('Something went wrong.');
+            }
+
+            pendingDeleteId = null;
+        });
+
+        // ── Restore project on Back navigation ─────────────────────
+        const preselectId = @(ViewBag.PreselectProjectId != null ? ViewBag.PreselectProjectId : "null");
+        if (preselectId) {
+            const match = allProjects.find(p => p.id === preselectId);
+            if (match) {
+                projectInput.value = match.name;
+                projectIdInput.value = match.id;
+                loadPayrolls();
+            }
+        }
+    </script>
+
+    <form id="submitTokenForm" style="display:none">
+        @Html.AntiForgeryToken()
+    </form>
+}
+
+<!-- Submit Confirmation Modal -->
+<div class="del-overlay" id="submitOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap" style="background:#dbeafe">
+            <i class="bi bi-send-fill" style="color:#266DF1;font-size:24px"></i>
+        </div>
+        <div class="del-title">Submit Payroll?</div>
+        <div class="del-msg">
+            This payroll record will be sent to the admin for review and approval.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" id="submitCancelBtn">Cancel</button>
+            <button class="del-btn-delete" style="background:#266DF1" id="submitConfirmBtn">Submit</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="del-overlay" id="deleteOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Delete Draft Payroll?</div>
+        <div class="del-msg">
+            This draft payroll record will be permanently deleted. This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" id="deleteCancelBtn">Cancel</button>
+            <button class="del-btn-delete" id="deleteConfirmBtn">Delete</button>
+        </div>
+    </div>
+</div>

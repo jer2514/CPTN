@@ -1,0 +1,46 @@
+﻿@model List<RSDSystem.Models.Payroll>
+@using RSDSystem.Helpers
+@{
+    ViewData["Title"] = "Payroll";
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-controller="Home" asp-action="Index" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="page-card">
+    <table class="emp-table">
+        <thead>
+            <tr>
+                <th>Employee ID</th>
+                <th>Employee Name</th>
+                <th>Job</th>
+                <th>Net Pay</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr><td colspan="5" class="text-center text-muted py-4">No payroll records pending review.</td></tr>
+            }
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td>@IdFormatter.Format(p.Employee?.EmployeeCode)</td>
+                    <td>@p.Employee?.FullName</td>
+                    <td>@p.Employee?.JobClassification</td>
+                    <td>₱@p.NetPay.ToString("N2")</td>
+                    <td>
+                        <a class="pill-btn pill-view" asp-action="View" asp-route-id="@p.PayrollId">Review</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

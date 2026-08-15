@@ -1,0 +1,57 @@
+﻿@model List<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "To do task";
+    Layout = "_PayrollStaffLayout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="task-card-title">To do task</div>
+
+    <table class="task-table">
+        <thead>
+            <tr>
+                <th>Project Name</th>
+                <th>Type of Project</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Mark as Done</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No tasks assigned.</td>
+                </tr>
+            }
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td>@p.ProjectName</td>
+                    <td>@(p.TypeOfService ?? "—")</td>
+                    <td>@(p.StartingDate?.ToString("MMMM d, yyyy") ?? "—")</td>
+                    <td>@(p.EstimateEndDate?.ToString("MMMM d, yyyy") ?? "—")</td>
+                    <td class="text-center">
+                        <form asp-action="ToggleTask" asp-route-id="@p.ProjectId" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="task-check-btn @(p.TaskCompleted ? "checked" : "")" title="Mark as done">
+                                @if (p.TaskCompleted)
+                                {
+                                    <i class="bi bi-check-square-fill"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-square"></i>
+                                }
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

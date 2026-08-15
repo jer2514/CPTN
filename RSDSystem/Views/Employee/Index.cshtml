@@ -1,4 +1,5 @@
-﻿@model IEnumerable<RSDSystem.Models.Employee>
+﻿@using RSDSystem.Helpers
+@model IEnumerable<RSDSystem.Models.Employee>
 @{
     ViewData["Title"] = "Employee";
     var sortBy = ViewBag.SortBy as string;
@@ -11,6 +12,7 @@
 
 
 <div class="page-card">
+
     <div class="emp-card-head">
         <div class="emp-title">All Employee</div>
 
@@ -63,42 +65,22 @@
     <table class="emp-table">
         <thead>
             <tr>
-                <th style="width:40px">
-                    <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
-                </th>
+                <th style="width:40px"><input type="checkbox" class="tbl-check" onclick="toggleAll(this)" /></th>
+                <th>Employee ID</th>
                 <th>User</th>
                 <th>Job</th>
                 <th>Assigned to</th>
+                <th>Date Added</th>
                 <th>Status</th>
-                <th>
-                    <div>
-                        <span>Action</span>
-                        <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
-                            @Html.AntiForgeryToken()
-                            <div id="bulkIdsContainer"></div>
-                            <button type="button"
-                                    id="bulkDeleteBtn"
-                                    class="action-btn action-delete"
-                                    style="display:none"
-                                    onclick="openBulkDeleteModal()">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </form>
-                    </div>
-                </th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
-            @if (!Model.Any())
-            {
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No employees found.</td>
-                </tr>
-            }
             @foreach (var emp in Model)
             {
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" /></td>
+                    <td>@IdFormatter.Format(emp.EmployeeCode)</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(emp.PhotoPath))
@@ -116,6 +98,7 @@
                     </td>
                     <td>@emp.JobClassification</td>
                     <td>@emp.Project?.ProjectName</td>
+                    <td>@emp.DateAdded.ToString("MMM d, yyyy")</td>
                     <td>
                         @if (emp.IsActive)
                         {
@@ -123,18 +106,18 @@
                         }
                         else
                         {
+
                             <span class="badge-inactive">Inactive</span>
                         }
                     </td>
                     <td>
                         <div class="action-cell">
-                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId"
-                                 class="action-btn action-edit" title="Edit">
-                                 <i class="bi bi-pencil-fill"></i>
+                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId" class="action-btn action-edit" title="Edit">
+                                <i class="bi bi-pencil-fill"></i>
                             </a>
                             <button type="button" class="action-btn action-delete" title="Delete"
-                                 onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName')">
-                                 <i class="bi bi-trash-fill"></i>
+                                    onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName')">
+                                <i class="bi bi-trash-fill"></i>
                             </button>
                         </div>
                     </td>
@@ -142,6 +125,7 @@
             }
         </tbody>
     </table>
+    @await Html.PartialAsync("_Pagination")
 </div>
 
 <!-- Delete Confirmation Modal -->

@@ -2,6 +2,15 @@
 @{
     ViewData["Title"] = "Edit User";
     var roles = ViewBag.Roles as string[] ?? Array.Empty<string>();
+    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
+    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
+    var generalErrors = ViewData.ModelState
+        .Where(kv => string.IsNullOrEmpty(kv.Key))
+        .SelectMany(kv => kv.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+        .ToList();
+    var maxDob = DateTime.Today.AddYears(-18).ToString("yyyy-MM-dd");
+    var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
+    var initials = $"{(string.IsNullOrEmpty(Model.FirstName) ? "" : Model.FirstName[..1])}{(string.IsNullOrEmpty(Model.LastName) ? "" : Model.LastName[..1])}";
 }
 
 
@@ -14,10 +23,21 @@
 </a>
 
 <div class="form-card">
-    <form asp-action="Edit" method="post" enctype="multipart/form-data">
+    <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
+        @if (generalErrors.Count > 0)
+        {
+            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:13px">
+                <ul class="mb-0 ps-3">
+                    @foreach (var err in generalErrors)
+                    {
+                        <li>@err.ErrorMessage</li>
+                    }
+                </ul>
+            </div>
+        }
         <input type="hidden" name="UserId" value="@Model.UserId" />
-        <input type="hidden" name="IsActive" value="@Model.IsActive.ToString().ToLower()" />
+
 
         <div class="edit-layout">
 
@@ -30,56 +50,62 @@
                 else
                 {
                     <div class="edit-photo-initials" id="photoPreviewPlaceholder">
-                        @Model.FirstName.Substring(0, 1)@Model.LastName.Substring(0, 1)
+                        @initials
                     </div>
                 }
-                <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
-                       onchange="previewPhoto(this)" />
+                <input type="file" id="photoInput" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                       class="d-none" data-validate="fileImage" onchange="previewPhoto(this)" />
 
                 <!-- Status toggle button -->
-                <form asp-controller="UserManagement" asp-action="ToggleStatus"
-                      asp-route-id="@Model.UserId" method="post" class="mt-2">
-                    @Html.AntiForgeryToken()
-                    @if (Model.IsActive)
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-inactive">
-                            <i class="bi bi-toggle-on"></i> Active
-                        </button>
-                    }
-                    else
-                    {
-                        <button type="submit" class="status-toggle-btn status-toggle-active">
-                            <i class="bi bi-toggle-off"></i> Inactive
-                        </button>
-                    }
-                </form>
+                @if (Model.IsActive)
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-inactive"
+                            onclick="toggleUserStatus(@Model.UserId)">
+                        <i class="bi bi-toggle-on"></i> Active
+                    </button>
+                }
+                else
+                {
+                    <button type="button" class="status-toggle-btn status-toggle-active"
+                            onclick="toggleUserStatus(@Model.UserId)">
+                        <i class="bi bi-toggle-off"></i> Inactive
+                    </button>
+                }
             </div>
-            
+
 
             <!-- RIGHT: Fields -->
             <div class="edit-fields-col">
 
                 <div class="form-row form-row-3">
                     <div>
-                        <label class="form-lbl">First Name</label>
-                        <input type="text" name="FirstName" value="@Model.FirstName" class="form-ctrl" required />
+                        <label class="form-lbl">First Name <span class="req-star">*</span></label>
+                        <input type="text" name="FirstName" value="@Model.FirstName" maxlength="80"
+                               class="@Ctrl("FirstName")" data-validate="required|name" data-label="First name" />
+                        <span class="field-error" data-error-for="FirstName">@Err("FirstName")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Last Name</label>
-                        <input type="text" name="LastName" value="@Model.LastName" class="form-ctrl" required />
+                        <label class="form-lbl">Last Name <span class="req-star">*</span></label>
+                        <input type="text" name="LastName" value="@Model.LastName" maxlength="80"
+                               class="@Ctrl("LastName")" data-validate="required|name" data-label="Last name" />
+                        <span class="field-error" data-error-for="LastName">@Err("LastName")</span>
                     </div>
                     <div>
                         <label class="form-lbl">M.I</label>
-                        <input type="text" name="MiddleInitial" value="@Model.MiddleInitial"
-                               maxlength="5" class="form-ctrl" />
+                        <input type="text" name="MiddleInitial" value="@Model.MiddleInitial" maxlength="2"
+                               class="@Ctrl("MiddleInitial")" data-validate="mi" data-label="Middle initial" />
+                        <span class="field-error" data-error-for="MiddleInitial">@Err("MiddleInitial")</span>
                     </div>
                 </div>
 
                 <div class="form-row form-row-3b">
                     <div>
                         <label class="form-lbl">Date of Birth</label>
-                        <input type="date" name="DateOfBirth" id="dobInput" class="form-ctrl"
-                               value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")" onchange="calcAge()" />
+                        <input type="date" name="DateOfBirth" id="dobInput"
+                               value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")"
+                               min="@minDob" max="@maxDob"
+                               class="@Ctrl("DateOfBirth")" data-validate="dob" data-label="Date of birth" />
+                        <span class="field-error" data-error-for="DateOfBirth">@Err("DateOfBirth")</span>
                     </div>
                     <div>
                         <label class="form-lbl">Age</label>
@@ -90,29 +116,18 @@
                         <label class="form-lbl">Gender</label>
                         <select name="Gender" class="form-ctrl">
                             <option value="">Select</option>
-                            @if (Model.Gender == "Male")
-                            {
-                                <option value="Male" selected>Male</option>
-                                <option value="Female">Female</option>
-                            }
-                            else if (Model.Gender == "Female")
-                            {
-                                <option value="Male">Male</option>
-                                <option value="Female" selected>Female</option>
-                            }
-                            else
-                            {
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                            }
+                            <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
+                            <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="form-row form-row-1">
                     <div>
-                        <label class="form-lbl">Username</label>
-                        <input type="text" name="Username" value="@Model.Username" class="form-ctrl" required />
+                        <label class="form-lbl">Username <span class="req-star">*</span></label>
+                        <input type="text" name="Username" value="@Model.Username" maxlength="50"
+                               class="@Ctrl("Username")" data-validate="required" data-label="Username" />
+                        <span class="field-error" data-error-for="Username">@Err("Username")</span>
                     </div>
                 </div>
 
@@ -120,39 +135,51 @@
                     <div>
                         <label class="form-lbl">New Password <span style="color:#9ab0d8;font-weight:400">(leave blank to keep)</span></label>
                         <div class="pwd-wrap">
-                            <input type="password" name="NewPassword" id="pwd" class="form-ctrl" />
+                            <input type="password" name="NewPassword" id="pwd" class="@Ctrl("NewPassword")"
+                                   data-validate="minlen8" data-label="Password" />
                             <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
                                 <i class="bi bi-eye-slash" id="eye1"></i>
                             </span>
                         </div>
+                        <span class="field-error" data-error-for="NewPassword">@Err("NewPassword")</span>
                     </div>
                     <div>
                         <label class="form-lbl">Confirm Password</label>
                         <div class="pwd-wrap">
-                            <input type="password" name="ConfirmPassword" id="cpwd" class="form-ctrl" />
+                            <input type="password" name="ConfirmPassword" id="cpwd" class="@Ctrl("ConfirmPassword")"
+                                   data-validate="match" data-match="pwd" data-label="Confirm password" />
                             <span class="pwd-eye" onclick="togglePwd('cpwd','eye2')">
                                 <i class="bi bi-eye-slash" id="eye2"></i>
                             </span>
                         </div>
+                        <span class="field-error" data-error-for="ConfirmPassword">@Err("ConfirmPassword")</span>
                     </div>
                 </div>
 
                 <div class="form-row form-row-2">
                     <div>
-                        <label class="form-lbl">Email</label>
-                        <input type="email" name="Email" value="@Model.Email" class="form-ctrl" />
+                        <label class="form-lbl">Email <span class="req-star">*</span></label>
+                        <input type="email" name="Email" value="@Model.Email" maxlength="100"
+                               class="@Ctrl("Email")" data-validate="required|email" data-label="Email" />
+                        <span class="field-error" data-error-for="Email">@Err("Email")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Contact Number</label>
-                        <input type="text" name="ContactNumber" value="@Model.ContactNumber" class="form-ctrl" />
+                        <label class="form-lbl">Contact Number <span class="req-star">*</span></label>
+                        <input type="text" name="ContactNumber" value="@Model.ContactNumber" maxlength="11"
+                               inputmode="numeric" class="@Ctrl("ContactNumber")"
+                               data-validate="required|phone" data-label="Contact number"
+                               placeholder="09XXXXXXXXX" />
+                        <span class="field-error" data-error-for="ContactNumber">@Err("ContactNumber")</span>
                     </div>
                 </div>
 
                 <div class="form-row form-row-1">
                     <div>
                         <label class="form-lbl">Address</label>
-                        <input type="text" name="Address" value="@Model.Address" class="form-ctrl"
+                        <input type="text" name="Address" value="@Model.Address" maxlength="250"
+                               class="@Ctrl("Address")" data-validate="address" data-label="Address"
                                placeholder="Barangay, Municipality/City, Province" />
+                        <span class="field-error" data-error-for="Address">@Err("Address")</span>
                     </div>
                 </div>
 
@@ -163,27 +190,22 @@
                             <label class="file-choose-btn" for="photoInput">Choose File</label>
                             <span class="file-name-lbl" id="fileLabel">
                                 @(string.IsNullOrEmpty(Model.PhotoPath)
-                                                                ? "No File Chosen"
-                                                                : System.IO.Path.GetFileName(Model.PhotoPath))
+                                    ? "No File Chosen"
+                                    : System.IO.Path.GetFileName(Model.PhotoPath))
                             </span>
                         </div>
+                        <span class="field-error" data-error-for="photo">@Err("photo")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Role</label>
-                        <select name="Role" class="form-ctrl" required>
+                        <label class="form-lbl">Role <span class="req-star">*</span></label>
+                        <select name="Role" class="@Ctrl("Role")" data-validate="required" data-label="Role">
                             <option value="">Select role</option>
                             @foreach (var r in roles)
                             {
-                                if (r == Model.Role)
-                                {
-                                    <option value="@r" selected>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
-                                }
-                                else
-                                {
-                                    <option value="@r">@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
-                                }
+                                <option value="@r" @(r == Model.Role ? "selected" : null)>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
                             }
                         </select>
+                        <span class="field-error" data-error-for="Role">@Err("Role")</span>
                     </div>
                 </div>
 
@@ -192,20 +214,16 @@
             </div>
         </div>
     </form>
+
+    <!-- Hidden form for toggle submission -->
+    <form id="toggleStatusForm" method="post" style="display: none;">
+        @Html.AntiForgeryToken()
+    </form>
 </div>
 
 @section Scripts {
+    <partial name="_FormValidationScripts" />
     <script>
-        function calcAge() {
-            const dob = document.getElementById('dobInput').value;
-            if (!dob) { document.getElementById('ageInput').value = ''; return; }
-            const birth = new Date(dob);
-            const today = new Date();
-            let age = today.getFullYear() - birth.getFullYear();
-            const m = today.getMonth() - birth.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-            document.getElementById('ageInput').value = age >= 0 ? age : '';
-        }
         function togglePwd(inputId, iconId) {
             const input = document.getElementById(inputId);
             const icon  = document.getElementById(iconId);
@@ -230,6 +248,12 @@
                 };
                 reader.readAsDataURL(input.files[0]);
             }
+        }
+
+        function toggleUserStatus(userId) {
+            const form = document.getElementById('toggleStatusForm');
+            form.action = '/UserManagement/ToggleStatus/' + userId;
+            form.submit();
         }
     </script>
 }
