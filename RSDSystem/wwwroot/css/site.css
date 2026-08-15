@@ -625,6 +625,36 @@ body {
     white-space: nowrap;
 }
 
+.badge-ongoing {
+    background: #d4f7e0;
+    color: #0d7a3e;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-finished {
+    background: #d6e4ff;
+    color: #163F8B;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-hold {
+    background: #ffdca0;
+    color: #a15c00;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* ── Toast notifications ─────────────────────────────────── */
 .rsd-toast {
     color: #fff;
@@ -1420,59 +1450,11 @@ select.form-ctrl {
     }
 
 /* ── Project view page ───────────────────────────────────── */
-.proj-view-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 18px;
-    flex-wrap: wrap;
-}
-
 .proj-view-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-bottom: 0;
-}
-
-.proj-status-line {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.proj-status-line .form-lbl {
-    display: inline;
-    margin-bottom: 0;
-}
-
-.proj-status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 88px;
-    padding: 4px 16px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    line-height: 1.2;
-}
-
-.proj-status-finished {
-    background: #d6e4ff;
-    color: #163F8B;
-}
-
-.proj-status-ongoing {
-    background: #d4f7e0;
-    color: #0d7a3e;
-}
-
-.proj-status-hold {
-    background: #ffdca0;
-    color: #a15c00;
+    margin-bottom: 14px;
 }
 
 .proj-view-group {
