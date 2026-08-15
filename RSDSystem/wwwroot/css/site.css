@@ -2319,21 +2319,81 @@ button.badge-btn {
 }
 
 .vp-inline-back {
-    margin-bottom: 0;
+    margin-bottom: 12px;
     position: static;
 }
 
+.vp-detail-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin: 4px 0 20px;
+}
+
 .vp-detail-title {
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 700;
     color: #266DF1;
-    margin-top: 8px;
+    line-height: 1.2;
 }
 
 .vp-detail-dates {
     font-size: 13px;
     color: #4a4a4a;
-    margin: 4px 0 18px;
+    margin-top: 6px;
+}
+
+.vp-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    align-items: center;
+}
+
+.vp-btn-pdf,
+.vp-btn-send {
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    white-space: nowrap;
+}
+
+.vp-btn-pdf {
+    background: #fff;
+    color: #111;
+    border: 1.5px solid #111;
+}
+
+.vp-btn-pdf:hover {
+    background: #f5f5f5;
+    color: #111;
+}
+
+.vp-btn-send {
+    background: #22a35a;
+    color: #fff;
+    border: none;
+}
+
+.vp-btn-send:hover {
+    background: #1b8448;
+    color: #fff;
+}
+
+.vp-employee-table thead tr {
+    background: #dce8ff;
+}
+
+.vp-employee-table th {
+    color: #163F8B;
 }
 
 .vp-employee-table tbody tr:nth-child(even) td {
@@ -2341,6 +2401,9 @@ button.badge-btn {
 }
 
 .vp-slip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
     margin-top: 28px;
 }
 
@@ -2428,6 +2491,15 @@ button.badge-btn {
 
 .pred-back {
     margin-bottom: 0;
+    background: #111;
+    color: #fff;
+    border-color: #111;
+    box-shadow: none;
+}
+
+.pred-back:hover {
+    background: #333;
+    color: #fff;
 }
 
 .pred-heading-row {
@@ -2560,10 +2632,15 @@ button.badge-btn {
     .vp-period-head,
     .vp-period-body,
     .pred-grid,
-    .pred-heading-row {
+    .pred-heading-row,
+    .vp-detail-heading {
         grid-template-columns: 1fr;
         display: flex;
         flex-direction: column;
+    }
+
+    .vp-detail-actions {
+        justify-content: flex-start;
     }
 }
 
