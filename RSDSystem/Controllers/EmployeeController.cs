@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
+using RSDSystem.Helpers;
 using RSDSystem.Models;
 using RSDSystem.Validation;
 
@@ -41,6 +42,7 @@ namespace RSDSystem.Controllers
                     e.LastName.Contains(s) ||
                     e.JobClassification.Contains(s) ||
                     (e.EmployeeCode != null && e.EmployeeCode.Contains(s)) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(s.Replace("-", ""))) ||
                     (e.Email != null && e.Email.Contains(s)) ||
                     (e.Project != null && e.Project.ProjectName.Contains(s)));
             }
@@ -307,30 +309,31 @@ namespace RSDSystem.Controllers
             return $"/uploads/employees/{fileName}";
         }
 
-        // Generate a unique EmployeeCode in the same format used by the
-        // migration: YY + 4-digit zero-padded sequence (e.g. 26 0001 => "260001").
+        // Unique 5-digit biometric ID: 00001, 00002, ...
         private async Task<string> GenerateEmployeeCodeAsync()
         {
-            var year = DateTime.Now.Year % 100;
-            var prefix = year.ToString("D2");
-
             var codes = await _db.Employees
-                                 .Where(e => e.EmployeeCode != null && e.EmployeeCode.StartsWith(prefix))
+                                 .Where(e => e.EmployeeCode != null && e.EmployeeCode != "")
                                  .Select(e => e.EmployeeCode!)
                                  .ToListAsync();
 
             int maxSeq = 0;
             foreach (var code in codes)
             {
-                if (code.Length >= 6)
-                {
-                    var tail = code.Substring(code.Length - 4);
-                    if (int.TryParse(tail, out var n) && n > maxSeq) maxSeq = n;
-                }
+                var seq = IdFormatter.EmployeeSequence(code);
+                if (seq.HasValue && seq.Value > maxSeq)
+                    maxSeq = seq.Value;
             }
 
             var next = maxSeq + 1;
-            return prefix + next.ToString("D4");
+            var candidate = next.ToString("D5");
+            while (codes.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+            {
+                next++;
+                candidate = next.ToString("D5");
+            }
+
+            return candidate;
         }
 
         //delete multiple employees
