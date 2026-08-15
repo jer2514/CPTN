@@ -18,17 +18,7 @@
     <i class="bi bi-arrow-left"></i> Back
 </a>
 
-<style>
-    .proj-view-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
-    .proj-view-toolbar .proj-view-actions { margin-bottom: 0; }
-    .proj-status-line { display: flex; align-items: center; gap: 8px; }
-    .proj-status-line .form-lbl { display: inline; margin-bottom: 0; }
-    .badge-ongoing { background: #22c55e; color: #111; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
-    .badge-finished { background: #266DF1; color: #fff; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
-    .badge-hold { background: #f59e0b; color: #111; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
-</style>
-
-<div class="form-card" style="max-width:680px">
+<div class="form-card">
 
     <div class="proj-view-toolbar">
         <div class="proj-status-line">
@@ -84,7 +74,7 @@
         <div class="form-lbl">Monthly Budget</div>
         @if (!budgets.Any())
         {
-            <div class="proj-view-field" style="color:#9ab0d8;font-size:12.5px">
+            <div class="proj-view-field proj-view-field-muted">
                 No monthly budget set.
             </div>
         }
