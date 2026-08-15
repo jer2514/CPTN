@@ -1436,59 +1436,43 @@ select.form-ctrl {
     margin-bottom: 0;
 }
 
-.proj-status-pills {
+.proj-status-line {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.proj-status-pills .form-lbl {
+.proj-status-line .form-lbl {
     display: inline;
     margin-bottom: 0;
-    margin-right: 4px;
 }
 
-.proj-status-form {
-    display: inline;
-    margin: 0;
-}
-
-.proj-status-pill {
+.proj-status-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-width: 88px;
-    padding: 6px 16px;
-    border: none;
+    padding: 4px 16px;
     border-radius: 20px;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
-    color: #111;
+    white-space: nowrap;
     line-height: 1.2;
-    cursor: pointer;
-}
-
-.proj-status-pill.is-idle {
-    opacity: 0.38;
-}
-
-.proj-status-pill.is-current {
-    opacity: 1;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(22, 63, 139, 0.35);
-    cursor: default;
 }
 
 .proj-status-finished {
-    background: #266DF1;
+    background: #d6e4ff;
+    color: #163F8B;
 }
 
 .proj-status-ongoing {
-    background: #22c55e;
+    background: #d4f7e0;
+    color: #0d7a3e;
 }
 
 .proj-status-hold {
-    background: #f59e0b;
+    background: #ffdca0;
+    color: #a15c00;
 }
 
 .proj-view-group {
