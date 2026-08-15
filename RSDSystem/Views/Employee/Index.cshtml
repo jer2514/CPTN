@@ -12,52 +12,45 @@
 
 
 <div class="page-card">
+    <div class="emp-title mb-3">All Employees</div>
 
-    <div class="emp-card-head">
-        <div class="emp-title">All Employee</div>
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search Employee" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+        </form>
 
-        <div class="emp-controls">
-            <!-- Filter dropdown -->
+        <div class="list-controls-actions">
             <div class="dropdown">
-                <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn-outline-blue dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="bi bi-funnel"></i> Filter
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     <li>
                         <a class="dropdown-item @(sortBy == "lastname" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="lastname" asp-route-search="@ViewBag.Search">
-                            Last Name
-                        </a>
+                           asp-action="Index" asp-route-sortBy="lastname"
+                           asp-route-search="@ViewBag.Search">Last Name</a>
                     </li>
                     <li>
                         <a class="dropdown-item @(sortBy == "job" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="job" asp-route-search="@ViewBag.Search">
-                            Job
-                        </a>
+                           asp-action="Index" asp-route-sortBy="job"
+                           asp-route-search="@ViewBag.Search">Job</a>
                     </li>
                     <li>
                         <a class="dropdown-item @(sortBy == "assigned" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="assigned" asp-route-search="@ViewBag.Search">
-                            Assigned
-                        </a>
+                           asp-action="Index" asp-route-sortBy="assigned"
+                           asp-route-search="@ViewBag.Search">Assigned</a>
                     </li>
                     <li>
                         <a class="dropdown-item @(sortBy == "status" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="status" asp-route-search="@ViewBag.Search">
-                            Status
-                        </a>
+                           asp-action="Index" asp-route-sortBy="status"
+                           asp-route-search="@ViewBag.Search">Status</a>
                     </li>
                 </ul>
             </div>
 
-            <!-- Search -->
-            <form asp-action="Index" method="get" class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
-                <input type="hidden" name="sortBy" value="@sortBy" />
-            </form>
-
-            <!-- Add Employee -->
             <a asp-action="Create" class="btn-primary-blue">Add Employee</a>
         </div>
     </div>
@@ -65,21 +58,46 @@
     <table class="emp-table">
         <thead>
             <tr>
-                <th style="width:40px"><input type="checkbox" class="tbl-check" onclick="toggleAll(this)" /></th>
+                <th style="width:40px">
+                    <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
+                </th>
                 <th>Employee ID</th>
-                <th>User</th>
+                <th>Employee</th>
                 <th>Job</th>
                 <th>Assigned to</th>
                 <th>Date Added</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th>
+                    <div>
+                        <span>Action</span>
+                        <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
+                            @Html.AntiForgeryToken()
+                            <div id="bulkIdsContainer"></div>
+                            <button type="button"
+                                    id="bulkDeleteBtn"
+                                    class="action-btn action-delete"
+                                    style="display:none"
+                                    onclick="openBulkDeleteModal()">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </form>
+                    </div>
+                </th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var emp in Model)
+            @if (!Model.Any())
             {
                 <tr>
-                    <td><input type="checkbox" class="tbl-check row-cb" /></td>
+                    <td colspan="8" class="text-center text-muted py-4">No employees found.</td>
+                </tr>
+            }
+            @foreach (var emp in Model)
+            {
+                var initials = $"{(string.IsNullOrEmpty(emp.FirstName) ? "" : emp.FirstName[..1])}{(string.IsNullOrEmpty(emp.LastName) ? "" : emp.LastName[..1])}";
+                var dateAdded = emp.DateAdded.Year > 1900 ? emp.DateAdded.ToString("MMM d, yyyy") : "—";
+                <tr>
+                    <td><input type="checkbox" class="tbl-check row-cb" data-id="@emp.EmployeeId" /></td>
                     <td>@IdFormatter.Format(emp.EmployeeCode)</td>
                     <td>
                         <div class="emp-name-cell">
@@ -89,16 +107,14 @@
                             }
                             else
                             {
-                                <span class="emp-avatar-initials">
-                                    @emp.FirstName.Substring(0, 1)@emp.LastName.Substring(0, 1)
-                                </span>
+                                <span class="emp-avatar-initials">@initials</span>
                             }
-                            <span>@emp.FirstName @emp.MiddleInitial @emp.LastName</span>
+                            <span>@emp.FullName</span>
                         </div>
                     </td>
                     <td>@emp.JobClassification</td>
-                    <td>@emp.Project?.ProjectName</td>
-                    <td>@emp.DateAdded.ToString("MMM d, yyyy")</td>
+                    <td>@(string.IsNullOrWhiteSpace(emp.Project?.ProjectName) ? "—" : emp.Project.ProjectName)</td>
+                    <td>@dateAdded</td>
                     <td>
                         @if (emp.IsActive)
                         {
@@ -106,17 +122,17 @@
                         }
                         else
                         {
-
                             <span class="badge-inactive">Inactive</span>
                         }
                     </td>
                     <td>
                         <div class="action-cell">
-                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId" class="action-btn action-edit" title="Edit">
+                            <a asp-action="Edit" asp-route-id="@emp.EmployeeId"
+                               class="action-btn action-edit" title="Edit">
                                 <i class="bi bi-pencil-fill"></i>
                             </a>
                             <button type="button" class="action-btn action-delete" title="Delete"
-                                    onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName')">
+                                    onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName.Replace("'", "\\'")')">
                                 <i class="bi bi-trash-fill"></i>
                             </button>
                         </div>
@@ -125,10 +141,11 @@
             }
         </tbody>
     </table>
+
     @await Html.PartialAsync("_Pagination")
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- Delete Overlay -->
 <div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
     <div class="del-modal">
         <div class="del-icon-wrap">
@@ -150,6 +167,7 @@
     </div>
 </div>
 
+
 <!-- Bulk Delete Overlay -->
 <div class="del-overlay" id="bulkDeleteOverlay" onclick="closeBulkDeleteModal(arguments[0])">
     <div class="del-modal">
@@ -159,7 +177,7 @@
         <div class="del-title">Are you sure?</div>
         <div class="del-msg">
             You are about to permanently delete
-            <strong id="bulkDeleteCount">0</strong> user(s).
+            <strong id="bulkDeleteCount">0</strong> employee(s).
             This action cannot be undone.
         </div>
         <div class="del-actions">
@@ -198,7 +216,6 @@
             const container = document.getElementById('bulkIdsContainer');
             const count     = document.getElementById('bulkDeleteCount');
 
-            // Populate hidden inputs
             container.innerHTML = '';
             checked.forEach(cb => {
                 const input = document.createElement('input');
