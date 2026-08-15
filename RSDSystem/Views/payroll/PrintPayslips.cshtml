@@ -1,10 +1,13 @@
 @model List<RSDSystem.Models.Payroll>
+@using RSDSystem.Helpers
+@using System.Globalization
 @{
     Layout = null;
     var projectName = ViewBag.ProjectName as string ?? "Project";
     var startLabel = ViewBag.StartLabel as string ?? "";
     var endLabel = ViewBag.EndLabel as string ?? "";
     var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
+    var dateCulture = CultureInfo.InvariantCulture;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -12,46 +15,138 @@
     <meta charset="utf-8" />
     <title>@fileName</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; color: #111; margin: 24px; }
-        h1 { font-size: 20px; color: #163F8B; margin: 0 0 4px; }
-        .period { color: #555; margin-bottom: 18px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .slip { border: 1px solid #222; padding: 14px 16px; break-inside: avoid; }
-        .slip h2 { font-size: 14px; margin: 0 0 2px; text-align: center; }
-        .slip h3 { font-size: 12px; margin: 0 0 10px; text-align: center; font-weight: 500; }
-        .line { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            color: #111;
+            margin: 20px;
+            background: #fff;
+        }
+        h1 { font-size: 18px; color: #163F8B; margin: 0 0 4px; }
+        .period { color: #555; margin-bottom: 16px; font-size: 13px; }
+        .slip {
+            border: 3px solid #266DF1;
+            border-radius: 8px;
+            padding: 22px 26px;
+            margin: 0 auto 20px;
+            max-width: 640px;
+            break-inside: avoid;
+            page-break-after: always;
+            background: #fff;
+        }
+        .slip:last-child { page-break-after: auto; }
+        .title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #266DF1;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 14px;
+        }
+        .section {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0d7a3e;
+            border-bottom: 1px solid #111;
+            padding-bottom: 5px;
+            margin: 16px 0 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+        }
+        .period-val {
+            font-size: 12px;
+            font-weight: 600;
+            color: #266DF1;
+        }
+        .row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 18px;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+        .line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            padding: 3px 0;
+        }
+        .line.net {
+            border-top: 1px solid #111;
+            margin-top: 6px;
+            padding-top: 8px;
+            font-weight: 700;
+        }
+        .lbl { color: #111; }
+        .val { color: #266DF1; font-weight: 600; }
+        .footer {
+            margin-top: 16px;
+            font-size: 12px;
+            color: #266DF1;
+            font-weight: 600;
+        }
         @@media print {
             .no-print { display: none; }
-            body { margin: 12px; }
+            body { margin: 0; }
+            .slip { margin: 0; max-width: none; border-radius: 0; }
         }
     </style>
 </head>
 <body>
     <div class="no-print" style="margin-bottom:16px">
         <button onclick="window.print()">Print / Save as PDF</button>
+        <div style="margin-top:8px;font-size:13px;color:#555">@projectName — @startLabel - @endLabel</div>
     </div>
-    <h1>@projectName</h1>
-    <div class="period">@startLabel - @endLabel</div>
     @if (!Model.Any())
     {
         <p>No payslips to print.</p>
     }
     else
     {
-        <div class="grid">
-            @foreach (var slip in Model)
-            {
-                <div class="slip">
-                    <h2>RSD Construction Services</h2>
-                    <h3>Employee Payslip</h3>
-                    <div class="line"><span>Employee</span><span>@(slip.Employee?.FullName ?? "—")</span></div>
-                    <div class="line"><span>Job</span><span>@(slip.Employee?.JobClassification ?? "—")</span></div>
-                    <div class="line"><span>Regular days</span><span>@slip.RegularDaysWorked</span></div>
-                    <div class="line"><span>OT hours</span><span>@slip.OvertimeHours.ToString("0.##")</span></div>
-                    <div class="line"><span>Net pay</span><span>₱@slip.NetPay.ToString("N2")</span></div>
+        @foreach (var slip in Model)
+        {
+            <div class="slip">
+                <div class="title">RSD Construction Services</div>
+                <div class="subtitle">Employee Payslip</div>
+
+                <div class="section">Employee Information</div>
+                <div class="row2">
+                    <div><span class="lbl">Employee ID: </span><span class="val">@IdFormatter.Format(slip.Employee?.EmployeeCode)</span></div>
+                    <div><span class="lbl">Project Assigned: </span><span class="val">@(slip.Project?.ProjectName ?? projectName)</span></div>
                 </div>
-            }
-        </div>
+                <div class="row2">
+                    <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "—")</span></div>
+                    <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
+                </div>
+                <div class="row2">
+                    <div><span class="lbl">Job Classification: </span><span class="val">@(string.IsNullOrWhiteSpace(slip.Employee?.JobClassification) ? "—" : slip.Employee.JobClassification)</span></div>
+                    <div><span class="lbl">Rate per hour: </span><span class="val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                </div>
+
+                <div class="section">
+                    Attendance Summary
+                    <span class="period-val">Payroll Period: @slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
+                </div>
+                <div class="line"><span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span></div>
+                <div class="line"><span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span></div>
+                <div class="line"><span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span></div>
+
+                <div class="section">Payroll Computation</div>
+                <div class="line"><span class="lbl">Regular Pay:</span><span class="val">₱@slip.RegularPay.ToString("N2")</span></div>
+                <div class="line"><span class="lbl">Overtime Pay:</span><span class="val">₱@slip.OvertimePay.ToString("N2")</span></div>
+                <div class="line"><span class="lbl">Gross Pay:</span><span class="val">₱@slip.GrossPay.ToString("N2")</span></div>
+                <div class="line"><span class="lbl">Cash Advance:</span><span class="val">₱@slip.CashAdvance.ToString("N2")</span></div>
+                <div class="line net"><span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span></div>
+
+                <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+            </div>
+        }
     }
     <script>window.addEventListener('load', function () { window.print(); });</script>
 </body>
