@@ -12,34 +12,36 @@
     int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
 }
 
-<div class="pred-topbar">
-    <a asp-action="Period"
-       asp-route-projectId="@projectId"
-       asp-route-start="@start.ToString("yyyy-MM-dd")"
-       asp-route-end="@end.ToString("yyyy-MM-dd")"
-       class="btn-back pred-back">
-        <i class="bi bi-arrow-left"></i> Back
-    </a>
+<div class="content-topbar">
+    <div class="page-label">View Payroll (Admin)</div>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="pred-heading-row">
-    <div>
-        <div class="pred-project">@projectName</div>
-        <div class="pred-dates">@startLabel - @endLabel</div>
-    </div>
-    <div class="pred-actions">
-        <a asp-action="PrintPayslips"
-           asp-route-projectId="@projectId"
-           asp-route-start="@start.ToString("yyyy-MM-dd")"
-           asp-route-end="@end.ToString("yyyy-MM-dd")"
-           target="_blank"
-           class="pred-btn-pdf">Download PDF</a>
-        <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
-    </div>
-</div>
+<a asp-action="Period"
+   asp-route-projectId="@projectId"
+   asp-route-start="@start.ToString("yyyy-MM-dd")"
+   asp-route-end="@end.ToString("yyyy-MM-dd")"
+   class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
 
 <div class="page-card pred-card">
+    <div class="vp-detail-heading">
+        <div>
+            <div class="vp-detail-title">@projectName</div>
+            <div class="vp-detail-dates">@startLabel - @endLabel</div>
+        </div>
+        <div class="vp-detail-actions">
+            <a asp-action="PrintPayslips"
+               asp-route-projectId="@projectId"
+               asp-route-start="@start.ToString("yyyy-MM-dd")"
+               asp-route-end="@end.ToString("yyyy-MM-dd")"
+               target="_blank"
+               class="vp-btn-pdf">Download PDF</a>
+            <button type="button" class="vp-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+        </div>
+    </div>
+
     @if (!Model.Any())
     {
         <div class="text-center text-muted py-5">
@@ -66,34 +68,34 @@
             }
         </div>
     }
-</div>
 
-<div class="pred-pager">
-    @if (currentPage > 1)
-    {
-        <a asp-action="GeneratedPayslips"
-           asp-route-projectId="@projectId"
-           asp-route-start="@start.ToString("yyyy-MM-dd")"
-           asp-route-end="@end.ToString("yyyy-MM-dd")"
-           asp-route-page="@(currentPage - 1)">&lt;</a>
-    }
-    else
-    {
-        <span class="disabled">&lt;</span>
-    }
-    <span>Page @currentPage of @totalPages</span>
-    @if (currentPage < totalPages)
-    {
-        <a asp-action="GeneratedPayslips"
-           asp-route-projectId="@projectId"
-           asp-route-start="@start.ToString("yyyy-MM-dd")"
-           asp-route-end="@end.ToString("yyyy-MM-dd")"
-           asp-route-page="@(currentPage + 1)">&gt;</a>
-    }
-    else
-    {
-        <span class="disabled">&gt;</span>
-    }
+    <div class="pred-pager">
+        @if (currentPage > 1)
+        {
+            <a asp-action="GeneratedPayslips"
+               asp-route-projectId="@projectId"
+               asp-route-start="@start.ToString("yyyy-MM-dd")"
+               asp-route-end="@end.ToString("yyyy-MM-dd")"
+               asp-route-page="@(currentPage - 1)">&lt;</a>
+        }
+        else
+        {
+            <span class="disabled">&lt;</span>
+        }
+        <span>Page @currentPage of @totalPages</span>
+        @if (currentPage < totalPages)
+        {
+            <a asp-action="GeneratedPayslips"
+               asp-route-projectId="@projectId"
+               asp-route-start="@start.ToString("yyyy-MM-dd")"
+               asp-route-end="@end.ToString("yyyy-MM-dd")"
+               asp-route-page="@(currentPage + 1)">&gt;</a>
+        }
+        else
+        {
+            <span class="disabled">&gt;</span>
+        }
+    </div>
 </div>
 
 <div class="del-overlay" id="sendOverlay" onclick="closeSendModal(arguments[0])">
