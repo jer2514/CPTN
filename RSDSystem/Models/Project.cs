@@ -157,9 +157,9 @@ namespace RSDSystem.Models
 
         public static string BadgeClass(string? status) => Normalize(status) switch
         {
-            Finished => "proj-status-finished",
-            OnHold => "proj-status-hold",
-            _ => "proj-status-ongoing"
+            Finished => "badge-finished",
+            OnHold => "badge-hold",
+            _ => "badge-ongoing"
         };
 
         public static IQueryable<Project> Ongoing(this IQueryable<Project> projects) =>

@@ -266,19 +266,6 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /Project/SetStatus
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SetStatus(int id, string? status)
-        {
-            var project = await _db.Projects.FindAsync(id);
-            if (project == null) return NotFound();
-
-            project.Status = ProjectStatusOptions.Normalize(status);
-            await _db.SaveChangesAsync();
-            return RedirectToAction(nameof(Details), new { id });
-        }
-
         // POST /Project/RemoveEmployee
         [HttpPost]
         [ValidateAntiForgeryToken]
