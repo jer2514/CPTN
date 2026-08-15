@@ -31,6 +31,7 @@ namespace RSDSystem.Models
         [Display(Name = "M.I.")]
         public string? MiddleInitial { get; set; }
 
+        [NotMapped]
         public string FullName => string.IsNullOrWhiteSpace(MiddleInitial)
             ? $"{FirstName} {LastName}"
             : $"{FirstName} {MiddleInitial}. {LastName}";
@@ -39,6 +40,7 @@ namespace RSDSystem.Models
         [DataType(DataType.Date)]
         public DateTime? DateOfBirth { get; set; }
 
+        [NotMapped]
         public int? Age => InputRules.CalculateAge(DateOfBirth);
 
         [MaxLength(10)]
