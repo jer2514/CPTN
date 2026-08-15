@@ -31,8 +31,13 @@ namespace RSDSystem.Models
                 .IsUnique();
 
             modelBuilder.Entity<Employee>()
+                .Property(e => e.Email)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
                 .HasIndex(e => e.Email)
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
 
             modelBuilder.Entity<Employee>()
                 .Ignore(e => e.FullName)
