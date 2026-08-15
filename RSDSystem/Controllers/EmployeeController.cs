@@ -198,13 +198,15 @@ namespace RSDSystem.Controllers
             emp.ContactNumber = emp.ContactNumber?.Trim();
             emp.Address = emp.Address?.Trim();
             emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
-            emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
+            emp.JobClassification = string.IsNullOrWhiteSpace(emp.JobClassification)
+                ? string.Empty
+                : emp.JobClassification.Trim();
         }
 
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
-            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
-            return ti.ToTitleCase(value.Trim().ToLower());
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLowerInvariant());
         }
 
         private void ValidatePhoto(IFormFile? photo)
