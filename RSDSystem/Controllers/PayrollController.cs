@@ -151,6 +151,7 @@ namespace RSDSystem.Controllers
             const int pageSize = 4;
             var slips = await _db.Payrolls
                 .Include(p => p.Employee)
+                .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)

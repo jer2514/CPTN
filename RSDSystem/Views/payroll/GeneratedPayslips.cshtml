@@ -1,4 +1,6 @@
 @model List<RSDSystem.Models.Payroll>
+@using RSDSystem.Helpers
+@using System.Globalization
 @{
     ViewData["Title"] = "View Payroll";
     var projectId = (int)ViewBag.ProjectId;
@@ -10,38 +12,37 @@
     var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
     int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
     int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
+    var dateCulture = CultureInfo.InvariantCulture;
 }
 
-<div class="content-topbar">
-    <div class="page-label">View Payroll (Admin)</div>
+<div class="pred-topbar">
+    <a asp-action="Period"
+       asp-route-projectId="@projectId"
+       asp-route-start="@start.ToString("yyyy-MM-dd")"
+       asp-route-end="@end.ToString("yyyy-MM-dd")"
+       class="btn-back pred-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<a asp-action="Period"
-   asp-route-projectId="@projectId"
-   asp-route-start="@start.ToString("yyyy-MM-dd")"
-   asp-route-end="@end.ToString("yyyy-MM-dd")"
-   class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
+<div class="pred-heading-row">
+    <div>
+        <div class="pred-project">@projectName</div>
+        <div class="pred-dates">@startLabel - @endLabel</div>
+    </div>
+    <div class="pred-actions">
+        <a asp-action="PrintPayslips"
+           asp-route-projectId="@projectId"
+           asp-route-start="@start.ToString("yyyy-MM-dd")"
+           asp-route-end="@end.ToString("yyyy-MM-dd")"
+           target="_blank"
+           class="pred-btn-pdf">Download PDF</a>
+        <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+    </div>
+</div>
 
 <div class="page-card pred-card">
-    <div class="vp-detail-heading">
-        <div>
-            <div class="vp-detail-title">@projectName</div>
-            <div class="vp-detail-dates">@startLabel - @endLabel</div>
-        </div>
-        <div class="vp-detail-actions">
-            <a asp-action="PrintPayslips"
-               asp-route-projectId="@projectId"
-               asp-route-start="@start.ToString("yyyy-MM-dd")"
-               asp-route-end="@end.ToString("yyyy-MM-dd")"
-               target="_blank"
-               class="vp-btn-pdf">Download PDF</a>
-            <button type="button" class="vp-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
-        </div>
-    </div>
-
     @if (!Model.Any())
     {
         <div class="text-center text-muted py-5">
@@ -57,19 +58,51 @@
                    asp-action="View"
                    asp-route-id="@slip.PayrollId"
                    asp-route-from="payslips">
-                    <div class="pred-slip-title">RSD Construction Services</div>
-                    <div class="pred-slip-sub">Employee Payslip</div>
-                    <div class="pred-slip-line"><span>Employee</span><strong>@(slip.Employee?.FullName ?? "—")</strong></div>
-                    <div class="pred-slip-line"><span>Job</span><strong>@(slip.Employee?.JobClassification ?? "—")</strong></div>
-                    <div class="pred-slip-line"><span>Period</span><strong>@slip.PayPeriodStart.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture) – @slip.PayPeriodEnd.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</strong></div>
-                    <div class="pred-slip-line"><span>Net Pay</span><strong>₱@slip.NetPay.ToString("N2")</strong></div>
-                    <div class="pred-slip-status">@slip.Status</div>
+                    <div class="mini-title">RSD Construction Services</div>
+                    <div class="mini-sub">Employee Payslip</div>
+
+                    <div class="mini-section">Employee Information</div>
+                    <div class="mini-info">
+                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@IdFormatter.Format(slip.Employee?.EmployeeCode)</span></div>
+                        <div><span class="mini-lbl">Project Assigned: </span><span class="mini-val">@(slip.Project?.ProjectName ?? projectName)</span></div>
+                        <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
+                        <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
+                        <div><span class="mini-lbl">Job Classification: </span><span class="mini-val">@(slip.Employee?.JobClassification)</span></div>
+                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                    </div>
+
+                    <div class="mini-section">
+                        Attendance Summary
+                        <span class="mini-period">@slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
+                    </div>
+                    <div class="mini-fields">
+                        <span class="mini-lbl">Regular Days Worked:</span><span class="mini-val">@slip.RegularDaysWorked Days</span>
+                        <span class="mini-lbl">Overtime:</span><span class="mini-val">@slip.OvertimeHours.ToString("0.##") hours</span>
+                        <span class="mini-lbl">Absent:</span><span class="mini-val">@slip.AbsentDays Days</span>
+                    </div>
+
+                    <div class="mini-section">Payroll Computation</div>
+                    <div class="mini-fields">
+                        <span class="mini-lbl">Regular Pay:</span><span class="mini-val">₱@slip.RegularPay.ToString("N2")</span>
+                        <span class="mini-lbl">Overtime Pay:</span><span class="mini-val">₱@slip.OvertimePay.ToString("N2")</span>
+                    </div>
+                    <div class="mini-fields mini-fields-gap">
+                        <span class="mini-lbl">Gross Pay:</span><span class="mini-val">₱@slip.GrossPay.ToString("N2")</span>
+                        <span class="mini-lbl">Cash Advance:</span><span class="mini-val">₱@slip.CashAdvance.ToString("N2")</span>
+                    </div>
+                    <div class="mini-net">
+                        <span class="mini-lbl">Net Pay:</span><span class="mini-val">₱@slip.NetPay.ToString("N2")</span>
+                    </div>
+                    <div class="mini-footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
                 </a>
             }
         </div>
     }
+</div>
 
-    <div class="pred-pager">
+<div class="pred-pager">
+    <div>Page @currentPage of @totalPages</div>
+    <div class="pred-pager-arrows">
         @if (currentPage > 1)
         {
             <a asp-action="GeneratedPayslips"
@@ -82,7 +115,6 @@
         {
             <span class="disabled">&lt;</span>
         }
-        <span>Page @currentPage of @totalPages</span>
         @if (currentPage < totalPages)
         {
             <a asp-action="GeneratedPayslips"
