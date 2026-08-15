@@ -72,7 +72,7 @@ body {
             transition: background .15s;
         }
 
-        .menu li.active a {
+        .menu > li.active > a {
             background: #C9DAFF;
             color: #163F8B;
             font-weight: 600;
@@ -1669,11 +1669,17 @@ button.badge-btn {
     }
 
         .submenu li a:hover {
-            background: #f5f8ff;
-            color: #163F8B;
+            background: none;
+            color: #266DF1;
         }
 
-    .submenu li.active a,
+    .submenu li.active a {
+        background: none;
+        box-shadow: none;
+        color: #266DF1;
+        font-weight: 600;
+    }
+
     .menu li a.menu-dropdown-toggle.active {
         background: #C9DAFF;
         color: #163F8B;
@@ -2491,15 +2497,6 @@ button.badge-btn {
 
 .pred-back {
     margin-bottom: 0;
-    background: #111;
-    color: #fff;
-    border-color: #111;
-    box-shadow: none;
-}
-
-.pred-back:hover {
-    background: #333;
-    color: #fff;
 }
 
 .pred-heading-row {
@@ -2611,14 +2608,14 @@ button.badge-btn {
     justify-content: center;
     align-items: center;
     gap: 16px;
-    color: #fff;
-    margin-top: 16px;
+    color: #163F8B;
+    margin-top: 22px;
     font-weight: 600;
 }
 
 .pred-pager a,
 .pred-pager span.disabled {
-    color: #fff;
+    color: #163F8B;
     text-decoration: none;
     font-size: 18px;
 }
