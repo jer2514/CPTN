@@ -64,19 +64,19 @@ namespace RSDSystem.Models
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (StartingDate.HasValue && !InputRules.IsUsableDate(StartingDate))
+            if (StartingDate.HasValue && !DateRules.IsUsableDate(StartingDate))
             {
                 yield return new ValidationResult(
-                    InputRules.CalendarYearMessage, new[] { nameof(StartingDate) });
+                    DateRules.CalendarYearMessage, new[] { nameof(StartingDate) });
             }
 
-            if (EstimateEndDate.HasValue && !InputRules.IsUsableDate(EstimateEndDate))
+            if (EstimateEndDate.HasValue && !DateRules.IsUsableDate(EstimateEndDate))
             {
                 yield return new ValidationResult(
-                    InputRules.CalendarYearMessage, new[] { nameof(EstimateEndDate) });
+                    DateRules.CalendarYearMessage, new[] { nameof(EstimateEndDate) });
             }
 
-            if (InputRules.IsUsableDate(StartingDate) && InputRules.IsUsableDate(EstimateEndDate)
+            if (DateRules.IsUsableDate(StartingDate) && DateRules.IsUsableDate(EstimateEndDate)
                 && EstimateEndDate!.Value.Date < StartingDate!.Value.Date)
             {
                 yield return new ValidationResult(

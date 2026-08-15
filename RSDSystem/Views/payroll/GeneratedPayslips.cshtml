@@ -63,7 +63,7 @@
 
                     <div class="mini-section">Employee Information</div>
                     <div class="mini-info">
-                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@IdFormatter.FormatEmployee(slip.Employee?.EmployeeCode)</span></div>
+                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@EmployeeIds.Format(slip.Employee?.EmployeeCode)</span></div>
                         <div><span class="mini-lbl">Project Assigned: </span><span class="mini-val">@(slip.Project?.ProjectName ?? projectName)</span></div>
                         <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
                         <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
@@ -115,7 +115,7 @@
         {
             <span class="disabled">&lt;</span>
         }
-        @if (currentPage < totalPages)
+        @if (totalPages > currentPage)
         {
             <a asp-action="GeneratedPayslips"
                asp-route-projectId="@projectId"
@@ -131,7 +131,7 @@
 </div>
 
 <div class="del-overlay" id="sendOverlay" onclick="closeSendModal(arguments[0])">
-    <div class="gen-modal" onclick="event.stopPropagation()">
+    <div class="gen-modal" onclick="stopModalClick(arguments[0])">
         <div class="gen-modal-title">Send to Payroll Staff</div>
         <div class="gen-modal-text">The following PDF will be sent:</div>
         <div class="send-file-row">
@@ -155,6 +155,9 @@
     <script>
         function openSendModal() {
             document.getElementById('sendOverlay').classList.add('open');
+        }
+        function stopModalClick(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
         }
         function closeSendModal(e) {
             if (!e || e.target === document.getElementById('sendOverlay'))

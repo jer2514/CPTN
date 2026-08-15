@@ -34,7 +34,7 @@ namespace RSDSystem.Models
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            foreach (var result in InputRules.ValidateDateRange(
+            foreach (var result in DateRules.ValidateDateRange(
                 StartingDate, EndDate,
                 nameof(StartingDate), nameof(EndDate),
                 "Starting date", "End date"))

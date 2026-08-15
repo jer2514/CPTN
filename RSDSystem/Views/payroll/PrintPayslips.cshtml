@@ -8,145 +8,40 @@
     var endLabel = ViewBag.EndLabel as string ?? "";
     var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
     var dateCulture = CultureInfo.InvariantCulture;
+    var slips = Model ?? new List<RSDSystem.Models.Payroll>();
+    var slipCount = slips.Count;
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <title>@fileName</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            color: #111;
-            margin: 0;
-            background: #e8eef8;
-        }
-        .no-print {
-            padding: 16px 24px 0;
-            font-size: 13px;
-            color: #555;
-        }
-        .no-print button { margin-bottom: 8px; }
-        .sheet {
-            width: 8.5in;
-            height: 11in;
-            margin: 16px auto;
-            padding: 0.28in;
-            background: #fff;
-            border: 1.5px solid #266DF1;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 0.16in;
-            page-break-after: always;
-        }
-        .sheet:last-child { page-break-after: auto; }
-        .slip {
-            border: 1px solid #266DF1;
-            padding: 10px 12px 8px;
-            overflow: hidden;
-            background: #fff;
-        }
-        .title {
-            text-align: center;
-            font-size: 13px;
-            font-weight: 700;
-            color: #266DF1;
-        }
-        .subtitle {
-            text-align: center;
-            font-size: 11px;
-            font-weight: 500;
-            color: #000;
-            margin: 1px 0 8px;
-        }
-        .section {
-            font-size: 10.5px;
-            font-weight: 700;
-            color: #0d7a3e;
-            border-bottom: 1px solid #111;
-            padding-bottom: 2px;
-            margin: 7px 0 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 6px;
-        }
-        .period-val {
-            font-size: 9px;
-            font-weight: 600;
-            color: #266DF1;
-            white-space: nowrap;
-        }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            column-gap: 10px;
-            row-gap: 3px;
-            font-size: 10px;
-        }
-        .fields {
-            display: grid;
-            grid-template-columns: 112px 1fr;
-            row-gap: 2px;
-            column-gap: 8px;
-            font-size: 10px;
-        }
-        .gap { height: 6px; grid-column: 1 / -1; }
-        .net-rule {
-            border: none;
-            border-top: 1px solid #111;
-            margin: 6px 0 5px;
-        }
-        .lbl { color: #111; }
-        .val { color: #266DF1; font-weight: 600; }
-        .footer {
-            margin-top: 8px;
-            font-size: 10px;
-            color: #266DF1;
-            font-weight: 600;
-        }
-        @@page {
-            size: letter;
-            margin: 0.25in;
-        }
-        @@media print {
-            body { background: #fff; }
-            .no-print { display: none; }
-            .sheet {
-                width: auto;
-                height: 10.5in;
-                margin: 0;
-                border: none;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="~/css/payslip-print.css" />
 </head>
 <body>
     <div class="no-print">
         <button type="button" onclick="window.print()">Print / Save as PDF</button>
         <div>@projectName — @startLabel - @endLabel</div>
     </div>
-    @if (!Model.Any())
+    @if (slipCount == 0)
     {
         <p style="padding:24px">No payslips to print.</p>
     }
     else
     {
-        @for (var i = 0; i < Model.Count; i += 4)
+        @for (var i = 0; slipCount > i; i += 4)
         {
             <div class="sheet">
-                @for (var n = i; n < i + 4 && n < Model.Count; n++)
+                @for (var n = i; (i + 4) > n && slipCount > n; n++)
                 {
-                    var slip = Model[n];
+                    var slip = slips[n];
                     <div class="slip">
                         <div class="title">RSD Construction Services</div>
                         <div class="subtitle">Employee Payslip</div>
 
                         <div class="section">Employee Information</div>
                         <div class="info-grid">
-                            <div><span class="lbl">Employee ID: </span><span class="val">@IdFormatter.FormatEmployee(slip.Employee?.EmployeeCode)</span></div>
+                            <div><span class="lbl">Employee ID: </span><span class="val">@EmployeeIds.Format(slip.Employee?.EmployeeCode)</span></div>
                             <div><span class="lbl">Project Assigned: </span><span class="val">@(slip.Project?.ProjectName ?? projectName)</span></div>
                             <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "")</span></div>
                             <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>

@@ -33,9 +33,9 @@
                asp-route-search="@search" asp-route-sortBy="@sortBy">@i</a>
         }
 
-        @if (endPage < totalPages)
+        @if (totalPages > endPage)
         {
-            if (endPage < totalPages - 1)
+            if (totalPages - 1 > endPage)
             {
                 <span class="page-ellipsis">…</span>
             }

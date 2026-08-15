@@ -79,13 +79,13 @@ namespace RSDSystem.Controllers
                 return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
 
-            var existing = await _db.Payrolls
+            var existing = await _db.Set<Payroll>()
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
                 .ToListAsync();
 
-            var daysWorked = Math.Max(1, InputRules.CountWeekdays(start.Date, end.Date));
+            var daysWorked = Math.Max(1, DateRules.CountWeekdays(start.Date, end.Date));
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
 
@@ -95,7 +95,7 @@ namespace RSDSystem.Controllers
                     continue;
 
                 var regularPay = emp.DailyRate * daysWorked;
-                _db.Payrolls.Add(new Payroll
+                _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
                     ProjectId = projectId,
@@ -149,7 +149,7 @@ namespace RSDSystem.Controllers
             if (project == null) return NotFound();
 
             const int pageSize = 4;
-            var slips = await _db.Payrolls
+            var slips = await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
@@ -159,7 +159,7 @@ namespace RSDSystem.Controllers
                 .ThenByDescending(p => p.PayrollId)
                 .ToListAsync();
 
-            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count / (double)pageSize));
+            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count() / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
 
             ViewBag.PageTitle = "View Payroll";
@@ -183,7 +183,7 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var slips = (await _db.Payrolls
+            var slips = (await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
@@ -211,7 +211,7 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var count = await _db.Payrolls.CountAsync(p => p.ProjectId == projectId
+            var count = await _db.Set<Payroll>().CountAsync(p => p.ProjectId == projectId
                 && p.PayPeriodStart.Date == start.Date
                 && p.PayPeriodEnd.Date == end.Date);
 
@@ -254,8 +254,8 @@ namespace RSDSystem.Controllers
         {
             var schedules = approvedOnly
                 ? new List<PayrollSchedule>()
-                : await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
-            var payrolls = await _db.Payrolls.Include(p => p.Project).ToListAsync();
+                : await _db.Set<PayrollSchedule>().Include(s => s.Project).ToListAsync();
+            var payrolls = await _db.Set<Payroll>().Include(p => p.Project).ToListAsync();
             if (approvedOnly)
                 payrolls = payrolls.Where(IsApproved).ToList();
             var rows = new Dictionary<string, PayrollPeriodRow>(StringComparer.OrdinalIgnoreCase);
@@ -324,7 +324,7 @@ namespace RSDSystem.Controllers
         private async Task<List<PayrollPeriodEmployeeRow>> LoadPeriodEmployeesAsync(
             int projectId, DateTime start, DateTime end, bool approvedOnly = false)
         {
-            var payrolls = await _db.Payrolls
+            var payrolls = await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start
@@ -398,28 +398,28 @@ namespace RSDSystem.Controllers
         // GET /Payroll/View/{id}
         public async Task<IActionResult> View(int id)
         {
-            var payroll = await _db.Payrolls
+            var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
                                    .FirstOrDefaultAsync(p => p.PayrollId == id);
 
             if (payroll == null) return NotFound();
 
-            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = EmployeeIds.Format(payroll.Employee?.EmployeeCode);
             return View(payroll);
         }
 
         [HttpGet]
         public async Task<IActionResult> ViewPartial(int id)
         {
-            var payroll = await _db.Payrolls
+            var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
                                    .FirstOrDefaultAsync(p => p.PayrollId == id);
 
             if (payroll == null) return NotFound();
 
-            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = EmployeeIds.Format(payroll.Employee?.EmployeeCode);
             return PartialView("_PayrollPartial", payroll);
         }
 
@@ -429,7 +429,7 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
         {
-            var payroll = await _db.Payrolls.FindAsync(id);
+            var payroll = await _db.Set<Payroll>().FindAsync(id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
@@ -448,7 +448,7 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(reason))
                 return Json(new { success = false, message = "Please provide a reason for correction." });
 
-            var payroll = await _db.Payrolls.FindAsync(id);
+            var payroll = await _db.Set<Payroll>().FindAsync(id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
@@ -481,7 +481,7 @@ namespace RSDSystem.Controllers
                 EndDate = EndDate.Date
             };
 
-            _db.PayrollSchedules.Add(schedule);
+            _db.Set<PayrollSchedule>().Add(schedule);
             await _db.SaveChangesAsync();
 
             TempData["Success"] = "Schedule added.";
@@ -494,7 +494,7 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> EditSchedule(int PayrollScheduleId, int ProjectId,
             string? TypeOfService, DateTime StartingDate, DateTime EndDate)
         {
-            var existing = await _db.PayrollSchedules.FindAsync(PayrollScheduleId);
+            var existing = await _db.Set<PayrollSchedule>().FindAsync(PayrollScheduleId);
             if (existing == null) return NotFound();
 
             var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate, PayrollScheduleId);
@@ -527,7 +527,7 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(typeOfService))
                 return "Type of project is required.";
 
-            var rangeErrors = InputRules.ValidateDateRange(
+            var rangeErrors = DateRules.ValidateDateRange(
                 startingDate, endDate,
                 nameof(PayrollSchedule.StartingDate), nameof(PayrollSchedule.EndDate),
                 "Starting date", "End date").ToList();
@@ -538,19 +538,19 @@ namespace RSDSystem.Controllers
             if (project == null)
                 return "Selected project was not found.";
 
-            if (InputRules.IsUsableDate(project.StartingDate) && startingDate.Date < project.StartingDate!.Value.Date)
+            if (DateRules.IsUsableDate(project.StartingDate) && startingDate.Date < project.StartingDate!.Value.Date)
                 return "Starting date cannot be before the project starting date.";
 
-            if (InputRules.IsUsableDate(project.EstimateEndDate) && startingDate.Date > project.EstimateEndDate!.Value.Date)
+            if (DateRules.IsUsableDate(project.EstimateEndDate) && startingDate.Date > project.EstimateEndDate!.Value.Date)
                 return "Starting date cannot be after the project estimate end date.";
 
-            if (InputRules.IsUsableDate(project.StartingDate) && endDate.Date < project.StartingDate!.Value.Date)
+            if (DateRules.IsUsableDate(project.StartingDate) && endDate.Date < project.StartingDate!.Value.Date)
                 return "End date cannot be before the project starting date.";
 
-            if (InputRules.IsUsableDate(project.EstimateEndDate) && endDate.Date > project.EstimateEndDate!.Value.Date)
+            if (DateRules.IsUsableDate(project.EstimateEndDate) && endDate.Date > project.EstimateEndDate!.Value.Date)
                 return "End date cannot be after the project estimate end date.";
 
-            var overlaps = await _db.PayrollSchedules.AnyAsync(s =>
+            var overlaps = await _db.Set<PayrollSchedule>().AnyAsync(s =>
                 s.ProjectId == projectId &&
                 (!excludeScheduleId.HasValue || s.PayrollScheduleId != excludeScheduleId.Value) &&
                 s.StartingDate.Date <= endDate.Date &&
@@ -567,10 +567,10 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteSchedule(int id)
         {
-            var schedule = await _db.PayrollSchedules.FindAsync(id);
+            var schedule = await _db.Set<PayrollSchedule>().FindAsync(id);
             if (schedule != null)
             {
-                _db.PayrollSchedules.Remove(schedule);
+                _db.Set<PayrollSchedule>().Remove(schedule);
                 await _db.SaveChangesAsync();
                 TempData["Success"] = "Schedule deleted.";
             }

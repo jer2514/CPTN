@@ -85,33 +85,14 @@ namespace RSDSystem.Validation
             }
         }
 
-        public const int MinCalendarYear = 2000;
-        public const int MaxCalendarYear = 2099;
+        public const int MinCalendarYear = DateRules.MinCalendarYear;
+        public const int MaxCalendarYear = DateRules.MaxCalendarYear;
+        public const string CalendarYearMessage = DateRules.CalendarYearMessage;
 
-        public static bool IsMissingDate(DateTime? value) =>
-            !value.HasValue || value.Value == default || value.Value.Year < 1000;
-
-        public static bool IsUsableDate(DateTime? value) =>
-            value.HasValue
-            && !IsMissingDate(value)
-            && value.Value.Year >= MinCalendarYear
-            && value.Value.Year <= MaxCalendarYear;
-
-        public static int InclusiveDays(DateTime start, DateTime end) =>
-            (end.Date - start.Date).Days + 1;
-
-        public static int CountWeekdays(DateTime start, DateTime end)
-        {
-            var days = 0;
-            for (var date = start.Date; date <= end.Date; date = date.AddDays(1))
-            {
-                if (date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday)
-                    days++;
-            }
-            return days;
-        }
-
-        public const string CalendarYearMessage = "Enter a valid date with a 4-digit year (2000–2099).";
+        public static bool IsMissingDate(DateTime? value) => DateRules.IsMissingDate(value);
+        public static bool IsUsableDate(DateTime? value) => DateRules.IsUsableDate(value);
+        public static int InclusiveDays(DateTime start, DateTime end) => DateRules.InclusiveDays(start, end);
+        public static int CountWeekdays(DateTime start, DateTime end) => DateRules.CountWeekdays(start, end);
 
         public static IEnumerable<ValidationResult> ValidateDateRange(
             DateTime? start,
@@ -119,25 +100,8 @@ namespace RSDSystem.Validation
             string startField,
             string endField,
             string startLabel = "Starting date",
-            string endLabel = "End date")
-        {
-            if (IsMissingDate(start))
-                yield return new ValidationResult($"{startLabel} is required.", new[] { startField });
-            else if (!IsUsableDate(start))
-                yield return new ValidationResult(CalendarYearMessage, new[] { startField });
-
-            if (IsMissingDate(end))
-                yield return new ValidationResult($"{endLabel} is required.", new[] { endField });
-            else if (!IsUsableDate(end))
-                yield return new ValidationResult(CalendarYearMessage, new[] { endField });
-
-            if (IsUsableDate(start) && IsUsableDate(end) && end!.Value.Date < start!.Value.Date)
-            {
-                yield return new ValidationResult(
-                    $"{endLabel} must be on or after the starting date.",
-                    new[] { endField });
-            }
-        }
+            string endLabel = "End date") =>
+            DateRules.ValidateDateRange(start, end, startField, endField, startLabel, endLabel);
 
         public static bool TryParseNonNegativeInt(string? raw, out int value, out string? error, string label)
         {

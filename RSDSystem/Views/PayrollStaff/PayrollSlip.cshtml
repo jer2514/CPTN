@@ -11,12 +11,12 @@
     var defaultStart = ViewBag.DefaultStart as string ?? "";
     var defaultEnd = ViewBag.DefaultEnd as string ?? "";
     var endMin = string.IsNullOrEmpty(defaultStart) ? minDate : defaultStart;
-    var isEdit = ViewBag.IsEdit as bool? == true;
-    var payrollId = ViewBag.PayrollId as int? ?? 0;
-    var daysWorked = ViewBag.DefaultDaysWorked as int? ?? 1;
-    var absentDays = ViewBag.AbsentDays as int? ?? 0;
-    var overtimeHours = ViewBag.OvertimeHours as decimal? ?? 0;
-    var cashAdvance = ViewBag.CashAdvance as decimal? ?? 0;
+    var isEdit = ViewBag.IsEdit is true;
+    var payrollId = ViewBag.PayrollId is int pid ? pid : 0;
+    var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
+    var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
+    var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
+    var cashAdvance = ViewBag.CashAdvance is decimal ca ? ca : 0m;
     var returnUrl = ViewBag.ReturnUrl as string ?? "";
     var slipConfig = JsonSerializer.Serialize(new
     {

@@ -320,7 +320,7 @@ namespace RSDSystem.Controllers
             int maxSeq = 0;
             foreach (var code in codes)
             {
-                var seq = IdFormatter.EmployeeSequence(code);
+                var seq = EmployeeIds.Sequence(code);
                 if (seq.HasValue && seq.Value > maxSeq)
                     maxSeq = seq.Value;
             }
