@@ -85,6 +85,72 @@ namespace RSDSystem.Validation
             }
         }
 
+        public static bool IsUsableDate(DateTime? value) =>
+            value.HasValue && value.Value.Year > 1900;
+
+        public static int InclusiveDays(DateTime start, DateTime end) =>
+            (end.Date - start.Date).Days + 1;
+
+        public static IEnumerable<ValidationResult> ValidateDateRange(
+            DateTime? start,
+            DateTime? end,
+            string startField,
+            string endField,
+            string startLabel = "Starting date",
+            string endLabel = "End date")
+        {
+            if (!IsUsableDate(start))
+                yield return new ValidationResult($"{startLabel} is required.", new[] { startField });
+
+            if (!IsUsableDate(end))
+                yield return new ValidationResult($"{endLabel} is required.", new[] { endField });
+
+            if (IsUsableDate(start) && IsUsableDate(end) && end!.Value.Date < start!.Value.Date)
+            {
+                yield return new ValidationResult(
+                    $"{endLabel} must be on or after the starting date.",
+                    new[] { endField });
+            }
+        }
+
+        public static bool TryParseNonNegativeInt(string? raw, out int value, out string? error, string label)
+        {
+            value = 0;
+            error = null;
+            if (string.IsNullOrWhiteSpace(raw) || !int.TryParse(raw.Trim(), out value))
+            {
+                error = $"{label} must be a whole number.";
+                return false;
+            }
+
+            if (value < 0)
+            {
+                error = $"{label} cannot be negative.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public static bool TryParseNonNegativeDecimal(string? raw, out decimal value, out string? error, string label)
+        {
+            value = 0;
+            error = null;
+            if (string.IsNullOrWhiteSpace(raw) || !decimal.TryParse(raw.Trim(), out value))
+            {
+                error = $"{label} must be a valid amount.";
+                return false;
+            }
+
+            if (value < 0)
+            {
+                error = $"{label} cannot be negative.";
+                return false;
+            }
+
+            return true;
+        }
+
         public static bool TryValidatePhoto(IFormFile? photo, out string? error)
         {
             error = null;

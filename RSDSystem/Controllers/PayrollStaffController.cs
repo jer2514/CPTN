@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Helpers;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -116,11 +117,28 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (emp == null || project == null) return NotFound();
 
+            var schedules = await _db.PayrollSchedules
+                .Where(s => s.ProjectId == projectId)
+                .OrderBy(s => s.StartingDate)
+                .ToListAsync();
+
+            var defaultSchedule = schedules.FirstOrDefault(s =>
+                    s.StartingDate.Date <= DateTime.Today && DateTime.Today <= s.EndDate.Date)
+                ?? schedules.FirstOrDefault(s => s.StartingDate.Date >= DateTime.Today)
+                ?? schedules.LastOrDefault();
+
             ViewBag.PageTitle = "Generate Payroll Slip";
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
-            ViewBag.DefaultStart = DateTime.Today.AddDays(-6).ToString("yyyy-MM-dd");
-            ViewBag.DefaultEnd = DateTime.Today.ToString("yyyy-MM-dd");
+            ViewBag.Schedules = schedules;
+            ViewBag.DefaultStart = (defaultSchedule?.StartingDate ?? DateTime.Today.AddDays(-6)).ToString("yyyy-MM-dd");
+            ViewBag.DefaultEnd = (defaultSchedule?.EndDate ?? DateTime.Today).ToString("yyyy-MM-dd");
+            ViewBag.MinDate = project.StartingDate.HasValue && project.StartingDate.Value.Year > 1900
+                ? project.StartingDate.Value.ToString("yyyy-MM-dd")
+                : (schedules.FirstOrDefault()?.StartingDate.ToString("yyyy-MM-dd") ?? "");
+            ViewBag.MaxDate = project.EstimateEndDate.HasValue && project.EstimateEndDate.Value.Year > 1900
+                ? project.EstimateEndDate.Value.ToString("yyyy-MM-dd")
+                : (schedules.LastOrDefault()?.EndDate.ToString("yyyy-MM-dd") ?? "");
 
             return View(emp);
         }
@@ -135,10 +153,81 @@ namespace RSDSystem.Controllers
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
 
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+
+            var errors = new Dictionary<string, string>();
+
+            foreach (var result in InputRules.ValidateDateRange(
+                payPeriodStart, payPeriodEnd,
+                "payPeriodStart", "payPeriodEnd",
+                "Pay period starting date", "Pay period ending date"))
+            {
+                var key = result.MemberNames.FirstOrDefault() ?? "";
+                if (!errors.ContainsKey(key) && !string.IsNullOrEmpty(result.ErrorMessage))
+                    errors[key] = result.ErrorMessage;
+            }
+
+            if (regularDaysWorked < 1)
+                errors["regularDaysWorked"] = "Regular days worked must be at least 1.";
+
+            if (absentDays < 0)
+                errors["absentDays"] = "Absent days cannot be negative.";
+
+            if (overtimeHours < 0)
+                errors["overtimeHours"] = "Overtime hours cannot be negative.";
+
+            if (cashAdvance < 0)
+                errors["cashAdvance"] = "Cash advance cannot be negative.";
+
+            if (InputRules.IsUsableDate(payPeriodStart) && InputRules.IsUsableDate(payPeriodEnd)
+                && payPeriodEnd.Date >= payPeriodStart.Date)
+            {
+                var periodDays = InputRules.InclusiveDays(payPeriodStart, payPeriodEnd);
+                if (periodDays > 31)
+                    errors["payPeriodEnd"] = "Pay period cannot be longer than 31 days.";
+
+                if (regularDaysWorked + absentDays > periodDays)
+                    errors["regularDaysWorked"] = "Days worked plus absences cannot exceed the pay period.";
+
+                if (overtimeHours > regularDaysWorked * 24)
+                    errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
+
+                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
+                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
+
+                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
+                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
+
+                var schedules = await _db.PayrollSchedules
+                    .Where(s => s.ProjectId == projectId)
+                    .ToListAsync();
+
+                if (schedules.Count > 0 &&
+                    !schedules.Any(s => s.StartingDate.Date <= payPeriodStart.Date && payPeriodEnd.Date <= s.EndDate.Date))
+                {
+                    errors["payPeriodStart"] = "Pay period must fall within a payroll schedule for this project.";
+                }
+            }
 
             decimal regularPay = emp.DailyRate * regularDaysWorked;
             decimal overtimePay = overtimeHours * emp.RatePerHour;
             decimal gross = regularPay + overtimePay;
+
+            if (cashAdvance > gross)
+                errors["cashAdvance"] = "Cash advance cannot be greater than gross pay.";
+
+            if (errors.Count > 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = errors.Values.First(),
+                    errors
+                });
+            }
+
             decimal net = gross - cashAdvance;
             if (net < 0) net = 0;
 
@@ -146,8 +235,8 @@ namespace RSDSystem.Controllers
             {
                 EmployeeId = employeeId,
                 ProjectId = projectId,
-                PayPeriodStart = payPeriodStart,
-                PayPeriodEnd = payPeriodEnd,
+                PayPeriodStart = payPeriodStart.Date,
+                PayPeriodEnd = payPeriodEnd.Date,
                 RegularDaysWorked = regularDaysWorked,
                 OvertimeHours = overtimeHours,
                 AbsentDays = absentDays,

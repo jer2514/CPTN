@@ -21,6 +21,13 @@
         return age;
     }
 
+    function formatIsoDate(iso) {
+        if (!iso) return '';
+        const parts = iso.split('-');
+        if (parts.length !== 3) return iso;
+        return parts[1] + '/' + parts[2] + '/' + parts[0];
+    }
+
     function valueOf(el) {
         if (!el) return '';
         if (el.type === 'file') return el.files && el.files.length ? el.files[0].name : '';
@@ -40,6 +47,22 @@
                 const n = parseFloat(el.value);
                 if (el.value === '' || Number.isNaN(n)) return label + ' is required.';
                 if (n <= 0) return label + ' must be greater than 0.';
+                continue;
+            }
+            if (rule === 'nonNeg') {
+                const n = parseFloat(el.value);
+                if (el.value === '' || Number.isNaN(n)) return label + ' is required.';
+                if (n < 0) return label + ' cannot be negative.';
+                continue;
+            }
+            if (rule === 'nonNegInt') {
+                if (el.value === '' || !/^\d+$/.test(el.value.trim())) return label + ' must be a whole number.';
+                if (parseInt(el.value, 10) < 0) return label + ' cannot be negative.';
+                continue;
+            }
+            if (rule === 'positiveInt') {
+                if (el.value === '' || !/^\d+$/.test(el.value.trim())) return label + ' must be a whole number.';
+                if (parseInt(el.value, 10) < 1) return label + ' must be at least 1.';
                 continue;
             }
             if (rule === 'match') {
@@ -92,7 +115,17 @@
                 const otherId = el.getAttribute('data-after');
                 const other = otherId ? document.getElementById(otherId) : null;
                 if (other && other.value && el.value && el.value < other.value) {
-                    return 'Estimate end date must be on or after the starting date.';
+                    return label + ' must be on or after the starting date.';
+                }
+            }
+            if (rule === 'dateWithin') {
+                const min = el.getAttribute('data-min');
+                const max = el.getAttribute('data-max');
+                if (min && el.value && el.value < min) {
+                    return label + ' must be on or after ' + formatIsoDate(min) + '.';
+                }
+                if (max && el.value && el.value > max) {
+                    return label + ' must be on or before ' + formatIsoDate(max) + '.';
                 }
             }
         }
@@ -189,6 +222,11 @@
             field.addEventListener('input', function () {
                 if (field.classList.contains('is-invalid')) validateField(field);
             });
+        });
+
+        form.querySelectorAll('[data-after]').forEach(function (field) {
+            const other = document.getElementById(field.getAttribute('data-after') || '');
+            if (other) other.addEventListener('change', function () { validateField(field); });
         });
     }
 
