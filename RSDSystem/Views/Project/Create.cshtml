@@ -130,10 +130,10 @@
             <div id="monthBudgetSection" style="@(postedYears.Any() ? "" : "display:none")">
                 <div class="proj-monthly-table">
                     <div id="monthRowsContainer">
-                        @for (var i = 0; i < postedYears.Count; i++)
+                        @for (var i = 0; postedYears.Count > i; i++)
                         {
                             if (!DateTime.TryParse(postedYears[i], out var dt)) { continue; }
-                            var amount = i < postedAmounts.Count ? postedAmounts[i] : 0;
+                            var amount = postedAmounts.Count > i ? postedAmounts[i] : 0;
                             <div class="proj-month-row">
                                 <span class="proj-month-label">Month of @dt.ToString("MMMM yyyy")</span>
                                 <div class="proj-budget-input proj-month-input">

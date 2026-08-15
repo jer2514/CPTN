@@ -98,7 +98,7 @@
                 var dateAdded = emp.DateAdded.Year > 1900 ? emp.DateAdded.ToString("MMM d, yyyy") : "—";
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" data-id="@emp.EmployeeId" /></td>
-                    <td>@IdFormatter.FormatEmployee(emp.EmployeeCode)</td>
+                    <td>@EmployeeIds.Format(emp.EmployeeCode)</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(emp.PhotoPath))

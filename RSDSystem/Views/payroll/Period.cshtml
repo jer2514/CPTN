@@ -78,7 +78,7 @@
 </div>
 
 <div class="del-overlay" id="generateOverlay" onclick="closeGenerateModal(arguments[0])">
-    <div class="gen-modal" onclick="event.stopPropagation()">
+    <div class="gen-modal" onclick="stopModalClick(arguments[0])">
         <div class="gen-modal-title">Generate Payslips</div>
         <div class="gen-modal-text">
             Generate payslips for all employees under <strong>@projectName</strong>.
@@ -102,6 +102,9 @@
     <script>
         function openGenerateModal() {
             document.getElementById('generateOverlay').classList.add('open');
+        }
+        function stopModalClick(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
         }
         function closeGenerateModal(e) {
             if (!e || e.target === document.getElementById('generateOverlay'))

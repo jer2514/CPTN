@@ -65,15 +65,15 @@ namespace RSDSystem.Controllers
                 p => p.ProjectId,
                 p => new ProjectDateBounds
                 {
-                    Start = InputRules.IsUsableDate(p.StartingDate)
+                    Start = DateRules.IsUsableDate(p.StartingDate)
                         ? p.StartingDate!.Value.ToString("yyyy-MM-dd")
                         : "",
-                    End = InputRules.IsUsableDate(p.EstimateEndDate)
+                    End = DateRules.IsUsableDate(p.EstimateEndDate)
                         ? p.EstimateEndDate!.Value.ToString("yyyy-MM-dd")
                         : ""
                 });
 
-            var scheduleRows = await _db.PayrollSchedules
+            var scheduleRows = await _db.Set<PayrollSchedule>()
                 .AsNoTracking()
                 .OrderBy(s => s.StartingDate)
                 .Select(s => new
@@ -101,7 +101,7 @@ namespace RSDSystem.Controllers
                 }
             }).ToList();
 
-            ViewBag.PendingApprovals = await _db.Payrolls
+            ViewBag.PendingApprovals = await _db.Set<Payroll>()
                 .AsNoTracking()
                 .Where(p => p.Status == PayrollStatusOptions.Submitted)
                 .OrderByDescending(p => p.GeneratedDate)

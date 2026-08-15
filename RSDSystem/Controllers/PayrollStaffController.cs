@@ -99,7 +99,7 @@ namespace RSDSystem.Controllers
             var result = employees.Select(e => new
             {
                 e.EmployeeId,
-                DisplayId = IdFormatter.FormatEmployee(e.EmployeeCode),
+                DisplayId = EmployeeIds.Format(e.EmployeeCode),
                 Name = e.FullName,
                 e.JobClassification,
                 e.DailyRate,
@@ -120,7 +120,7 @@ namespace RSDSystem.Controllers
             Payroll? existing = null;
             if (payrollId.HasValue && payrollId.Value > 0)
             {
-                existing = await _db.Payrolls.FirstOrDefaultAsync(p =>
+                existing = await _db.Set<Payroll>().FirstOrDefaultAsync(p =>
                     p.PayrollId == payrollId.Value &&
                     p.EmployeeId == employeeId &&
                     p.ProjectId == projectId);
@@ -133,14 +133,14 @@ namespace RSDSystem.Controllers
                 }
             }
 
-            var schedules = await _db.PayrollSchedules
+            var schedules = await _db.Set<PayrollSchedule>()
                 .Where(s => s.ProjectId == projectId)
                 .OrderBy(s => s.StartingDate)
                 .ToListAsync();
 
-            var projectStart = InputRules.IsUsableDate(project.StartingDate)
+            var projectStart = DateRules.IsUsableDate(project.StartingDate)
                 ? project.StartingDate!.Value.Date : (DateTime?)null;
-            var projectEnd = InputRules.IsUsableDate(project.EstimateEndDate)
+            var projectEnd = DateRules.IsUsableDate(project.EstimateEndDate)
                 ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
 
             var defaultStart = existing?.PayPeriodStart.Date
@@ -159,7 +159,7 @@ namespace RSDSystem.Controllers
                 ?? (existing != null
                     ? Url.Action(nameof(ViewPayroll), new { id = existing.PayrollId })
                     : Url.Action(nameof(GeneratePayroll), new { projectId }));
-            ViewBag.DisplayId = IdFormatter.FormatEmployee(emp.EmployeeCode);
+            ViewBag.DisplayId = EmployeeIds.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
             ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
@@ -167,7 +167,7 @@ namespace RSDSystem.Controllers
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
             ViewBag.DefaultDaysWorked = existing?.RegularDaysWorked
-                ?? Math.Max(1, InputRules.CountWeekdays(defaultStart, defaultEnd));
+                ?? Math.Max(1, DateRules.CountWeekdays(defaultStart, defaultEnd));
             ViewBag.AbsentDays = existing?.AbsentDays ?? 0;
             ViewBag.OvertimeHours = existing?.OvertimeHours ?? 0;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
@@ -194,7 +194,7 @@ namespace RSDSystem.Controllers
 
             var errors = new Dictionary<string, string>();
 
-            foreach (var result in InputRules.ValidateDateRange(
+            foreach (var result in DateRules.ValidateDateRange(
                 payPeriodStart, payPeriodEnd,
                 "payPeriodStart", "payPeriodEnd",
                 "Pay period starting date", "Pay period ending date"))
@@ -216,10 +216,10 @@ namespace RSDSystem.Controllers
             if (cashAdvance < 0)
                 errors["cashAdvance"] = "Cash advance cannot be negative.";
 
-            if (InputRules.IsUsableDate(payPeriodStart) && InputRules.IsUsableDate(payPeriodEnd)
+            if (DateRules.IsUsableDate(payPeriodStart) && DateRules.IsUsableDate(payPeriodEnd)
                 && payPeriodEnd.Date >= payPeriodStart.Date)
             {
-                var periodDays = InputRules.InclusiveDays(payPeriodStart, payPeriodEnd);
+                var periodDays = DateRules.InclusiveDays(payPeriodStart, payPeriodEnd);
 
                 if (regularDaysWorked + absentDays > periodDays)
                     errors["regularDaysWorked"] = "Days worked plus absences cannot exceed the pay period.";
@@ -227,16 +227,16 @@ namespace RSDSystem.Controllers
                 if (overtimeHours > regularDaysWorked * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
-                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
+                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
                     errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
 
-                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
+                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
                     errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
 
-                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
+                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
                     errors["payPeriodEnd"] = "Pay period cannot end before the project starting date.";
 
-                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
+                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
                     errors["payPeriodStart"] = "Pay period cannot start after the project estimate end date.";
             }
 
@@ -263,7 +263,7 @@ namespace RSDSystem.Controllers
             Payroll? payroll = null;
             if (payrollId > 0)
             {
-                payroll = await _db.Payrolls.FirstOrDefaultAsync(p =>
+                payroll = await _db.Set<Payroll>().FirstOrDefaultAsync(p =>
                     p.PayrollId == payrollId &&
                     p.EmployeeId == employeeId &&
                     p.ProjectId == projectId);
@@ -313,7 +313,7 @@ namespace RSDSystem.Controllers
                     GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
                     GeneratedDate = DateTime.Now
                 };
-                _db.Payrolls.Add(payroll);
+                _db.Set<Payroll>().Add(payroll);
             }
 
             await _db.SaveChangesAsync();
@@ -389,7 +389,7 @@ namespace RSDSystem.Controllers
             if (project == null)
                 return Json(new { success = false, message = "Project not found." });
 
-            var payrolls = await _db.Payrolls
+            var payrolls = await _db.Set<Payroll>()
                                     .Include(p => p.Employee)
                                     .Where(p => p.ProjectId == projectId)
                                     .ToListAsync();
@@ -400,7 +400,7 @@ namespace RSDSystem.Controllers
                 .Select(p => new
                 {
                     p.PayrollId,
-                    DisplayId = IdFormatter.FormatEmployee(p.Employee?.EmployeeCode),
+                    DisplayId = EmployeeIds.Format(p.Employee?.EmployeeCode),
                     EmployeeName = p.Employee?.FullName,
                     Job = p.Employee?.JobClassification,
                     p.Status,
@@ -413,7 +413,7 @@ namespace RSDSystem.Controllers
         // GET /PayrollStaff/ViewPayroll/{id}
         public async Task<IActionResult> ViewPayroll(int id)
         {
-            var payroll = await _db.Payrolls
+            var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
                                    .FirstOrDefaultAsync(p => p.PayrollId == id);
@@ -421,7 +421,7 @@ namespace RSDSystem.Controllers
             if (payroll == null) return NotFound();
 
             ViewBag.PageTitle = "View Payroll";
-            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = EmployeeIds.Format(payroll.Employee?.EmployeeCode);
             return View(payroll);
         }
 
@@ -430,7 +430,7 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitPayroll(int id)
         {
-             var payroll = await _db.Payrolls.FindAsync(id);
+             var payroll = await _db.Set<Payroll>().FindAsync(id);
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
@@ -445,14 +445,14 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePayroll(int id)
         {
-            var payroll = await _db.Payrolls.FindAsync(id);
+            var payroll = await _db.Set<Payroll>().FindAsync(id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
             if (payroll.Status != PayrollStatusOptions.Draft)
                 return Json(new { success = false, message = "Only draft payroll records can be deleted." });
 
-            _db.Payrolls.Remove(payroll);
+            _db.Set<Payroll>().Remove(payroll);
             await _db.SaveChangesAsync();
 
             return Json(new { success = true, message = "Draft payroll deleted." });
