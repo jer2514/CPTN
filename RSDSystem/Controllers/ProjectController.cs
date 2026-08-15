@@ -83,16 +83,20 @@ namespace RSDSystem.Controllers
             List<string> MonthYears, List<decimal> MonthAmounts)
         {
             ModelState.Remove("MonthlyBudgets");
+            NormalizeProject(project);
+            await ValidateProjectAsync(project, MonthYears, MonthAmounts);
 
             if (!ModelState.IsValid)
             {
                 ViewBag.PageTitle = "Add Project";
+                ViewBag.MonthYears = MonthYears;
+                ViewBag.MonthAmounts = MonthAmounts;
                 PopulateViewBag();
                 return View(project);
             }
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            project.ProjectName = ti.ToTitleCase(project.ProjectName.Trim().ToLower());
+            project.ProjectName = ti.ToTitleCase((project.ProjectName ?? string.Empty).Trim().ToLower());
             project.ProjectId = 0;
 
             // Add monthly budget rows from date range
@@ -111,6 +115,7 @@ namespace RSDSystem.Controllers
 
             _db.Projects.Add(project);
             await _db.SaveChangesAsync();
+            TempData["Success"] = "Project added successfully.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -140,10 +145,17 @@ namespace RSDSystem.Controllers
             List<string> MonthYears, List<decimal> MonthAmounts)
         {
             ModelState.Remove("MonthlyBudgets");
+            NormalizeProject(project);
+            await ValidateProjectAsync(project, MonthYears, MonthAmounts, project.ProjectId);
 
             if (!ModelState.IsValid)
             {
                 ViewBag.PageTitle = "Edit Project";
+                ViewBag.MonthYears = MonthYears;
+                ViewBag.MonthAmounts = MonthAmounts;
+                ViewBag.Employees = await _db.Employees
+                    .Where(e => e.ProjectId == project.ProjectId)
+                    .ToListAsync();
                 PopulateViewBag();
                 return View(project);
             }
@@ -155,7 +167,7 @@ namespace RSDSystem.Controllers
             if (existing == null) return NotFound();
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            existing.ProjectName = ti.ToTitleCase(project.ProjectName.Trim().ToLower());
+            existing.ProjectName = ti.ToTitleCase((project.ProjectName ?? string.Empty).Trim().ToLower());
             existing.Location = project.Location;
             existing.TypeOfService = project.TypeOfService;
             existing.StartingDate = project.StartingDate;
@@ -183,7 +195,56 @@ namespace RSDSystem.Controllers
             }
 
             await _db.SaveChangesAsync();
+            TempData["Success"] = "Project updated successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private static void NormalizeProject(Project project)
+        {
+            project.ProjectName = project.ProjectName?.Trim() ?? string.Empty;
+            project.Location = project.Location?.Trim();
+            project.TypeOfService = string.IsNullOrWhiteSpace(project.TypeOfService) ? null : project.TypeOfService.Trim();
+            project.PayrollDistribution = string.IsNullOrWhiteSpace(project.PayrollDistribution) ? null : project.PayrollDistribution.Trim();
+            project.AssignedPayrollStaff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff) ? null : project.AssignedPayrollStaff.Trim();
+        }
+
+        private async Task ValidateProjectAsync(
+            Project project,
+            List<string> monthYears,
+            List<decimal> monthAmounts,
+            int excludeId = 0)
+        {
+            if (!string.IsNullOrWhiteSpace(project.ProjectName))
+            {
+                var name = project.ProjectName.Trim().ToLower();
+                var nameTaken = await _db.Projects.AnyAsync(p =>
+                    p.ProjectId != excludeId &&
+                    p.ProjectName.ToLower() == name);
+                if (nameTaken)
+                    ModelState.AddModelError("ProjectName", "A project with this name already exists.");
+            }
+
+            if (project.StartingDate.HasValue && project.EstimateEndDate.HasValue)
+            {
+                if (monthYears == null || monthYears.Count == 0)
+                {
+                    ModelState.AddModelError("MonthlyBudget",
+                        "Select starting and estimate end dates to generate monthly budget rows.");
+                }
+                else if (monthAmounts != null && monthAmounts.Any(a => a < 0))
+                {
+                    ModelState.AddModelError("MonthlyBudget", "Monthly budget amounts cannot be negative.");
+                }
+                else if (project.PayrollBudget.HasValue && monthAmounts != null)
+                {
+                    var monthlyTotal = monthAmounts.Sum();
+                    if (monthlyTotal > project.PayrollBudget.Value)
+                    {
+                        ModelState.AddModelError("MonthlyBudget",
+                            "Monthly budget total cannot exceed the payroll budget.");
+                    }
+                }
+            }
         }
 
         // POST /Project/Delete/{id}

@@ -5,8 +5,16 @@
     var distros = ViewBag.DistributionOptions as string[] ?? Array.Empty<string>();
     var staffList = ViewBag.PayrollStaffList as List<string> ?? new List<string>();
     var employees = ViewBag.Employees as List<RSDSystem.Models.Employee> ?? new();
+    var postedYears = ViewBag.MonthYears as List<string>;
+    var postedAmounts = ViewBag.MonthAmounts as List<decimal> ?? new List<decimal>();
     var existingBudgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
                            ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
+    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
+    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
+    var generalErrors = ViewData.ModelState
+        .Where(kv => string.IsNullOrEmpty(kv.Key))
+        .SelectMany(kv => kv.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+        .ToList();
 }
 
 
@@ -19,29 +27,42 @@
 </a>
 
 <div class="form-card" style="max-width:680px">
-    <form asp-action="Edit" method="post">
+    <form asp-action="Edit" method="post" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
+        @if (generalErrors.Count > 0)
+        {
+            <div class="form-error-box">
+                @foreach (var err in generalErrors)
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
         <input type="hidden" name="ProjectId" value="@Model.ProjectId" />
 
         <!-- Project Name -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Project Name</label>
-                <input type="text" name="ProjectName" value="@Model.ProjectName"
-                       class="form-ctrl" required />
+                <label class="form-lbl">Project Name <span class="req-star">*</span></label>
+                <input type="text" name="ProjectName" value="@Model.ProjectName" maxlength="150"
+                       class="@Ctrl("ProjectName")" data-validate="required|projectName" data-label="Project name" />
+                <span class="field-error" data-error-for="ProjectName">@Err("ProjectName")</span>
             </div>
         </div>
 
         <!-- Location | Type of Service -->
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Location</label>
-                <input type="text" name="Location" value="@Model.Location"
-                       class="form-ctrl" placeholder="Barangay, Municipality/City, Province" />
+                <label class="form-lbl">Location <span class="req-star">*</span></label>
+                <input type="text" name="Location" value="@Model.Location" maxlength="250"
+                       class="@Ctrl("Location")" data-validate="required|address" data-label="Location"
+                       placeholder="Barangay, Municipality/City, Province" />
+                <span class="field-error" data-error-for="Location">@Err("Location")</span>
             </div>
             <div>
-                <label class="form-lbl">Type of Service</label>
-                <select name="TypeOfService" class="form-ctrl">
+                <label class="form-lbl">Type of Service <span class="req-star">*</span></label>
+                <select name="TypeOfService" class="@Ctrl("TypeOfService")"
+                        data-validate="required" data-label="Type of service">
                     <option value="">Select type</option>
                     @foreach (var s in services)
                     {
@@ -55,41 +76,49 @@
                         }
                     }
                 </select>
+                <span class="field-error" data-error-for="TypeOfService">@Err("TypeOfService")</span>
             </div>
         </div>
 
         <!-- Starting Date | Estimate End Date -->
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Starting Date</label>
-                <input type="date" name="StartingDate" id="startDate" class="form-ctrl"
+                <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
+                <input type="date" name="StartingDate" id="startDate"
                        value="@Model.StartingDate?.ToString("yyyy-MM-dd")"
+                       class="@Ctrl("StartingDate")" data-validate="required" data-label="Starting date"
                        onchange="generateMonthRows()" />
+                <span class="field-error" data-error-for="StartingDate">@Err("StartingDate")</span>
             </div>
             <div>
-                <label class="form-lbl">Estimate End Date</label>
-                <input type="date" name="EstimateEndDate" id="endDate" class="form-ctrl"
+                <label class="form-lbl">Estimate End Date <span class="req-star">*</span></label>
+                <input type="date" name="EstimateEndDate" id="endDate"
                        value="@Model.EstimateEndDate?.ToString("yyyy-MM-dd")"
+                       class="@Ctrl("EstimateEndDate")" data-validate="required|dateAfter" data-after="startDate"
+                       data-label="Estimate end date"
                        onchange="generateMonthRows()" />
+                <span class="field-error" data-error-for="EstimateEndDate">@Err("EstimateEndDate")</span>
             </div>
         </div>
 
         <!-- Payroll Budget -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Payroll Budget</label>
+                <label class="form-lbl">Payroll Budget <span class="req-star">*</span></label>
                 <div class="proj-budget-input">
                     <span class="proj-peso">₱</span>
-                    <input type="number" name="PayrollBudget" class="form-ctrl proj-budget-field"
-                           step="0.01" min="0"
-                           value="@Model.PayrollBudget" placeholder="0.00" />
+                    <input type="number" name="PayrollBudget" class="@Ctrl("PayrollBudget") proj-budget-field"
+                           step="0.01" min="0.01" placeholder="0.00"
+                           value="@(Model.PayrollBudget > 0 ? Model.PayrollBudget.Value.ToString("0.00") : "")"
+                           data-validate="money" data-label="Payroll budget" />
                 </div>
+                <span class="field-error" data-error-for="PayrollBudget">@Err("PayrollBudget")</span>
             </div>
         </div>
 
         <!-- Monthly Budget — dynamically generated, pre-filled from existing data -->
         <div class="form-row form-row-1">
-            <label class="form-lbl">Monthly Budget</label>
+            <label class="form-lbl">Monthly Budget <span class="req-star">*</span></label>
 
             <div id="monthBudgetPlaceholder" class="proj-view-field"
                  style="color:#9ab0d8;font-size:12.5px; @(existingBudgets.Any() ? "display:none" : "")">
@@ -122,13 +151,15 @@
                     </div>
                 </div>
             </div>
+            <span class="field-error" data-error-for="MonthlyBudget">@Err("MonthlyBudget")</span>
         </div>
 
         <!-- Payroll Distribution -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Payroll Distribution</label>
-                <select name="PayrollDistribution" class="form-ctrl">
+                <label class="form-lbl">Payroll Distribution <span class="req-star">*</span></label>
+                <select name="PayrollDistribution" class="@Ctrl("PayrollDistribution")"
+                        data-validate="required" data-label="Payroll distribution">
                     <option value="">Select distribution</option>
                     @foreach (var d in distros)
                     {
@@ -142,14 +173,16 @@
                         }
                     }
                 </select>
+                <span class="field-error" data-error-for="PayrollDistribution">@Err("PayrollDistribution")</span>
             </div>
         </div>
 
         <!-- Assigned to Payroll Staff | Status -->
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Assigned to Payroll Staff</label>
-                <select name="AssignedPayrollStaff" class="form-ctrl">
+                <label class="form-lbl">Assigned to Payroll Staff <span class="req-star">*</span></label>
+                <select name="AssignedPayrollStaff" class="@Ctrl("AssignedPayrollStaff")"
+                        data-validate="required" data-label="Assigned payroll staff">
                     <option value="">Select payroll staff</option>
                     @foreach (var staff in staffList)
                     {
@@ -163,6 +196,7 @@
                         }
                     }
                 </select>
+                <span class="field-error" data-error-for="AssignedPayrollStaff">@Err("AssignedPayrollStaff")</span>
             </div>
             <div>
                 <label class="form-lbl">Status</label>
@@ -275,6 +309,7 @@
 </div>
 
 @section Scripts {
+    <partial name="_FormValidationScripts" />
     <script>
         function generateMonthRows() {
             const start = document.getElementById('startDate').value;
@@ -289,7 +324,9 @@
             const endDt   = new Date(end + 'T00:00:00');
 
             if (startDt > endDt) {
-                alert('Starting Date must be before Estimate End Date.');
+                const dest = document.querySelector('[data-error-for="EstimateEndDate"]');
+                if (dest) dest.textContent = 'Estimate end date must be on or after the starting date.';
+                document.getElementById('endDate').classList.add('is-invalid');
                 return;
             }
 
