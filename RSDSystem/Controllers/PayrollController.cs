@@ -41,6 +41,21 @@ namespace RSDSystem.Controllers
             return View(payroll);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> ViewPartial(int id)
+        {
+            var payroll = await _db.Payrolls
+                                   .Include(p => p.Employee)
+                                   .Include(p => p.Project)
+                                   .FirstOrDefaultAsync(p => p.PayrollId == id);
+
+            if (payroll == null) return NotFound();
+
+            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            return PartialView("_PayrollPartial", payroll);
+        }
+
+
         // POST /Payroll/Approve/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]

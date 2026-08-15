@@ -1,5 +1,4 @@
-﻿@model List<RSDSystem.Models.Project>
-@{
+﻿@{
     ViewData["Title"] = "Pending Payroll";
     Layout = "_PayrollStaffLayout";
 }
@@ -67,7 +66,7 @@
         const allProjects = [
             @foreach (var p in Model)
             {
-                        @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
+                                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
             }
         ];
 
@@ -158,6 +157,32 @@
             return '';
         }
 
+        // ── Build the action buttons per row based on status ─────────
+        // Draft       -> Submit, View, Delete
+        // Correction  -> Submit, View
+        // Submitted   -> View only
+        // Approved    -> View only
+        function actionButtons(p) {
+            let btns = '';
+
+            if (p.status === 'Draft') {
+                // Submit first
+                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
+                // View next
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+                // Delete last
+                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            } else if (p.status === 'Correction') {
+                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            } else {
+                // Submitted / Approved / other statuses -> View only
+                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            }
+
+            return btns;
+        }
+
         function renderPayrolls(list) {
             const tbody = document.getElementById('payrollTableBody');
 
@@ -169,10 +194,7 @@
                     <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">
-                            ${p.status !== 'Submitted'
-                                ? `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`
-                                : ''}
-                            <a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>
+                            ${actionButtons(p)}
                         </div>
                     </td>
                 </tr>`).join('');
@@ -182,6 +204,10 @@
             const q = document.getElementById('payrollSearch').value.toLowerCase();
             renderPayrolls(currentPayrolls.filter(p =>
                 p.employeeName.toLowerCase().includes(q) || p.job.toLowerCase().includes(q)));
+        }
+
+        function getToken() {
+            return document.querySelector('#submitTokenForm input[name="__RequestVerificationToken"]').value;
         }
 
         // ── Submit confirmation ─────────────────────────────────────
@@ -199,11 +225,10 @@
 
         document.getElementById('submitConfirmBtn').addEventListener('click', async function () {
             if (!pendingSubmitId) return;
-            const token = document.querySelector('#submitTokenForm input[name="__RequestVerificationToken"]').value;
 
             const form = new FormData();
             form.append('id', pendingSubmitId);
-            form.append('__RequestVerificationToken', token);
+            form.append('__RequestVerificationToken', getToken());
 
             try {
                 const res  = await fetch('/PayrollStaff/SubmitPayroll/' + pendingSubmitId, { method: 'POST', body: form });
@@ -220,6 +245,47 @@
                 document.getElementById('submitOverlay').classList.remove('open');
                 alert('Something went wrong.');
             }
+
+            pendingSubmitId = null;
+        });
+
+        // ── Delete confirmation (Draft only) ─────────────────────────
+        let pendingDeleteId = null;
+
+        function confirmDelete(payrollId) {
+            pendingDeleteId = payrollId;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+
+        document.getElementById('deleteCancelBtn').addEventListener('click', function () {
+            document.getElementById('deleteOverlay').classList.remove('open');
+            pendingDeleteId = null;
+        });
+
+        document.getElementById('deleteConfirmBtn').addEventListener('click', async function () {
+            if (!pendingDeleteId) return;
+
+            const form = new FormData();
+            form.append('id', pendingDeleteId);
+            form.append('__RequestVerificationToken', getToken());
+
+            try {
+                const res  = await fetch('/PayrollStaff/DeletePayroll/' + pendingDeleteId, { method: 'POST', body: form });
+                const data = await res.json();
+
+                document.getElementById('deleteOverlay').classList.remove('open');
+
+                if (data.success) {
+                    loadPayrolls();
+                } else {
+                    alert(data.message || 'Failed to delete payroll.');
+                }
+            } catch (err) {
+                document.getElementById('deleteOverlay').classList.remove('open');
+                alert('Something went wrong.');
+            }
+
+            pendingDeleteId = null;
         });
 
         // ── Restore project on Back navigation ─────────────────────
@@ -252,6 +318,23 @@
         <div class="del-actions">
             <button class="del-btn-cancel" id="submitCancelBtn">Cancel</button>
             <button class="del-btn-delete" style="background:#266DF1" id="submitConfirmBtn">Submit</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="del-overlay" id="deleteOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Delete Draft Payroll?</div>
+        <div class="del-msg">
+            This draft payroll record will be permanently deleted. This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" id="deleteCancelBtn">Cancel</button>
+            <button class="del-btn-delete" id="deleteConfirmBtn">Delete</button>
         </div>
     </div>
 </div>
