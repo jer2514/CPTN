@@ -206,6 +206,7 @@ namespace RSDSystem.Controllers
             project.TypeOfService = string.IsNullOrWhiteSpace(project.TypeOfService) ? null : project.TypeOfService.Trim();
             project.PayrollDistribution = string.IsNullOrWhiteSpace(project.PayrollDistribution) ? null : project.PayrollDistribution.Trim();
             project.AssignedPayrollStaff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff) ? null : project.AssignedPayrollStaff.Trim();
+            project.Status = ProjectStatusOptions.Normalize(project.Status);
         }
 
         private async Task ValidateProjectAsync(

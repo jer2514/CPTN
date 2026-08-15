@@ -19,13 +19,13 @@ namespace RSDSystem.Controllers
 
         public async Task<IActionResult> Index()
         {
-            ViewBag.ActiveProjects = await _db.Projects.CountAsync(p => p.Status == "Active");
+            ViewBag.ActiveProjects = await _db.Projects.Ongoing().CountAsync();
             ViewBag.ActiveEmployees = await _db.Employees.CountAsync(e => e.IsActive);
             ViewBag.ActivePayrollStaff = await _db.Users.CountAsync(u => u.Role == "PayrollStaff" && u.IsActive);
 
             var activeProjectRows = await _db.Projects
                 .AsNoTracking()
-                .Where(p => p.Status == "Active")
+                .Ongoing()
                 .OrderBy(p => p.ProjectName)
                 .Select(p => new
                 {
@@ -38,7 +38,7 @@ namespace RSDSystem.Controllers
                     p.PayrollBudget,
                     PayrollDistribution = p.PayrollDistribution ?? "",
                     AssignedPayrollStaff = p.AssignedPayrollStaff ?? "",
-                    Status = p.Status ?? "Active",
+                    Status = p.Status ?? "On Going",
                     p.TaskCompleted
                 })
                 .ToListAsync();

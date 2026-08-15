@@ -75,7 +75,7 @@ namespace RSDSystem.Controllers
         {
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
+                                  .Ongoing()
                                   .OrderBy(p => p.ProjectName)
                                   .ToList();
             return View(new Employee());
@@ -107,7 +107,7 @@ namespace RSDSystem.Controllers
             {
                 ViewBag.JobClassifications = JobClassifications;
                 ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
+                                      .Ongoing()
                                       .OrderBy(p => p.ProjectName)
                                       .ToList();
                 return View(emp);
@@ -139,7 +139,7 @@ namespace RSDSystem.Controllers
 
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
+                                  .Ongoing()
                                   .OrderBy(p => p.ProjectName)
                                   .ToList();
             return View(emp);
@@ -171,7 +171,7 @@ namespace RSDSystem.Controllers
             {
                 ViewBag.JobClassifications = JobClassifications;
                 ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
+                                      .Ongoing()
                                       .OrderBy(p => p.ProjectName)
                                       .ToList();
                 return View(emp);

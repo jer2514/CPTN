@@ -203,37 +203,16 @@
             <div>
                 <label class="form-lbl">Status</label>
                 <select name="Status" class="form-ctrl">
-                    @if (Model.Status == "Active")
+                    @foreach (var status in ProjectStatusOptions.All)
                     {
-                        <option value="Active" selected>Active</option>
-                    }
-                    else
-                    {
-                        <option value="Active">Active</option>
-                    }
-                    @if (Model.Status == "Completed")
-                    {
-                        <option value="Completed" selected>Completed</option>
-                    }
-                    else
-                    {
-                        <option value="Completed">Completed</option>
-                    }
-                    @if (Model.Status == "On Hold")
-                    {
-                        <option value="On Hold" selected>On Hold</option>
-                    }
-                    else
-                    {
-                        <option value="On Hold">On Hold</option>
-                    }
-                    @if (Model.Status == "Cancelled")
-                    {
-                        <option value="Cancelled" selected>Cancelled</option>
-                    }
-                    else
-                    {
-                        <option value="Cancelled">Cancelled</option>
+                        if (ProjectStatusOptions.Normalize(Model.Status) == status)
+                        {
+                            <option value="@status" selected>@status</option>
+                        }
+                        else
+                        {
+                            <option value="@status">@status</option>
+                        }
                     }
                 </select>
             </div>

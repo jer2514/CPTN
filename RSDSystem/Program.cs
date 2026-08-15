@@ -76,7 +76,9 @@ BEGIN
     )
         ALTER TABLE dbo.Projects ALTER COLUMN ProjectName nvarchar(150) NULL;
 
-    UPDATE dbo.Projects SET Status = N'Active' WHERE Status IS NULL OR LTRIM(RTRIM(Status)) = N'';
+    UPDATE dbo.Projects SET Status = N'On Going' WHERE Status IS NULL OR LTRIM(RTRIM(Status)) = N'' OR Status = N'Active';
+    UPDATE dbo.Projects SET Status = N'Finished' WHERE Status = N'Completed';
+    UPDATE dbo.Projects SET Status = N'On Hold' WHERE Status = N'Cancelled';
     UPDATE dbo.Projects SET ProjectName = N'' WHERE ProjectName IS NULL;
 END");
         }
