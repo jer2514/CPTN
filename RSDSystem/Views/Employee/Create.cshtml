@@ -75,8 +75,21 @@
                 <label class="form-lbl">Gender <span class="req-star">*</span></label>
                 <select name="Gender" class="@Ctrl("Gender")" data-validate="required" data-label="Gender">
                     <option value="">Select</option>
-                    <option value="Male" selected="@(Model.Gender == "Male")">Male</option>
-                    <option value="Female" selected="@(Model.Gender == "Female")">Female</option>
+                    @if (Model.Gender == "Male")
+                    {
+                        <option value="Male" selected>Male</option>
+                        <option value="Female">Female</option>
+                    }
+                    else if (Model.Gender == "Female")
+                    {
+                        <option value="Male">Male</option>
+                        <option value="Female" selected>Female</option>
+                    }
+                    else
+                    {
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    }
                 </select>
                 <span class="field-error" data-error-for="Gender">@Err("Gender")</span>
             </div>
@@ -119,7 +132,14 @@
                     <option value="">Select project</option>
                     @foreach (var p in projects)
                     {
-                        <option value="@p.ProjectId" selected="@(Model.ProjectId == p.ProjectId)">@p.ProjectName</option>
+                        if (p.ProjectId == Model.ProjectId)
+                        {
+                            <option value="@p.ProjectId" selected>@p.ProjectName</option>
+                        }
+                        else
+                        {
+                            <option value="@p.ProjectId">@p.ProjectName</option>
+                        }
                     }
                 </select>
             </div>
@@ -134,7 +154,14 @@
                     <option value="">Select</option>
                     @foreach (var j in jobs)
                     {
-                        <option value="@j" selected="@(Model.JobClassification == j)">@j</option>
+                        if (j == Model.JobClassification)
+                        {
+                            <option value="@j" selected>@j</option>
+                        }
+                        else
+                        {
+                            <option value="@j">@j</option>
+                        }
                     }
                 </select>
                 <span class="field-error" data-error-for="JobClassification">@Err("JobClassification")</span>

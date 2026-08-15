@@ -3,7 +3,7 @@
     const MI_RE = /^[A-Za-zÑñ]{1,2}$/;
     const PHONE_RE = /^09\d{9}$/;
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const ADDRESS_RE = /^[A-Za-z0-9Ññ\s,.\-/#'()&]{5,250}$/;
+    const ADDRESS_RE = new RegExp("^[A-Za-z0-9Ññ\\s,.\\-/#')(&]{5,250}$");
     const ALLOWED_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
     const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
     const MIN_AGE = 18;
