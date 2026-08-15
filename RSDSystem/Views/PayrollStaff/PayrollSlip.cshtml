@@ -60,7 +60,7 @@
             <div class="slip-schedule-hint">
                 Pay period must fall within a payroll schedule:
                 @string.Join(" · ", schedules.Select(s =>
-                    $"{s.StartingDate:MMM d, yyyy} – {s.EndDate:MMM d, yyyy}"))
+                    $"{s.StartingDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} – {s.EndDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)}"))
             </div>
         }
 
@@ -78,10 +78,12 @@
                 <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
                 <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
                        value="@ViewBag.DefaultEnd"
-                       min="@minDate" max="@maxDate"
+                       min="@(string.IsNullOrEmpty(ViewBag.DefaultStart as string) ? minDate : ViewBag.DefaultStart)"
+                       max="@maxDate"
                        data-validate="required|dateAfter|dateWithin" data-after="payPeriodStart"
                        data-label="Pay period ending date"
-                       data-min="@minDate" data-max="@maxDate" />
+                       data-min="@(string.IsNullOrEmpty(ViewBag.DefaultStart as string) ? minDate : ViewBag.DefaultStart)"
+                       data-max="@maxDate" />
                 <span class="field-error" data-error-for="payPeriodEnd"></span>
             </div>
         </div>
@@ -152,7 +154,58 @@
                 start = s.StartingDate.ToString("yyyy-MM-dd"),
                 end = s.EndDate.ToString("yyyy-MM-dd")
             })));
+        const boundMin = '@minDate';
+        const boundMax = '@maxDate';
         let redirectProjectId = null;
+
+        function formatIsoDate(iso) {
+            if (!iso) return '';
+            const parts = iso.split('-');
+            if (parts.length !== 3) return iso;
+            return parts[1] + '/' + parts[2] + '/' + parts[0];
+        }
+
+        function laterDate(a, b) {
+            if (!a) return b || '';
+            if (!b) return a;
+            return a > b ? a : b;
+        }
+
+        function earlierDate(a, b) {
+            if (!a) return b || '';
+            if (!b) return a;
+            return a < b ? a : b;
+        }
+
+        function coveringSchedule(startIso, endIso) {
+            if (!startIso) return null;
+            const end = endIso || startIso;
+            return schedules.find(s => s.start <= startIso && end <= s.end) || null;
+        }
+
+        function syncPeriodBounds() {
+            const startEl = document.getElementById('payPeriodStart');
+            const endEl = document.getElementById('payPeriodEnd');
+            const start = startEl.value;
+            const cover = coveringSchedule(start, start);
+            const rangeMax = cover ? cover.end : boundMax;
+            const rangeMin = boundMin;
+
+            startEl.min = rangeMin || '';
+            startEl.max = earlierDate(rangeMax, endEl.value) || rangeMax || '';
+            if (rangeMin) startEl.setAttribute('data-min', rangeMin);
+            else startEl.removeAttribute('data-min');
+            if (rangeMax) startEl.setAttribute('data-max', rangeMax);
+            else startEl.removeAttribute('data-max');
+
+            const endMin = laterDate(rangeMin, start);
+            endEl.min = endMin || '';
+            endEl.max = rangeMax || '';
+            if (endMin) endEl.setAttribute('data-min', endMin);
+            else endEl.removeAttribute('data-min');
+            if (rangeMax) endEl.setAttribute('data-max', rangeMax);
+            else endEl.removeAttribute('data-max');
+        }
 
         function showFieldError(name, message) {
             const field = slipForm.querySelector('[name="' + name + '"]');
@@ -208,13 +261,25 @@
             if (schedules.length && start && end) {
                 const inside = schedules.some(s => s.start <= start && end <= s.end);
                 if (!inside) {
-                    showFieldError('payPeriodStart', 'Pay period must fall within a payroll schedule for this project.');
+                    const maxEnd = schedules.reduce((m, s) => !m || s.end > m ? s.end : m, '');
+                    const minStart = schedules.reduce((m, s) => !m || s.start < m ? s.start : m, '');
+                    if (end > maxEnd) {
+                        showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(maxEnd) + '.');
+                    } else if (start < minStart) {
+                        showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(minStart) + '.');
+                    } else {
+                        showFieldError('payPeriodEnd', 'Pay period must fall within a payroll schedule for this project.');
+                    }
                     ok = false;
                 }
             }
 
             return ok;
         }
+
+        document.getElementById('payPeriodStart').addEventListener('change', syncPeriodBounds);
+        document.getElementById('payPeriodEnd').addEventListener('change', syncPeriodBounds);
+        syncPeriodBounds();
 
         slipForm.addEventListener('submit', async function (e) {
             e.preventDefault();
