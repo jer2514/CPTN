@@ -31,7 +31,7 @@ namespace RSDSystem.Controllers
             if (blocked != null) return blocked;
 
             await BindProjectSuggestionsAsync();
-            var periods = await LoadPeriodsAsync(projectName, month, projectId);
+            var periods = await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true);
             ViewBag.PageTitle = "View Payroll";
             ViewBag.ProjectName = projectName ?? "";
             ViewBag.SelectedProjectId = projectId;
@@ -55,7 +55,7 @@ namespace RSDSystem.Controllers
             ViewBag.End = end.Date;
             ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
-            return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date));
+            return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date, approvedOnly: true));
         }
 
         [HttpPost]
@@ -254,10 +254,16 @@ namespace RSDSystem.Controllers
             ViewBag.ProjectSuggestionsJson = JsonSerializer.Serialize(projects);
         }
 
-        private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(string? projectName, int? month, int? projectId = null)
+        private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(
+            string? projectName, int? month, int? projectId = null, bool approvedOnly = false)
         {
-            var schedules = await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
-            var payrolls = await _db.Payrolls.Include(p => p.Project).ToListAsync();
+            var schedules = approvedOnly
+                ? new List<PayrollSchedule>()
+                : await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
+            var payrollQuery = _db.Payrolls.Include(p => p.Project).AsQueryable();
+            if (approvedOnly)
+                payrollQuery = payrollQuery.Where(p => p.Status == PayrollStatusOptions.Approved);
+            var payrolls = await payrollQuery.ToListAsync();
             var rows = new Dictionary<string, PayrollPeriodRow>(StringComparer.OrdinalIgnoreCase);
 
             void Add(int projectId, string name, DateTime start, DateTime end, string? staff)
@@ -322,18 +328,41 @@ namespace RSDSystem.Controllers
         }
 
         private async Task<List<PayrollPeriodEmployeeRow>> LoadPeriodEmployeesAsync(
-            int projectId, DateTime start, DateTime end)
+            int projectId, DateTime start, DateTime end, bool approvedOnly = false)
         {
+            var payrollQuery = _db.Payrolls
+                .Include(p => p.Employee)
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start
+                    && p.PayPeriodEnd.Date == end);
+
+            if (approvedOnly)
+                payrollQuery = payrollQuery.Where(p => p.Status == PayrollStatusOptions.Approved);
+
+            var payrolls = await payrollQuery.ToListAsync();
+
+            if (approvedOnly)
+            {
+                return payrolls
+                    .OrderBy(p => p.Employee?.LastName)
+                    .ThenBy(p => p.Employee?.FirstName)
+                    .Select(slip => new PayrollPeriodEmployeeRow
+                    {
+                        PayrollId = slip.PayrollId,
+                        EmployeeName = slip.Employee?.FullName ?? "—",
+                        Job = slip.Employee?.JobClassification ?? "—",
+                        RegularHours = slip.RegularDaysWorked * 8,
+                        OtHours = slip.OvertimeHours,
+                        NetPay = slip.NetPay,
+                        Status = slip.Status
+                    })
+                    .ToList();
+            }
+
             var employees = await _db.Employees
                 .Where(e => e.ProjectId == projectId && e.IsActive)
                 .OrderBy(e => e.LastName)
                 .ThenBy(e => e.FirstName)
-                .ToListAsync();
-
-            var payrolls = await _db.Payrolls
-                .Where(p => p.ProjectId == projectId
-                    && p.PayPeriodStart.Date == start
-                    && p.PayPeriodEnd.Date == end)
                 .ToListAsync();
 
             return employees.Select(emp =>
