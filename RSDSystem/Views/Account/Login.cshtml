@@ -56,31 +56,6 @@
             <div class="form-group mt-1">
                 <button type="submit" class="btn-primary-blue-block">Login</button>
             </div>
-
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="validation-summary">
-                    @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                    {
-                        <div class="text-danger">@err.ErrorMessage</div>
-                    }
-                </div>
-            }
-
-            
-            @if (!string.IsNullOrEmpty(ViewBag.Error))
-            {
-                <div class="alert alert-danger" role="alert" style="
-                    background:#fde8e8;
-                    color:#c0392b;
-                    border:1.5px solid #fecaca;
-                    border-radius:8px;
-                    padding:10px 16px;
-                    font-size:13px;
-                    margin-bottom:16px;">
-                    @ViewBag.Error
-                </div>
-            }
         </form>
     </div>
 </div>

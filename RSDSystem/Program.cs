@@ -57,6 +57,46 @@ using (var scope = app.Services.CreateScope())
         //    // ignore migration errors in local dev if DB unavailable
         //}
 
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Employees', N'Email') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Employees')
+          AND name = N'Email'
+          AND is_nullable = 0
+    )
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE name = N'IX_Employees_Email'
+              AND object_id = OBJECT_ID(N'dbo.Employees')
+        )
+            DROP INDEX IX_Employees_Email ON dbo.Employees;
+
+        ALTER TABLE dbo.Employees ALTER COLUMN Email nvarchar(100) NULL;
+    END
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_Employees_Email'
+          AND object_id = OBJECT_ID(N'dbo.Employees')
+    )
+    BEGIN
+        CREATE UNIQUE INDEX IX_Employees_Email ON dbo.Employees(Email)
+        WHERE [Email] IS NOT NULL AND [Email] <> N'';
+    END
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Employee email schema fix error: " + ex.Message);
+        }
+
         var toAdd = new List<User>();
 
         if (!db.Users.Any(u => u.Username == "demo"))

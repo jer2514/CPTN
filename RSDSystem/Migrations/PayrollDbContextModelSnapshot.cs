@@ -49,7 +49,6 @@ namespace RSDSystem.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
@@ -96,7 +95,8 @@ namespace RSDSystem.Migrations
                     b.HasKey("EmployeeId");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
 
                     b.HasIndex("ProjectId");
 
