@@ -52,7 +52,7 @@ namespace RSDSystem.Models
         [Display(Name = "Assigned to Payroll Staff")]
         public string? AssignedPayrollStaff { get; set; }
 
-        public string? Status { get; set; } = "Active";
+        public string? Status { get; set; } = ProjectStatusOptions.OnGoing;
 
         public bool TaskCompleted { get; set; } = false;   // ← new, drives "Mark as Done"
 
@@ -132,5 +132,38 @@ namespace RSDSystem.Models
             "Half-Month",
             "Monthly"
         };
+    }
+
+    public static class ProjectStatusOptions
+    {
+        public const string OnGoing = "On Going";
+        public const string OnHold = "On Hold";
+        public const string Finished = "Finished";
+
+        public static readonly string[] All = { OnGoing, OnHold, Finished };
+
+        public static string Normalize(string? status)
+        {
+            var value = (status ?? string.Empty).Trim();
+            if (value.Equals("Finished", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Completed", StringComparison.OrdinalIgnoreCase))
+                return Finished;
+            if (value.Equals("On Hold", StringComparison.OrdinalIgnoreCase))
+                return OnHold;
+            if (value.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
+                return OnHold;
+            return OnGoing;
+        }
+
+        public static string BadgeClass(string? status) => Normalize(status) switch
+        {
+            Finished => "proj-status-finished",
+            OnHold => "proj-status-hold",
+            _ => "proj-status-ongoing"
+        };
+
+        public static IQueryable<Project> Ongoing(this IQueryable<Project> projects) =>
+            projects.Where(p => p.Status == OnGoing || p.Status == "Active"
+                || p.Status == null || p.Status == "");
     }
 }

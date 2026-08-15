@@ -22,8 +22,8 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Index()
         {
             var tasks = await _db.Projects
-                 .Where(p => p.AssignedPayrollStaff == CurrentStaffName
-                 && p.Status == "Active")
+                 .Where(p => p.AssignedPayrollStaff == CurrentStaffName)
+                 .Ongoing()
                  .OrderBy(p => p.StartingDate)
                  .ToListAsync();
 
@@ -52,7 +52,7 @@ namespace RSDSystem.Controllers
         {
             var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
 
-            var projectsQuery = _db.Projects.Where(p => p.Status == "Active");
+            var projectsQuery = _db.Projects.Ongoing();
 
             List<Project> projects;
 
@@ -353,7 +353,7 @@ namespace RSDSystem.Controllers
         {
             var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
 
-            var projectsQuery = _db.Projects.Where(p => p.Status == "Active");
+            var projectsQuery = _db.Projects.Ongoing();
             List<Project> projects;
 
             if (!string.IsNullOrWhiteSpace(staffName))

@@ -1454,6 +1454,42 @@ select.form-ctrl {
     color: #6b87c0;
 }
 
+.proj-status-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.proj-status-line .form-lbl {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.proj-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    line-height: 1.2;
+}
+
+.proj-status-finished {
+    background: #266DF1;
+}
+
+.proj-status-ongoing {
+    background: #22c55e;
+}
+
+.proj-status-hold {
+    background: #f59e0b;
+}
+
 /* ── Assigned Employees action buttons ─────────────────── */
 .emp-action-btns {
     display: flex;
