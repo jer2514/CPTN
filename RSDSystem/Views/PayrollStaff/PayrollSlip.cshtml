@@ -1,11 +1,28 @@
 ﻿@model RSDSystem.Models.Employee
+@using System.Text.Json
 @{
     ViewData["Title"] = "Generate Payroll Slip";
     Layout = "_PayrollStaffLayout";
     var project = ViewBag.Project as RSDSystem.Models.Project;
-    var schedules = ViewBag.Schedules as List<RSDSystem.Models.PayrollSchedule> ?? new();
+    var schedules = (ViewBag.Schedules as IEnumerable<RSDSystem.Models.PayrollSchedule>)?.ToList()
+        ?? new List<RSDSystem.Models.PayrollSchedule>();
     var minDate = ViewBag.MinDate as string ?? "";
     var maxDate = ViewBag.MaxDate as string ?? "";
+    var defaultStart = ViewBag.DefaultStart as string ?? "";
+    var defaultEnd = ViewBag.DefaultEnd as string ?? "";
+    var endMin = string.IsNullOrEmpty(defaultStart) ? minDate : defaultStart;
+    var slipConfig = JsonSerializer.Serialize(new
+    {
+        dailyRate = Model.DailyRate,
+        hourlyRate = Model.RatePerHour,
+        boundMin = minDate,
+        boundMax = maxDate,
+        schedules = schedules.Select(s => new
+        {
+            start = s.StartingDate.ToString("yyyy-MM-dd"),
+            end = s.EndDate.ToString("yyyy-MM-dd")
+        })
+    });
 }
 
 
@@ -55,7 +72,7 @@
             </div>
         </div>
 
-        @if (schedules.Count > 0)
+        @if (schedules.Any())
         {
             <div class="slip-schedule-hint">
                 Pay period must fall within a payroll schedule:
@@ -68,7 +85,7 @@
             <div>
                 <label class="form-lbl">Pay Period Starting Date <span class="req-star">*</span></label>
                 <input type="date" name="payPeriodStart" id="payPeriodStart" class="form-ctrl"
-                       value="@ViewBag.DefaultStart"
+                       value="@defaultStart"
                        min="@minDate" max="@maxDate"
                        data-validate="required|dateWithin" data-label="Pay period starting date"
                        data-min="@minDate" data-max="@maxDate" />
@@ -77,13 +94,11 @@
             <div>
                 <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
                 <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
-                       value="@ViewBag.DefaultEnd"
-                       min="@(string.IsNullOrEmpty(ViewBag.DefaultStart as string) ? minDate : ViewBag.DefaultStart)"
-                       max="@maxDate"
+                       value="@defaultEnd"
+                       min="@endMin" max="@maxDate"
                        data-validate="required|dateAfter|dateWithin" data-after="payPeriodStart"
                        data-label="Pay period ending date"
-                       data-min="@(string.IsNullOrEmpty(ViewBag.DefaultStart as string) ? minDate : ViewBag.DefaultStart)"
-                       data-max="@maxDate" />
+                       data-min="@endMin" data-max="@maxDate" />
                 <span class="field-error" data-error-for="payPeriodEnd"></span>
             </div>
         </div>
@@ -141,185 +156,6 @@
 
 @section Scripts {
     <partial name="_FormValidationScripts" />
-    <script>
-        const slipForm = document.getElementById('payrollSlipForm');
-        const generateBtn = document.getElementById('generateBtn');
-        const successOverlay = document.getElementById('successOverlay');
-        const successMsg = document.getElementById('successMsg');
-        const successOkBtn = document.getElementById('successOkBtn');
-        const dailyRate = @Model.DailyRate.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        const hourlyRate = @Model.RatePerHour.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        const schedules = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-            schedules.Select(s => new {
-                start = s.StartingDate.ToString("yyyy-MM-dd"),
-                end = s.EndDate.ToString("yyyy-MM-dd")
-            })));
-        const boundMin = '@minDate';
-        const boundMax = '@maxDate';
-        let redirectProjectId = null;
-
-        function formatIsoDate(iso) {
-            if (!iso) return '';
-            const parts = iso.split('-');
-            if (parts.length !== 3) return iso;
-            return parts[1] + '/' + parts[2] + '/' + parts[0];
-        }
-
-        function laterDate(a, b) {
-            if (!a) return b || '';
-            if (!b) return a;
-            return a > b ? a : b;
-        }
-
-        function earlierDate(a, b) {
-            if (!a) return b || '';
-            if (!b) return a;
-            return a < b ? a : b;
-        }
-
-        function coveringSchedule(startIso, endIso) {
-            if (!startIso) return null;
-            const end = endIso || startIso;
-            return schedules.find(s => s.start <= startIso && end <= s.end) || null;
-        }
-
-        function syncPeriodBounds() {
-            const startEl = document.getElementById('payPeriodStart');
-            const endEl = document.getElementById('payPeriodEnd');
-            const start = startEl.value;
-            const cover = coveringSchedule(start, start);
-            const rangeMax = cover ? cover.end : boundMax;
-            const rangeMin = boundMin;
-
-            startEl.min = rangeMin || '';
-            startEl.max = earlierDate(rangeMax, endEl.value) || rangeMax || '';
-            if (rangeMin) startEl.setAttribute('data-min', rangeMin);
-            else startEl.removeAttribute('data-min');
-            if (rangeMax) startEl.setAttribute('data-max', rangeMax);
-            else startEl.removeAttribute('data-max');
-
-            const endMin = laterDate(rangeMin, start);
-            endEl.min = endMin || '';
-            endEl.max = rangeMax || '';
-            if (endMin) endEl.setAttribute('data-min', endMin);
-            else endEl.removeAttribute('data-min');
-            if (rangeMax) endEl.setAttribute('data-max', rangeMax);
-            else endEl.removeAttribute('data-max');
-        }
-
-        function showFieldError(name, message) {
-            const field = slipForm.querySelector('[name="' + name + '"]');
-            const dest = slipForm.querySelector('[data-error-for="' + name + '"]');
-            if (field) field.classList.toggle('is-invalid', !!message);
-            if (dest) dest.textContent = message || '';
-        }
-
-        function clearServerErrors() {
-            ['payPeriodStart', 'payPeriodEnd', 'regularDaysWorked', 'absentDays', 'overtimeHours', 'cashAdvance']
-                .forEach(name => showFieldError(name, ''));
-        }
-
-        function inclusiveDays(startIso, endIso) {
-            if (!startIso || !endIso) return null;
-            const start = new Date(startIso + 'T00:00:00');
-            const end = new Date(endIso + 'T00:00:00');
-            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null;
-            return Math.round((end - start) / 86400000) + 1;
-        }
-
-        function validateSlipExtras() {
-            let ok = true;
-            const start = document.getElementById('payPeriodStart').value;
-            const end = document.getElementById('payPeriodEnd').value;
-            const daysWorked = parseInt(document.getElementById('regularDaysWorked').value, 10) || 0;
-            const absent = parseInt(document.getElementById('absentDays').value, 10) || 0;
-            const ot = parseFloat(document.getElementById('overtimeHours').value) || 0;
-            const cash = parseFloat(document.getElementById('cashAdvance').value) || 0;
-            const periodDays = inclusiveDays(start, end);
-
-            if (periodDays !== null && periodDays > 31) {
-                showFieldError('payPeriodEnd', 'Pay period cannot be longer than 31 days.');
-                ok = false;
-            }
-
-            if (periodDays !== null && daysWorked + absent > periodDays) {
-                showFieldError('regularDaysWorked', 'Days worked plus absences cannot exceed the pay period.');
-                ok = false;
-            }
-
-            if (daysWorked > 0 && ot > daysWorked * 24) {
-                showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
-                ok = false;
-            }
-
-            const gross = (dailyRate * daysWorked) + (hourlyRate * ot);
-            if (cash > gross) {
-                showFieldError('cashAdvance', 'Cash advance cannot be greater than gross pay.');
-                ok = false;
-            }
-
-            if (schedules.length && start && end) {
-                const inside = schedules.some(s => s.start <= start && end <= s.end);
-                if (!inside) {
-                    const maxEnd = schedules.reduce((m, s) => !m || s.end > m ? s.end : m, '');
-                    const minStart = schedules.reduce((m, s) => !m || s.start < m ? s.start : m, '');
-                    if (end > maxEnd) {
-                        showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(maxEnd) + '.');
-                    } else if (start < minStart) {
-                        showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(minStart) + '.');
-                    } else {
-                        showFieldError('payPeriodEnd', 'Pay period must fall within a payroll schedule for this project.');
-                    }
-                    ok = false;
-                }
-            }
-
-            return ok;
-        }
-
-        document.getElementById('payPeriodStart').addEventListener('change', syncPeriodBounds);
-        document.getElementById('payPeriodEnd').addEventListener('change', syncPeriodBounds);
-        syncPeriodBounds();
-
-        slipForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            clearServerErrors();
-
-            if (window.RsdFormValidation && !window.RsdFormValidation.validate(slipForm)) return;
-            if (!validateSlipExtras()) return;
-
-            generateBtn.disabled = true;
-            generateBtn.textContent = 'Generating...';
-
-            try {
-                const res = await fetch('/PayrollStaff/GeneratePayrollSlip', {
-                    method: 'POST',
-                    body: new FormData(slipForm)
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    successMsg.textContent = data.message;
-                    redirectProjectId = data.projectId;
-                    successOverlay.classList.add('open');
-                } else {
-                    if (data.errors) {
-                        Object.keys(data.errors).forEach(function (name) {
-                            showFieldError(name, data.errors[name]);
-                        });
-                    }
-                    generateBtn.disabled = false;
-                    generateBtn.textContent = 'Generate Payroll';
-                }
-            } catch (err) {
-                showFieldError('regularDaysWorked', 'Something went wrong. Please try again.');
-                generateBtn.disabled = false;
-                generateBtn.textContent = 'Generate Payroll';
-            }
-        });
-
-        successOkBtn.addEventListener('click', function () {
-            window.location.href = '/PayrollStaff/GeneratePayroll?projectId=' + redirectProjectId;
-        });
-    </script>
+    <script type="application/json" id="slip-config">@Html.Raw(slipConfig)</script>
+    <script src="~/js/payroll-slip.js" asp-append-version="true"></script>
 }
