@@ -9,6 +9,10 @@
     const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
     const MIN_AGE = 18;
     const MAX_AGE = 80;
+    const MIN_YEAR = 2000;
+    const MAX_YEAR = 2099;
+    const DATE_MIN = '2000-01-01';
+    const DATE_MAX = '2099-12-31';
 
     function ageFrom(isoDate) {
         if (!isoDate) return null;
@@ -111,6 +115,13 @@
             if (rule === 'projectName' && !PROJECT_NAME_RE.test(value)) {
                 return 'Enter a valid project name.';
             }
+            if (rule === 'dateYear') {
+                const yearPart = (el.value || '').split('-')[0] || '';
+                const year = parseInt(yearPart, 10);
+                if (yearPart.length !== 4 || Number.isNaN(year) || year < MIN_YEAR || year > MAX_YEAR) {
+                    return 'Enter a valid date with a 4-digit year (2000–2099).';
+                }
+            }
             if (rule === 'dateAfter') {
                 const otherId = el.getAttribute('data-after');
                 const other = otherId ? document.getElementById(otherId) : null;
@@ -192,6 +203,47 @@
         });
     }
 
+    function applyDefaultDateBounds(el) {
+        if (!el || el.type !== 'date' || hasRule(el, 'dob')) return;
+        if (!el.min) el.min = DATE_MIN;
+        if (!el.max) el.max = DATE_MAX;
+        if (el.min && el.max && el.min > el.max) {
+            el.max = el.min;
+        }
+    }
+
+    function sanitizeDateValue(el) {
+        if (!el || el.type !== 'date') return;
+        applyDefaultDateBounds(el);
+
+        const raw = el.value || '';
+        if (!raw) return;
+
+        const parts = raw.split('-');
+        if (!parts[0]) return;
+
+        if (parts[0].length > 4) {
+            parts[0] = parts[0].slice(0, 4);
+            el.value = parts.length >= 3 ? parts[0] + '-' + parts[1] + '-' + parts[2] : parts[0];
+        }
+
+        const year = parseInt(parts[0], 10);
+        if (!Number.isNaN(year) && parts[0].length === 4 && year > MAX_YEAR) {
+            el.value = '';
+        }
+    }
+
+    function bindDateInputs(root) {
+        (root || document).querySelectorAll('input[type="date"]').forEach(function (el) {
+            if (el.getAttribute('data-date-bound') === '1') return;
+            el.setAttribute('data-date-bound', '1');
+            applyDefaultDateBounds(el);
+            el.addEventListener('input', function () { sanitizeDateValue(el); });
+            el.addEventListener('change', function () { sanitizeDateValue(el); });
+            sanitizeDateValue(el);
+        });
+    }
+
     function bindMi(form) {
         form.querySelectorAll('[data-validate]').forEach(function (el) {
             if (!hasRule(el, 'mi')) return;
@@ -209,6 +261,7 @@
         bindAge(form);
         bindPhone(form);
         bindMi(form);
+        bindDateInputs(form);
 
         form.addEventListener('submit', function (e) {
             if (!validateForm(form)) e.preventDefault();
@@ -232,7 +285,8 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('form.js-validate').forEach(initForm);
+        bindDateInputs(document);
     });
 
-    window.RsdFormValidation = { init: initForm, validate: validateForm };
+    window.RsdFormValidation = { init: initForm, validate: validateForm, sanitizeDate: sanitizeDateValue };
 })();

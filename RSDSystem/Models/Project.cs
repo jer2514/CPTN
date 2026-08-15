@@ -64,8 +64,20 @@ namespace RSDSystem.Models
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
-            if (StartingDate.HasValue && EstimateEndDate.HasValue &&
-                EstimateEndDate.Value.Date < StartingDate.Value.Date)
+            if (StartingDate.HasValue && !InputRules.IsUsableDate(StartingDate))
+            {
+                yield return new ValidationResult(
+                    InputRules.CalendarYearMessage, new[] { nameof(StartingDate) });
+            }
+
+            if (EstimateEndDate.HasValue && !InputRules.IsUsableDate(EstimateEndDate))
+            {
+                yield return new ValidationResult(
+                    InputRules.CalendarYearMessage, new[] { nameof(EstimateEndDate) });
+            }
+
+            if (InputRules.IsUsableDate(StartingDate) && InputRules.IsUsableDate(EstimateEndDate)
+                && EstimateEndDate!.Value.Date < StartingDate!.Value.Date)
             {
                 yield return new ValidationResult(
                     "Estimate end date must be on or after the starting date.",

@@ -47,29 +47,50 @@
         }) || null;
     }
 
+    function clampBounds(min, max) {
+        const calendarMin = '2000-01-01';
+        const calendarMax = '2099-12-31';
+        let nextMin = laterDate(min || calendarMin, calendarMin);
+        let nextMax = earlierDate(max || calendarMax, calendarMax);
+        if (nextMin && nextMax && nextMin.localeCompare(nextMax) > 0) {
+            nextMax = nextMin;
+        }
+        return { min: nextMin, max: nextMax };
+    }
+
     function syncPeriodBounds() {
         const startEl = document.getElementById('payPeriodStart');
         const endEl = document.getElementById('payPeriodEnd');
         if (!startEl || !endEl) return;
 
+        if (window.RsdFormValidation) {
+            window.RsdFormValidation.sanitizeDate(startEl);
+            window.RsdFormValidation.sanitizeDate(endEl);
+        }
+
         const start = startEl.value;
         const cover = coveringSchedule(start);
-        const rangeMax = earlierDate(cover ? cover.end : boundMax, boundMax);
-        const rangeMin = laterDate(boundMin, cover ? cover.start : boundMin) || boundMin;
+        const rawMax = earlierDate(cover ? cover.end : boundMax, boundMax);
+        const rawMin = laterDate(boundMin, cover ? cover.start : boundMin) || boundMin;
+        const range = clampBounds(rawMin, rawMax);
 
-        startEl.min = rangeMin || '';
-        startEl.max = earlierDate(rangeMax, endEl.value) || rangeMax || '';
-        if (rangeMin) startEl.setAttribute('data-min', rangeMin);
+        startEl.min = range.min;
+        let startMax = earlierDate(range.max, endEl.value) || range.max;
+        if (startMax && startMax.localeCompare(range.min) < 0) startMax = range.max;
+        startEl.max = startMax;
+        if (boundMin) startEl.setAttribute('data-min', range.min);
         else startEl.removeAttribute('data-min');
-        if (rangeMax) startEl.setAttribute('data-max', rangeMax);
+        if (boundMax) startEl.setAttribute('data-max', range.max);
         else startEl.removeAttribute('data-max');
 
-        const endMin = laterDate(rangeMin, start);
-        endEl.min = endMin || '';
-        endEl.max = rangeMax || '';
+        const endMin = laterDate(range.min, start) || range.min;
+        let endMax = range.max;
+        if (endMin && endMax && endMin.localeCompare(endMax) > 0) endMax = endMin;
+        endEl.min = endMin;
+        endEl.max = endMax;
         if (endMin) endEl.setAttribute('data-min', endMin);
         else endEl.removeAttribute('data-min');
-        if (rangeMax) endEl.setAttribute('data-max', rangeMax);
+        if (range.max) endEl.setAttribute('data-max', range.max);
         else endEl.removeAttribute('data-max');
     }
 
