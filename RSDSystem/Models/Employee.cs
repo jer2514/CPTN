@@ -12,19 +12,19 @@ namespace RSDSystem.Models
 
         [Required, MaxLength(10)]
         [Display(Name = "Employee ID")]
-        public string EmployeeCode { get; set; } = string.Empty;
+        public string? EmployeeCode { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "First name is required.")]
         [MaxLength(80)]
         [RegularExpression(InputRules.PersonNamePattern, ErrorMessage = InputRules.PersonNameMessage)]
         [Display(Name = "First Name")]
-        public string FirstName { get; set; } = string.Empty;
+        public string? FirstName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Last name is required.")]
         [MaxLength(80)]
         [RegularExpression(InputRules.PersonNamePattern, ErrorMessage = InputRules.PersonNameMessage)]
         [Display(Name = "Last Name")]
-        public string LastName { get; set; } = string.Empty;
+        public string? LastName { get; set; } = string.Empty;
 
         [MaxLength(2)]
         [RegularExpression(InputRules.MiddleInitialPattern, ErrorMessage = InputRules.MiddleInitialMessage)]
@@ -70,7 +70,7 @@ namespace RSDSystem.Models
         [Required(ErrorMessage = "Job classification is required.")]
         [MaxLength(80)]
         [Display(Name = "Job Classification")]
-        public string JobClassification { get; set; } = string.Empty;
+        public string? JobClassification { get; set; } = string.Empty;
 
         [Range(0.01, 999999.99, ErrorMessage = "Rate per day must be greater than 0.")]
         [Column(TypeName = "decimal(10,2)")]

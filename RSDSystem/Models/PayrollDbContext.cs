@@ -35,6 +35,42 @@ namespace RSDSystem.Models
                 .IsRequired(false);
 
             modelBuilder.Entity<Employee>()
+                .Property(e => e.EmployeeCode)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.FirstName)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.LastName)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.MiddleInitial)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.Gender)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.Address)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.ContactNumber)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.PhotoPath)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.JobClassification)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
                 .HasIndex(e => e.Email)
                 .IsUnique()
                 .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
