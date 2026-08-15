@@ -120,8 +120,8 @@
                 {
                     <tr>
                         <td>@(s.Project?.ProjectName ?? "—")</td>
-                        <td>@s.StartingDate.ToString("MMM d, yyyy")</td>
-                        <td>@s.EndDate.ToString("MMM d, yyyy")</td>
+                        <td>@s.StartingDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        <td>@s.EndDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
                         <td>
                             <div class="action-cell">
                                 <button type="button" class="action-btn action-edit" title="Edit"
