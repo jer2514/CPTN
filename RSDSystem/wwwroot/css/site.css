@@ -1825,6 +1825,23 @@ button.badge-btn {
     background: none;
 }
 
+.genpay-suggest-list .suggest-name {
+    display: block;
+}
+
+.genpay-suggest-list .suggest-meta {
+    display: block;
+    font-size: 11px;
+    color: #7a93c4;
+    margin-top: 2px;
+}
+
+.genpay-suggest-list .suggest-match {
+    color: #266DF1;
+    font-weight: 700;
+    background: #e8f0ff;
+}
+
 .genpay-fallback-note {
     background: #FFF8E1;
     color: #8a6d00;
@@ -2254,6 +2271,7 @@ button.badge-btn {
     gap: 14px;
     align-items: end;
     margin-bottom: 22px;
+    overflow: visible;
 }
 
 .vp-filter-submit {

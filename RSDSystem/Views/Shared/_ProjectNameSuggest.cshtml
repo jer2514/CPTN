@@ -1,0 +1,13 @@
+@{
+    var currentName = ViewBag.SuggestProjectName as string ?? "";
+    var currentId = ViewBag.SelectedProjectId is int selectedId ? selectedId : 0;
+    var json = ViewBag.ProjectSuggestionsJson as string ?? "[]";
+}
+
+<div class="genpay-autocomplete">
+    <input type="text" id="projectInput" name="projectName" value="@currentName"
+           class="form-ctrl" placeholder="Search project" autocomplete="off" />
+    <input type="hidden" id="projectIdInput" name="projectId" value="@(currentId > 0 ? currentId.ToString() : "")" />
+    <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+</div>
+<script type="application/json" id="project-suggest-data">@Html.Raw(json)</script>
