@@ -38,7 +38,7 @@
 
     <div class="payslip-section-lbl">
         Attendance Summary
-        <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy") - @Model.PayPeriodEnd.ToString("MMMM dd, yyyy")</span>
+        <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture) - @Model.PayPeriodEnd.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)</span>
     </div>
     <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
     <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours hours</span></div>
@@ -51,7 +51,7 @@
     <div class="payslip-line"><span>Cash Advance:</span><span class="payslip-val">₱@Model.CashAdvance.ToString("N2")</span></div>
     <div class="payslip-line payslip-line-strong"><span>Net Pay:</span><span class="payslip-val">₱@Model.NetPay.ToString("N2")</span></div>
 
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy")</div>
+    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)</div>
 
     @if (Model.Status == RSDSystem.Models.PayrollStatusOptions.Correction && !string.IsNullOrWhiteSpace(Model.CorrectionReason))
     {

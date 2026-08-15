@@ -55,6 +55,7 @@ namespace RSDSystem.Controllers
             ViewBag.End = end.Date;
             ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
             return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date, approvedOnly: true));
         }
 
@@ -122,7 +123,7 @@ namespace RSDSystem.Controllers
                 ? $"Generated {created} payslip(s) for {project.ProjectName}."
                 : "Payslips for this period already exist.";
 
-            return RedirectToAction(nameof(Prediction), new
+            return RedirectToAction(nameof(Period), new
             {
                 projectId,
                 start = start.ToString("yyyy-MM-dd"),
@@ -130,54 +131,13 @@ namespace RSDSystem.Controllers
             });
         }
 
-        public async Task<IActionResult> Prediction(int? projectId, DateTime? start, DateTime? end,
-            string? projectName, int? month, int page = 1)
+        public IActionResult Prediction()
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
             ViewBag.PageTitle = "Payroll Prediction";
-            ViewBag.ProjectNameFilter = projectName ?? "";
-            ViewBag.SelectedProjectId = !start.HasValue || !end.HasValue ? projectId : null;
-            ViewBag.Month = month;
-            ViewBag.Months = MonthOptions();
-
-            if (!projectId.HasValue || !start.HasValue || !end.HasValue)
-            {
-                await BindProjectSuggestionsAsync();
-                ViewBag.HasPeriod = false;
-                return View("PredictionList", await LoadPeriodsAsync(projectName, month, projectId));
-            }
-
-            var project = await _db.Projects.FindAsync(projectId.Value);
-            if (project == null) return NotFound();
-
-            const int pageSize = 4;
-            var slips = await _db.Payrolls
-                .Include(p => p.Employee)
-                .Where(p => p.ProjectId == projectId.Value
-                    && p.PayPeriodStart.Date == start.Value.Date
-                    && p.PayPeriodEnd.Date == end.Value.Date)
-                .OrderByDescending(p => p.GeneratedDate)
-                .ThenByDescending(p => p.PayrollId)
-                .ToListAsync();
-
-            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count / (double)pageSize));
-            page = Math.Clamp(page, 1, totalPages);
-
-            ViewBag.HasPeriod = true;
-            ViewBag.ProjectId = projectId.Value;
-            ViewBag.ProjectName = project.ProjectName;
-            ViewBag.Start = start.Value.Date;
-            ViewBag.End = end.Value.Date;
-            ViewBag.StartLabel = start.Value.ToString("MMMM dd, yyyy", DateCulture);
-            ViewBag.EndLabel = end.Value.ToString("MMMM dd, yyyy", DateCulture);
-            ViewBag.FileName = PayslipFileName(project.ProjectName, start.Value, end.Value);
-            ViewBag.CurrentPage = page;
-            ViewBag.TotalPages = totalPages;
-            ViewBag.TotalSlips = slips.Count;
-
-            return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+            return View();
         }
 
         public async Task<IActionResult> PrintPayslips(int projectId, DateTime start, DateTime end)
@@ -188,15 +148,17 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var slips = await _db.Payrolls
+            var slips = (await _db.Payrolls
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
-                .OrderBy(p => p.Employee!.LastName)
-                .ThenBy(p => p.Employee!.FirstName)
-                .ToListAsync();
+                .ToListAsync())
+                .Where(IsApproved)
+                .OrderBy(p => p.Employee?.LastName)
+                .ThenBy(p => p.Employee?.FirstName)
+                .ToList();
 
             ViewBag.ProjectName = project.ProjectName;
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
@@ -215,14 +177,16 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var count = await _db.Payrolls.CountAsync(p =>
-                p.ProjectId == projectId
-                && p.PayPeriodStart.Date == start.Date
-                && p.PayPeriodEnd.Date == end.Date);
+            var slips = await _db.Payrolls
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .ToListAsync();
+            var count = slips.Count(IsApproved);
 
             if (count == 0)
             {
-                TempData["Error"] = "Generate payslips before sending them to payroll staff.";
+                TempData["Error"] = "There are no approved payslips to send for this period.";
                 return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
 
@@ -231,7 +195,7 @@ namespace RSDSystem.Controllers
                 : project.AssignedPayrollStaff;
 
             TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
-            return RedirectToAction(nameof(Prediction), new
+            return RedirectToAction(nameof(Period), new
             {
                 projectId,
                 start = start.ToString("yyyy-MM-dd"),

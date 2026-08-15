@@ -2340,6 +2340,10 @@ button.badge-btn {
     background: #f4f8ff;
 }
 
+.vp-slip-grid {
+    margin-top: 28px;
+}
+
 .gen-modal {
     background: #fff;
     border-radius: 12px;
