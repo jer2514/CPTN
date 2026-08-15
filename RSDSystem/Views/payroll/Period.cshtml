@@ -16,24 +16,26 @@
 </div>
 
 <div class="page-card">
-    <div class="vp-detail-top">
-        <a asp-action="Index" class="btn-back vp-inline-back">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
-        <div class="pred-actions">
+    <a asp-action="Index" class="btn-back vp-inline-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+
+    <div class="vp-detail-heading">
+        <div>
+            <div class="vp-detail-title">@projectName</div>
+            <div class="vp-detail-dates">Date: @startLabel - @endLabel</div>
+        </div>
+        <div class="vp-detail-actions">
             <a asp-action="PrintPayslips"
                asp-route-projectId="@projectId"
                asp-route-start="@start.ToString("yyyy-MM-dd")"
                asp-route-end="@end.ToString("yyyy-MM-dd")"
                target="_blank"
-               class="pred-btn-pdf">Download PDF</a>
-            <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+               class="vp-btn-pdf">Download PDF</a>
+            <button type="button" class="vp-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
             <button type="button" class="btn-primary-blue-solid" onclick="openGenerateModal()">Generate Payslips</button>
         </div>
     </div>
-
-    <div class="vp-detail-title">@projectName</div>
-    <div class="vp-detail-dates">Date: @startLabel - @endLabel</div>
 
     <table class="emp-table vp-employee-table">
         <thead>
@@ -84,7 +86,7 @@
 
     @if (Model.Any())
     {
-        <div class="pred-grid vp-slip-grid">
+        <div class="vp-slip-grid">
             @foreach (var row in Model)
             {
                 <a class="pred-slip" asp-action="View" asp-route-id="@row.PayrollId">
