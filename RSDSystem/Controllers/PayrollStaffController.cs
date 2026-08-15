@@ -127,18 +127,29 @@ namespace RSDSystem.Controllers
                 ?? schedules.FirstOrDefault(s => s.StartingDate.Date >= DateTime.Today)
                 ?? schedules.LastOrDefault();
 
+            string? boundStart = null;
+            string? boundEnd = null;
+            if (schedules.Count > 0)
+            {
+                boundStart = schedules.Min(s => s.StartingDate).ToString("yyyy-MM-dd");
+                boundEnd = schedules.Max(s => s.EndDate).ToString("yyyy-MM-dd");
+            }
+            else if (InputRules.IsUsableDate(project.StartingDate) || InputRules.IsUsableDate(project.EstimateEndDate))
+            {
+                boundStart = InputRules.IsUsableDate(project.StartingDate)
+                    ? project.StartingDate!.Value.ToString("yyyy-MM-dd") : null;
+                boundEnd = InputRules.IsUsableDate(project.EstimateEndDate)
+                    ? project.EstimateEndDate!.Value.ToString("yyyy-MM-dd") : null;
+            }
+
             ViewBag.PageTitle = "Generate Payroll Slip";
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
             ViewBag.DefaultStart = (defaultSchedule?.StartingDate ?? DateTime.Today.AddDays(-6)).ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = (defaultSchedule?.EndDate ?? DateTime.Today).ToString("yyyy-MM-dd");
-            ViewBag.MinDate = project.StartingDate.HasValue && project.StartingDate.Value.Year > 1900
-                ? project.StartingDate.Value.ToString("yyyy-MM-dd")
-                : (schedules.FirstOrDefault()?.StartingDate.ToString("yyyy-MM-dd") ?? "");
-            ViewBag.MaxDate = project.EstimateEndDate.HasValue && project.EstimateEndDate.Value.Year > 1900
-                ? project.EstimateEndDate.Value.ToString("yyyy-MM-dd")
-                : (schedules.LastOrDefault()?.EndDate.ToString("yyyy-MM-dd") ?? "");
+            ViewBag.MinDate = boundStart ?? "";
+            ViewBag.MaxDate = boundEnd ?? "";
 
             return View(emp);
         }
@@ -194,20 +205,35 @@ namespace RSDSystem.Controllers
                 if (overtimeHours > regularDaysWorked * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
-                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
-                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
-
-                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
-                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
-
                 var schedules = await _db.PayrollSchedules
                     .Where(s => s.ProjectId == projectId)
                     .ToListAsync();
 
-                if (schedules.Count > 0 &&
-                    !schedules.Any(s => s.StartingDate.Date <= payPeriodStart.Date && payPeriodEnd.Date <= s.EndDate.Date))
+                if (schedules.Count > 0)
                 {
-                    errors["payPeriodStart"] = "Pay period must fall within a payroll schedule for this project.";
+                    var covering = schedules.FirstOrDefault(s =>
+                        s.StartingDate.Date <= payPeriodStart.Date && payPeriodEnd.Date <= s.EndDate.Date);
+
+                    if (covering == null)
+                    {
+                        var maxEnd = schedules.Max(s => s.EndDate).Date;
+                        var minStart = schedules.Min(s => s.StartingDate).Date;
+
+                        if (payPeriodEnd.Date > maxEnd)
+                            errors["payPeriodEnd"] = $"Pay period ending date must be on or before {maxEnd:MM/dd/yyyy}.";
+                        else if (payPeriodStart.Date < minStart)
+                            errors["payPeriodStart"] = $"Pay period starting date must be on or after {minStart:MM/dd/yyyy}.";
+                        else
+                            errors["payPeriodEnd"] = "Pay period must fall within a payroll schedule for this project.";
+                    }
+                }
+                else
+                {
+                    if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
+                        errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
+
+                    if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
+                        errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
                 }
             }
 
