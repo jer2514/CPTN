@@ -111,7 +111,7 @@ namespace RSDSystem.Controllers
         }
 
         // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
-        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null)
+        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null, string? returnUrl = null)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             var project = await _db.Projects.FindAsync(projectId);
@@ -155,6 +155,10 @@ namespace RSDSystem.Controllers
             ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
             ViewBag.IsEdit = existing != null;
             ViewBag.PayrollId = existing?.PayrollId ?? 0;
+            ViewBag.ReturnUrl = SafeReturnUrl(returnUrl)
+                ?? (existing != null
+                    ? Url.Action(nameof(ViewPayroll), new { id = existing.PayrollId })
+                    : Url.Action(nameof(GeneratePayroll), new { projectId }));
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
@@ -322,7 +326,10 @@ namespace RSDSystem.Controllers
                     : $"Payroll for {emp.FullName} has been saved.",
                 projectId,
                 payrollId = payroll.PayrollId,
-                isEdit = payrollId > 0
+                isEdit = payrollId > 0,
+                returnUrl = payrollId > 0
+                    ? Url.Action(nameof(ViewPayroll), new { id = payroll.PayrollId })
+                    : Url.Action(nameof(GeneratePayroll), new { projectId })
             });
         }
 
@@ -455,6 +462,15 @@ namespace RSDSystem.Controllers
         {
              // TODO: clear auth/session once login is implemented
              return RedirectToAction(nameof(Index));
+        }
+
+        private string? SafeReturnUrl(string? returnUrl)
+        {
+            if (string.IsNullOrWhiteSpace(returnUrl))
+                return null;
+            if (!Url.IsLocalUrl(returnUrl))
+                return null;
+            return returnUrl;
         }
     }
 }
