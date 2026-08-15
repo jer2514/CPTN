@@ -13,7 +13,12 @@
     const schedules = Array.isArray(config.schedules) ? config.schedules : [];
     const boundMin = config.boundMin || '';
     const boundMax = config.boundMax || '';
+    const isEdit = !!config.isEdit;
+    const existingPayrollId = Number(config.payrollId || 0);
+    const submitLabel = isEdit ? 'Save Changes' : 'Generate Payroll';
+    const busyLabel = isEdit ? 'Saving...' : 'Generating...';
     let redirectProjectId = null;
+    let savedPayrollId = existingPayrollId;
 
     function formatIsoDate(iso) {
         if (!iso) return '';
@@ -152,14 +157,14 @@
 
     document.getElementById('payPeriodStart').addEventListener('change', function () {
         syncPeriodBounds();
-        fillDaysFromPeriod();
+        if (!isEdit) fillDaysFromPeriod();
     });
     document.getElementById('payPeriodEnd').addEventListener('change', function () {
         syncPeriodBounds();
-        fillDaysFromPeriod();
+        if (!isEdit) fillDaysFromPeriod();
     });
     syncPeriodBounds();
-    if (!parseInt(document.getElementById('regularDaysWorked').value, 10)) {
+    if (!isEdit && !parseInt(document.getElementById('regularDaysWorked').value, 10)) {
         fillDaysFromPeriod();
     }
 
@@ -171,7 +176,7 @@
         if (!validateSlipExtras()) return;
 
         generateBtn.disabled = true;
-        generateBtn.textContent = 'Generating...';
+        generateBtn.textContent = busyLabel;
 
         try {
             const res = await fetch('/PayrollStaff/GeneratePayrollSlip', {
@@ -183,6 +188,7 @@
             if (data.success) {
                 successMsg.textContent = data.message;
                 redirectProjectId = data.projectId;
+                savedPayrollId = Number(data.payrollId || existingPayrollId || 0);
                 successOverlay.classList.add('open');
             } else {
                 if (data.errors) {
@@ -191,16 +197,20 @@
                     });
                 }
                 generateBtn.disabled = false;
-                generateBtn.textContent = 'Generate Payroll';
+                generateBtn.textContent = submitLabel;
             }
         } catch (err) {
             showFieldError('regularDaysWorked', 'Something went wrong. Please try again.');
             generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Payroll';
+            generateBtn.textContent = submitLabel;
         }
     });
 
     successOkBtn.addEventListener('click', function () {
+        if (isEdit && savedPayrollId) {
+            window.location.href = '/PayrollStaff/ViewPayroll/' + savedPayrollId;
+            return;
+        }
         window.location.href = '/PayrollStaff/GeneratePayroll?projectId=' + redirectProjectId;
     });
 })();

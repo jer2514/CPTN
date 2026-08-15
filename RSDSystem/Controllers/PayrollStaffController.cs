@@ -110,12 +110,28 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, projectName = project.ProjectName, employees = result });
         }
 
-        // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5
-        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId)
+        // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
+        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             var project = await _db.Projects.FindAsync(projectId);
             if (emp == null || project == null) return NotFound();
+
+            Payroll? existing = null;
+            if (payrollId.HasValue && payrollId.Value > 0)
+            {
+                existing = await _db.Payrolls.FirstOrDefaultAsync(p =>
+                    p.PayrollId == payrollId.Value &&
+                    p.EmployeeId == employeeId &&
+                    p.ProjectId == projectId);
+
+                if (existing == null) return NotFound();
+                if (existing.Status == PayrollStatusOptions.Submitted ||
+                    existing.Status == PayrollStatusOptions.Approved)
+                {
+                    return RedirectToAction(nameof(ViewPayroll), new { id = existing.PayrollId });
+                }
+            }
 
             var schedules = await _db.PayrollSchedules
                 .Where(s => s.ProjectId == projectId)
@@ -127,12 +143,18 @@ namespace RSDSystem.Controllers
             var projectEnd = InputRules.IsUsableDate(project.EstimateEndDate)
                 ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
 
-            var defaultStart = projectStart ?? DateTime.Today.AddDays(-6);
-            var defaultEnd = projectEnd ?? DateTime.Today;
+            var defaultStart = existing?.PayPeriodStart.Date
+                ?? projectStart
+                ?? DateTime.Today.AddDays(-6);
+            var defaultEnd = existing?.PayPeriodEnd.Date
+                ?? projectEnd
+                ?? DateTime.Today;
             if (defaultEnd < defaultStart)
                 defaultEnd = defaultStart;
 
-            ViewBag.PageTitle = "Generate Payroll Slip";
+            ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
+            ViewBag.IsEdit = existing != null;
+            ViewBag.PayrollId = existing?.PayrollId ?? 0;
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
@@ -140,7 +162,11 @@ namespace RSDSystem.Controllers
             ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
-            ViewBag.DefaultDaysWorked = Math.Max(1, InputRules.CountWeekdays(defaultStart, defaultEnd));
+            ViewBag.DefaultDaysWorked = existing?.RegularDaysWorked
+                ?? Math.Max(1, InputRules.CountWeekdays(defaultStart, defaultEnd));
+            ViewBag.AbsentDays = existing?.AbsentDays ?? 0;
+            ViewBag.OvertimeHours = existing?.OvertimeHours ?? 0;
+            ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
             ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
 
@@ -151,7 +177,8 @@ namespace RSDSystem.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GeneratePayrollSlip(int employeeId, int projectId,
-            DateTime payPeriodStart, DateTime payPeriodEnd, int regularDaysWorked, decimal overtimeHours, int absentDays, decimal cashAdvance)
+            DateTime payPeriodStart, DateTime payPeriodEnd, int regularDaysWorked, decimal overtimeHours, int absentDays, decimal cashAdvance,
+            int payrollId = 0)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
@@ -229,33 +256,73 @@ namespace RSDSystem.Controllers
             decimal net = gross - cashAdvance;
             if (net < 0) net = 0;
 
-            var payroll = new Payroll
+            Payroll? payroll = null;
+            if (payrollId > 0)
             {
-                EmployeeId = employeeId,
-                ProjectId = projectId,
-                PayPeriodStart = payPeriodStart.Date,
-                PayPeriodEnd = payPeriodEnd.Date,
-                RegularDaysWorked = regularDaysWorked,
-                OvertimeHours = overtimeHours,
-                AbsentDays = absentDays,
-                RegularPay = regularPay,
-                OvertimePay = overtimePay,
-                GrossPay = gross,
-                CashAdvance = cashAdvance,
-                NetPay = net,
-                Status = PayrollStatusOptions.Draft,
-                GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
-                GeneratedDate = DateTime.Now
-            };
+                payroll = await _db.Payrolls.FirstOrDefaultAsync(p =>
+                    p.PayrollId == payrollId &&
+                    p.EmployeeId == employeeId &&
+                    p.ProjectId == projectId);
 
-            _db.Payrolls.Add(payroll);
+                if (payroll == null)
+                    return Json(new { success = false, message = "Payroll record not found." });
+
+                if (payroll.Status == PayrollStatusOptions.Submitted ||
+                    payroll.Status == PayrollStatusOptions.Approved)
+                {
+                    return Json(new { success = false, message = "Submitted or approved payroll cannot be edited." });
+                }
+            }
+
+            if (payroll != null)
+            {
+                payroll.PayPeriodStart = payPeriodStart.Date;
+                payroll.PayPeriodEnd = payPeriodEnd.Date;
+                payroll.RegularDaysWorked = regularDaysWorked;
+                payroll.OvertimeHours = overtimeHours;
+                payroll.AbsentDays = absentDays;
+                payroll.RegularPay = regularPay;
+                payroll.OvertimePay = overtimePay;
+                payroll.GrossPay = gross;
+                payroll.CashAdvance = cashAdvance;
+                payroll.NetPay = net;
+                payroll.GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
+                payroll.GeneratedDate = DateTime.Now;
+            }
+            else
+            {
+                payroll = new Payroll
+                {
+                    EmployeeId = employeeId,
+                    ProjectId = projectId,
+                    PayPeriodStart = payPeriodStart.Date,
+                    PayPeriodEnd = payPeriodEnd.Date,
+                    RegularDaysWorked = regularDaysWorked,
+                    OvertimeHours = overtimeHours,
+                    AbsentDays = absentDays,
+                    RegularPay = regularPay,
+                    OvertimePay = overtimePay,
+                    GrossPay = gross,
+                    CashAdvance = cashAdvance,
+                    NetPay = net,
+                    Status = PayrollStatusOptions.Draft,
+                    GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
+                    GeneratedDate = DateTime.Now
+                };
+                _db.Payrolls.Add(payroll);
+            }
+
             await _db.SaveChangesAsync();
 
             return Json(new
             {
                 success = true,
-                message = $"Payroll for {emp.FullName} has been saved.",
-                projectId
+                message = payrollId > 0
+                    ? $"Payroll for {emp.FullName} has been updated."
+                    : $"Payroll for {emp.FullName} has been saved.",
+                projectId,
+                payrollId = payroll.PayrollId,
+                isEdit = payrollId > 0
             });
         }
 
