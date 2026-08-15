@@ -30,28 +30,27 @@ namespace RSDSystem.Controllers
         {
             const int pageSize = 10;
 
-            var query = _db.Employees
-                           .Include(e => e.Project)
-                           .AsQueryable();
+            var query = _db.Employees.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var s = search.Trim();
+                var sDigits = s.Replace("-", "");
                 query = query.Where(e =>
-                    e.FirstName.Contains(s) ||
-                    e.LastName.Contains(s) ||
-                    e.JobClassification.Contains(s) ||
+                    (e.FirstName != null && e.FirstName.Contains(s)) ||
+                    (e.LastName != null && e.LastName.Contains(s)) ||
+                    (e.JobClassification != null && e.JobClassification.Contains(s)) ||
                     (e.EmployeeCode != null && e.EmployeeCode.Contains(s)) ||
-                    (e.EmployeeCode != null && e.EmployeeCode.Contains(s.Replace("-", ""))) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(sDigits)) ||
                     (e.Email != null && e.Email.Contains(s)) ||
-                    (e.Project != null && e.Project.ProjectName.Contains(s)));
+                    (e.Project != null && e.Project.ProjectName != null && e.Project.ProjectName.Contains(s)));
             }
 
             query = sortBy switch
             {
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
-                "assigned" => query.OrderBy(e => e.Project!.ProjectName),
+                "assigned" => query.OrderBy(e => e.Project != null ? e.Project.ProjectName : ""),
                 "status" => query.OrderByDescending(e => e.IsActive),
                 _ => query.OrderByDescending(e => e.DateAdded).ThenByDescending(e => e.EmployeeId)
             };
@@ -60,7 +59,39 @@ namespace RSDSystem.Controllers
             var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
 
-            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            var rows = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(e => new
+                {
+                    e.EmployeeId,
+                    EmployeeCode = e.EmployeeCode ?? "",
+                    FirstName = e.FirstName ?? "",
+                    LastName = e.LastName ?? "",
+                    MiddleInitial = e.MiddleInitial ?? "",
+                    PhotoPath = e.PhotoPath,
+                    JobClassification = e.JobClassification ?? "",
+                    e.DateAdded,
+                    e.IsActive,
+                    ProjectName = e.Project != null ? e.Project.ProjectName ?? "" : ""
+                })
+                .ToListAsync();
+
+            var items = rows.Select(e => new Employee
+            {
+                EmployeeId = e.EmployeeId,
+                EmployeeCode = e.EmployeeCode,
+                FirstName = e.FirstName,
+                LastName = e.LastName,
+                MiddleInitial = e.MiddleInitial,
+                PhotoPath = e.PhotoPath,
+                JobClassification = e.JobClassification,
+                DateAdded = e.DateAdded,
+                IsActive = e.IsActive,
+                Project = string.IsNullOrWhiteSpace(e.ProjectName)
+                    ? null
+                    : new Project { ProjectName = e.ProjectName }
+            }).ToList();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
@@ -71,13 +102,10 @@ namespace RSDSystem.Controllers
         }
 
         // GET /Employee/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             ViewBag.JobClassifications = JobClassifications;
-            ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
-                                  .OrderBy(p => p.ProjectName)
-                                  .ToList();
+            ViewBag.Projects = await ActiveProjectsAsync();
             return View(new Employee());
         }
 
@@ -106,10 +134,7 @@ namespace RSDSystem.Controllers
             if (!ModelState.IsValid)
             {
                 ViewBag.JobClassifications = JobClassifications;
-                ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
-                                      .OrderBy(p => p.ProjectName)
-                                      .ToList();
+                ViewBag.Projects = await ActiveProjectsAsync();
                 return View(emp);
             }
 
@@ -138,10 +163,7 @@ namespace RSDSystem.Controllers
             if (emp == null) return View("EmployeeNotFound");
 
             ViewBag.JobClassifications = JobClassifications;
-            ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
-                                  .OrderBy(p => p.ProjectName)
-                                  .ToList();
+            ViewBag.Projects = await ActiveProjectsAsync();
             return View(emp);
         }
 
@@ -170,10 +192,7 @@ namespace RSDSystem.Controllers
             if (!ModelState.IsValid)
             {
                 ViewBag.JobClassifications = JobClassifications;
-                ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
-                                      .OrderBy(p => p.ProjectName)
-                                      .ToList();
+                ViewBag.Projects = await ActiveProjectsAsync();
                 return View(emp);
             }
 
@@ -307,6 +326,26 @@ namespace RSDSystem.Controllers
             using var stream = new FileStream(filePath, FileMode.Create);
             await photo.CopyToAsync(stream);
             return $"/uploads/employees/{fileName}";
+        }
+
+        private async Task<List<Project>> ActiveProjectsAsync()
+        {
+            var rows = await _db.Projects
+                .AsNoTracking()
+                .Where(p => p.Status == "Active")
+                .OrderBy(p => p.ProjectName)
+                .Select(p => new
+                {
+                    p.ProjectId,
+                    ProjectName = p.ProjectName ?? ""
+                })
+                .ToListAsync();
+
+            return rows.Select(p => new Project
+            {
+                ProjectId = p.ProjectId,
+                ProjectName = p.ProjectName
+            }).ToList();
         }
 
         // Unique 5-digit biometric ID: 00001, 00002, ...

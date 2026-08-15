@@ -125,6 +125,24 @@ END");
             Console.WriteLine("Employee email schema fix error: " + ex.Message);
         }
 
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.Employees SET FirstName = N'' WHERE FirstName IS NULL;
+    UPDATE dbo.Employees SET LastName = N'' WHERE LastName IS NULL;
+    UPDATE dbo.Employees SET JobClassification = N'' WHERE JobClassification IS NULL;
+    UPDATE dbo.Employees SET ContactNumber = N'' WHERE ContactNumber IS NULL;
+    UPDATE dbo.Employees SET Address = N'' WHERE Address IS NULL;
+    UPDATE dbo.Employees SET Gender = N'' WHERE Gender IS NULL;
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Employee null-column fix error: " + ex.Message);
+        }
+
         var toAdd = new List<User>();
 
         if (!db.Users.Any(u => u.Username == "demo"))
