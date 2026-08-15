@@ -14,7 +14,7 @@ namespace RSDSystem.Models
         [MaxLength(150)]
         [RegularExpression(InputRules.ProjectNamePattern, ErrorMessage = InputRules.ProjectNameMessage)]
         [Display(Name = "Project Name")]
-        public string ProjectName { get; set; } = string.Empty;
+        public string? ProjectName { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Location is required.")]
         [MaxLength(250)]
@@ -52,7 +52,7 @@ namespace RSDSystem.Models
         [Display(Name = "Assigned to Payroll Staff")]
         public string? AssignedPayrollStaff { get; set; }
 
-        public string Status { get; set; } = "Active";
+        public string? Status { get; set; } = "Active";
 
         public bool TaskCompleted { get; set; } = false;   // ← new, drives "Mark as Done"
 
