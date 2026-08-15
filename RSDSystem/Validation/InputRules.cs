@@ -91,6 +91,17 @@ namespace RSDSystem.Validation
         public static int InclusiveDays(DateTime start, DateTime end) =>
             (end.Date - start.Date).Days + 1;
 
+        public static int CountWeekdays(DateTime start, DateTime end)
+        {
+            var days = 0;
+            for (var date = start.Date; date <= end.Date; date = date.AddDays(1))
+            {
+                if (date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday)
+                    days++;
+            }
+            return days;
+        }
+
         public static IEnumerable<ValidationResult> ValidateDateRange(
             DateTime? start,
             DateTime? end,

@@ -87,6 +87,31 @@
         return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
     }
 
+    function weekdayCount(startIso, endIso) {
+        const total = inclusiveDays(startIso, endIso);
+        if (total === null) return 1;
+        const start = new Date(startIso + 'T00:00:00');
+        let days = 0;
+        for (let i = 0; i < total; i++) {
+            const day = new Date(start.getTime());
+            day.setDate(start.getDate() + i);
+            const weekday = day.getDay();
+            if (weekday !== 0 && weekday !== 6) days++;
+        }
+        return days > 0 ? days : 1;
+    }
+
+    function fillDaysFromPeriod() {
+        const start = document.getElementById('payPeriodStart').value;
+        const end = document.getElementById('payPeriodEnd').value;
+        const daysEl = document.getElementById('regularDaysWorked');
+        if (!daysEl || !start || !end) return;
+        daysEl.value = String(weekdayCount(start, end));
+        daysEl.classList.remove('is-invalid');
+        const dest = slipForm.querySelector('[data-error-for="regularDaysWorked"]');
+        if (dest) dest.textContent = '';
+    }
+
     function validateSlipExtras() {
         let ok = true;
         const start = document.getElementById('payPeriodStart').value;
@@ -96,11 +121,6 @@
         const ot = parseFloat(document.getElementById('overtimeHours').value) || 0;
         const cash = parseFloat(document.getElementById('cashAdvance').value) || 0;
         const periodDays = inclusiveDays(start, end);
-
-        if (periodDays !== null && periodDays > 31) {
-            showFieldError('payPeriodEnd', 'Pay period cannot be longer than 31 days.');
-            ok = false;
-        }
 
         if (periodDays !== null && daysWorked + absent > periodDays) {
             showFieldError('regularDaysWorked', 'Days worked plus absences cannot exceed the pay period.');
@@ -143,9 +163,18 @@
         return ok;
     }
 
-    document.getElementById('payPeriodStart').addEventListener('change', syncPeriodBounds);
-    document.getElementById('payPeriodEnd').addEventListener('change', syncPeriodBounds);
+    document.getElementById('payPeriodStart').addEventListener('change', function () {
+        syncPeriodBounds();
+        fillDaysFromPeriod();
+    });
+    document.getElementById('payPeriodEnd').addEventListener('change', function () {
+        syncPeriodBounds();
+        fillDaysFromPeriod();
+    });
     syncPeriodBounds();
+    if (!parseInt(document.getElementById('regularDaysWorked').value, 10)) {
+        fillDaysFromPeriod();
+    }
 
     slipForm.addEventListener('submit', async function (e) {
         e.preventDefault();
