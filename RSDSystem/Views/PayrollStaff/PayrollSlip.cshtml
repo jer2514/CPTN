@@ -3,6 +3,9 @@
     ViewData["Title"] = "Generate Payroll Slip";
     Layout = "_PayrollStaffLayout";
     var project = ViewBag.Project as RSDSystem.Models.Project;
+    var schedules = ViewBag.Schedules as List<RSDSystem.Models.PayrollSchedule> ?? new();
+    var minDate = ViewBag.MinDate as string ?? "";
+    var maxDate = ViewBag.MaxDate as string ?? "";
 }
 
 
@@ -17,7 +20,7 @@
 <div class="slip-card">
     <div class="slip-title">Generate Payroll Slip</div>
 
-    <form id="payrollSlipForm">
+    <form id="payrollSlipForm" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
         <input type="hidden" name="employeeId" value="@Model.EmployeeId" />
         <input type="hidden" name="projectId" value="@project?.ProjectId" />
@@ -52,41 +55,67 @@
             </div>
         </div>
 
+        @if (schedules.Count > 0)
+        {
+            <div class="slip-schedule-hint">
+                Pay period must fall within a payroll schedule:
+                @string.Join(" · ", schedules.Select(s =>
+                    $"{s.StartingDate:MMM d, yyyy} – {s.EndDate:MMM d, yyyy}"))
+            </div>
+        }
+
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Pay Period Starting Date</label>
-                <input type="date" name="payPeriodStart" class="form-ctrl"
-                       value="@ViewBag.DefaultStart" required />
+                <label class="form-lbl">Pay Period Starting Date <span class="req-star">*</span></label>
+                <input type="date" name="payPeriodStart" id="payPeriodStart" class="form-ctrl"
+                       value="@ViewBag.DefaultStart"
+                       min="@minDate" max="@maxDate"
+                       data-validate="required|dateWithin" data-label="Pay period starting date"
+                       data-min="@minDate" data-max="@maxDate" />
+                <span class="field-error" data-error-for="payPeriodStart"></span>
             </div>
             <div>
-                <label class="form-lbl">Pay Period Ending Date</label>
-                <input type="date" name="payPeriodEnd" class="form-ctrl"
-                       value="@ViewBag.DefaultEnd" required />
+                <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
+                <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
+                       value="@ViewBag.DefaultEnd"
+                       min="@minDate" max="@maxDate"
+                       data-validate="required|dateAfter|dateWithin" data-after="payPeriodStart"
+                       data-label="Pay period ending date"
+                       data-min="@minDate" data-max="@maxDate" />
+                <span class="field-error" data-error-for="payPeriodEnd"></span>
             </div>
         </div>
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Regular Days Worked</label>
-                <input type="number" name="regularDaysWorked" class="form-ctrl"
-                       step="1" min="0" value="0" required />
+                <label class="form-lbl">Regular Days Worked <span class="req-star">*</span></label>
+                <input type="number" name="regularDaysWorked" id="regularDaysWorked" class="form-ctrl"
+                       step="1" min="1" value="0"
+                       data-validate="positiveInt" data-label="Regular days worked" />
+                <span class="field-error" data-error-for="regularDaysWorked"></span>
             </div>
             <div>
                 <label class="form-lbl">Absent Days</label>
-                <input type="number" name="absentDays" class="form-ctrl"
-                       step="1" min="0" value="0" />
+                <input type="number" name="absentDays" id="absentDays" class="form-ctrl"
+                       step="1" min="0" value="0"
+                       data-validate="nonNegInt" data-label="Absent days" />
+                <span class="field-error" data-error-for="absentDays"></span>
             </div>
         </div>
 
         <div class="form-row form-row-2">
             <div>
                 <label class="form-lbl">Overtime (Hours)</label>
-                <input type="number" name="overtimeHours" class="form-ctrl"
-                       step="0.5" min="0" value="0" />
+                <input type="number" name="overtimeHours" id="overtimeHours" class="form-ctrl"
+                       step="0.5" min="0" value="0"
+                       data-validate="nonNeg" data-label="Overtime hours" />
+                <span class="field-error" data-error-for="overtimeHours"></span>
             </div>
             <div>
                 <label class="form-lbl">Cash Advance</label>
-                <input type="number" name="cashAdvance" class="form-ctrl"
-                       step="0.01" min="0" value="0" />
+                <input type="number" name="cashAdvance" id="cashAdvance" class="form-ctrl"
+                       step="0.01" min="0" value="0"
+                       data-validate="nonNeg" data-label="Cash advance" />
+                <span class="field-error" data-error-for="cashAdvance"></span>
             </div>
         </div>
 
@@ -109,16 +138,90 @@
 </div>
 
 @section Scripts {
+    <partial name="_FormValidationScripts" />
     <script>
-        const slipForm   = document.getElementById('payrollSlipForm');
+        const slipForm = document.getElementById('payrollSlipForm');
         const generateBtn = document.getElementById('generateBtn');
         const successOverlay = document.getElementById('successOverlay');
-        const successMsg  = document.getElementById('successMsg');
+        const successMsg = document.getElementById('successMsg');
         const successOkBtn = document.getElementById('successOkBtn');
+        const dailyRate = @Model.DailyRate.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        const hourlyRate = @Model.RatePerHour.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        const schedules = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            schedules.Select(s => new {
+                start = s.StartingDate.ToString("yyyy-MM-dd"),
+                end = s.EndDate.ToString("yyyy-MM-dd")
+            })));
         let redirectProjectId = null;
+
+        function showFieldError(name, message) {
+            const field = slipForm.querySelector('[name="' + name + '"]');
+            const dest = slipForm.querySelector('[data-error-for="' + name + '"]');
+            if (field) field.classList.toggle('is-invalid', !!message);
+            if (dest) dest.textContent = message || '';
+        }
+
+        function clearServerErrors() {
+            ['payPeriodStart', 'payPeriodEnd', 'regularDaysWorked', 'absentDays', 'overtimeHours', 'cashAdvance']
+                .forEach(name => showFieldError(name, ''));
+        }
+
+        function inclusiveDays(startIso, endIso) {
+            if (!startIso || !endIso) return null;
+            const start = new Date(startIso + 'T00:00:00');
+            const end = new Date(endIso + 'T00:00:00');
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return null;
+            return Math.round((end - start) / 86400000) + 1;
+        }
+
+        function validateSlipExtras() {
+            let ok = true;
+            const start = document.getElementById('payPeriodStart').value;
+            const end = document.getElementById('payPeriodEnd').value;
+            const daysWorked = parseInt(document.getElementById('regularDaysWorked').value, 10) || 0;
+            const absent = parseInt(document.getElementById('absentDays').value, 10) || 0;
+            const ot = parseFloat(document.getElementById('overtimeHours').value) || 0;
+            const cash = parseFloat(document.getElementById('cashAdvance').value) || 0;
+            const periodDays = inclusiveDays(start, end);
+
+            if (periodDays !== null && periodDays > 31) {
+                showFieldError('payPeriodEnd', 'Pay period cannot be longer than 31 days.');
+                ok = false;
+            }
+
+            if (periodDays !== null && daysWorked + absent > periodDays) {
+                showFieldError('regularDaysWorked', 'Days worked plus absences cannot exceed the pay period.');
+                ok = false;
+            }
+
+            if (daysWorked > 0 && ot > daysWorked * 24) {
+                showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
+                ok = false;
+            }
+
+            const gross = (dailyRate * daysWorked) + (hourlyRate * ot);
+            if (cash > gross) {
+                showFieldError('cashAdvance', 'Cash advance cannot be greater than gross pay.');
+                ok = false;
+            }
+
+            if (schedules.length && start && end) {
+                const inside = schedules.some(s => s.start <= start && end <= s.end);
+                if (!inside) {
+                    showFieldError('payPeriodStart', 'Pay period must fall within a payroll schedule for this project.');
+                    ok = false;
+                }
+            }
+
+            return ok;
+        }
 
         slipForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+            clearServerErrors();
+
+            if (window.RsdFormValidation && !window.RsdFormValidation.validate(slipForm)) return;
+            if (!validateSlipExtras()) return;
 
             generateBtn.disabled = true;
             generateBtn.textContent = 'Generating...';
@@ -135,12 +238,16 @@
                     redirectProjectId = data.projectId;
                     successOverlay.classList.add('open');
                 } else {
-                    alert(data.message || 'Failed to generate payroll.');
+                    if (data.errors) {
+                        Object.keys(data.errors).forEach(function (name) {
+                            showFieldError(name, data.errors[name]);
+                        });
+                    }
                     generateBtn.disabled = false;
                     generateBtn.textContent = 'Generate Payroll';
                 }
             } catch (err) {
-                alert('Something went wrong.');
+                showFieldError('regularDaysWorked', 'Something went wrong. Please try again.');
                 generateBtn.disabled = false;
                 generateBtn.textContent = 'Generate Payroll';
             }

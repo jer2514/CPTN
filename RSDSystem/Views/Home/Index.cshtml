@@ -102,7 +102,8 @@
             <thead>
                 <tr>
                     <th>Project Name</th>
-                    <th>Date</th>
+                    <th>Starting Date</th>
+                    <th>End Date</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -110,7 +111,7 @@
                 @if (!schedules.Any())
                 {
                     <tr>
-                        <td colspan="3" class="text-center text-muted py-4">
+                        <td colspan="4" class="text-center text-muted py-4">
                             No schedules yet.
                         </td>
                     </tr>
@@ -119,7 +120,8 @@
                 {
                     <tr>
                         <td>@(s.Project?.ProjectName ?? "—")</td>
-                        <td>@s.StartingDate.ToString("MM-dd-yy") &ndash; @s.EndDate.ToString("MM-dd-yy")</td>
+                        <td>@s.StartingDate.ToString("MMM d, yyyy")</td>
+                        <td>@s.EndDate.ToString("MMM d, yyyy")</td>
                         <td>
                             <div class="action-cell">
                                 <button type="button" class="action-btn action-edit" title="Edit"
@@ -148,14 +150,15 @@
     <div class="del-modal dash-schedule-modal">
         <div class="del-title mb-3" id="scheduleModalTitle">Payroll Schedule</div>
 
-        <form id="scheduleForm" asp-controller="Payroll" asp-action="AddSchedule" method="post">
+        <form id="scheduleForm" asp-controller="Payroll" asp-action="AddSchedule" method="post" class="js-validate" novalidate>
             @Html.AntiForgeryToken()
             <input type="hidden" name="PayrollScheduleId" id="schedulePayrollScheduleId" value="" />
 
             <div class="form-row form-row-2">
                 <div>
-                    <label class="form-lbl">Project Name</label>
-                    <select name="ProjectId" id="scheduleProjectSelect" class="form-ctrl" required
+                    <label class="form-lbl">Project Name <span class="req-star">*</span></label>
+                    <select name="ProjectId" id="scheduleProjectSelect" class="form-ctrl"
+                            data-validate="required" data-label="Project"
                             onchange="autoFillProjectType(this.value)">
                         <option value="">Select project</option>
                         @foreach (var p in activeProjects)
@@ -163,27 +166,35 @@
                             <option value="@p.ProjectId">@p.ProjectName</option>
                         }
                     </select>
+                    <span class="field-error" data-error-for="ProjectId"></span>
                 </div>
                 <div>
-                    <label class="form-lbl">Type of Project</label>
-                    <select name="TypeOfService" id="scheduleTypeSelect" class="form-ctrl">
+                    <label class="form-lbl">Type of Project <span class="req-star">*</span></label>
+                    <select name="TypeOfService" id="scheduleTypeSelect" class="form-ctrl"
+                            data-validate="required" data-label="Type of project">
                         <option value="">Select type</option>
                         @foreach (var s in services)
                         {
                             <option value="@s">@s</option>
                         }
                     </select>
+                    <span class="field-error" data-error-for="TypeOfService"></span>
                 </div>
             </div>
 
             <div class="form-row form-row-2">
                 <div>
-                    <label class="form-lbl">Starting Date</label>
-                    <input type="date" name="StartingDate" id="scheduleStartDate" class="form-ctrl" required />
+                    <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
+                    <input type="date" name="StartingDate" id="scheduleStartDate" class="form-ctrl"
+                           data-validate="required|dateWithin" data-label="Starting date" />
+                    <span class="field-error" data-error-for="StartingDate"></span>
                 </div>
                 <div>
-                    <label class="form-lbl">End Date</label>
-                    <input type="date" name="EndDate" id="scheduleEndDate" class="form-ctrl" required />
+                    <label class="form-lbl">End Date <span class="req-star">*</span></label>
+                    <input type="date" name="EndDate" id="scheduleEndDate" class="form-ctrl"
+                           data-validate="required|dateAfter|dateWithin" data-after="scheduleStartDate"
+                           data-label="End date" />
+                    <span class="field-error" data-error-for="EndDate"></span>
                 </div>
             </div>
 
@@ -221,13 +232,35 @@
 </div>
 
 @section Scripts {
+    <partial name="_FormValidationScripts" />
     <script>
         const projectTypeMap = @Html.Raw(JsonSerializer.Serialize(projectTypeMap));
+        const projectDateMap = @Html.Raw(JsonSerializer.Serialize(ViewBag.ProjectDateMap));
+
+        function clearScheduleErrors() {
+            const form = document.getElementById('scheduleForm');
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+        }
+
+        function applyProjectDateBounds(projectId) {
+            const range = projectDateMap[projectId] || {};
+            ['scheduleStartDate', 'scheduleEndDate'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (range.start) el.setAttribute('data-min', range.start);
+                else el.removeAttribute('data-min');
+                if (range.end) el.setAttribute('data-max', range.end);
+                else el.removeAttribute('data-max');
+                el.min = range.start || '';
+                el.max = range.end || '';
+            });
+        }
 
         function autoFillProjectType(projectId) {
             const typeSelect = document.getElementById('scheduleTypeSelect');
             const type = projectTypeMap[projectId];
             typeSelect.value = type ? type : "";
+            applyProjectDateBounds(projectId);
         }
 
         function openScheduleModal() {
@@ -239,6 +272,8 @@
             document.getElementById('scheduleTypeSelect').value = '';
             document.getElementById('scheduleStartDate').value = '';
             document.getElementById('scheduleEndDate').value = '';
+            applyProjectDateBounds('');
+            clearScheduleErrors();
             document.getElementById('scheduleOverlay').classList.add('open');
         }
 
@@ -251,6 +286,8 @@
             document.getElementById('scheduleTypeSelect').value = typeOfService;
             document.getElementById('scheduleStartDate').value = startDate;
             document.getElementById('scheduleEndDate').value = endDate;
+            applyProjectDateBounds(String(projectId));
+            clearScheduleErrors();
             document.getElementById('scheduleOverlay').classList.add('open');
         }
 

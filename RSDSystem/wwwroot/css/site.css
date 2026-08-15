@@ -216,7 +216,7 @@ body {
 }
 
 .dash-schedule-modal {
-    width: 460px;
+    width: 520px;
     text-align: left;
 }
 
@@ -1897,6 +1897,17 @@ button.badge-btn {
     font-size: 13.5px;
     font-weight: 600;
     color: #266DF1;
+}
+
+.slip-schedule-hint {
+    background: #eef4ff;
+    border: 1px solid #c5d8ff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #163F8B;
+    line-height: 1.4;
 }
 
 /* ── Pending Payroll — status rows & pills ──────────────── */

@@ -31,6 +31,17 @@ namespace RSDSystem.Controllers
             ViewBag.ActiveProjectsList = activeProjects;
             ViewBag.TypeOfServiceOptions = TypeOfServiceOptions.All;
             ViewBag.ProjectTypeMap = activeProjects.ToDictionary(p => p.ProjectId, p => p.TypeOfService ?? "");
+            ViewBag.ProjectDateMap = activeProjects.ToDictionary(
+                p => p.ProjectId,
+                p => new
+                {
+                    start = p.StartingDate.HasValue && p.StartingDate.Value.Year > 1900
+                        ? p.StartingDate.Value.ToString("yyyy-MM-dd")
+                        : "",
+                    end = p.EstimateEndDate.HasValue && p.EstimateEndDate.Value.Year > 1900
+                        ? p.EstimateEndDate.Value.ToString("yyyy-MM-dd")
+                        : ""
+                });
 
             // Payroll schedules list
             ViewBag.PayrollSchedules = await _db.PayrollSchedules

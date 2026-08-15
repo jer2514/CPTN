@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
 using RSDSystem.Models;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -98,24 +99,19 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> AddSchedule(int ProjectId, string? TypeOfService,
             DateTime StartingDate, DateTime EndDate)
         {
-            if (ProjectId == 0)
+            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate);
+            if (error != null)
             {
-                TempData["Error"] = "Please select a project.";
-                return RedirectToAction("Index", "Home");
-            }
-
-            if (StartingDate > EndDate)
-            {
-                TempData["Error"] = "Starting Date must be before End Date.";
+                TempData["Error"] = error;
                 return RedirectToAction("Index", "Home");
             }
 
             var schedule = new PayrollSchedule
             {
                 ProjectId = ProjectId,
-                TypeOfService = TypeOfService,
-                StartingDate = StartingDate,
-                EndDate = EndDate
+                TypeOfService = TypeOfService?.Trim(),
+                StartingDate = StartingDate.Date,
+                EndDate = EndDate.Date
             };
 
             _db.PayrollSchedules.Add(schedule);
@@ -134,20 +130,63 @@ namespace RSDSystem.Controllers
             var existing = await _db.PayrollSchedules.FindAsync(PayrollScheduleId);
             if (existing == null) return NotFound();
 
-            if (StartingDate > EndDate)
+            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate, PayrollScheduleId);
+            if (error != null)
             {
-                TempData["Error"] = "Starting Date must be before End Date.";
+                TempData["Error"] = error;
                 return RedirectToAction("Index", "Home");
             }
 
             existing.ProjectId = ProjectId;
-            existing.TypeOfService = TypeOfService;
-            existing.StartingDate = StartingDate;
-            existing.EndDate = EndDate;
+            existing.TypeOfService = TypeOfService?.Trim();
+            existing.StartingDate = StartingDate.Date;
+            existing.EndDate = EndDate.Date;
 
             await _db.SaveChangesAsync();
             TempData["Success"] = "Schedule updated.";
             return RedirectToAction("Index", "Home");
+        }
+
+        private async Task<string?> ValidateScheduleAsync(
+            int projectId,
+            string? typeOfService,
+            DateTime startingDate,
+            DateTime endDate,
+            int? excludeScheduleId = null)
+        {
+            if (projectId <= 0)
+                return "Please select a project.";
+
+            if (string.IsNullOrWhiteSpace(typeOfService))
+                return "Type of project is required.";
+
+            var rangeErrors = InputRules.ValidateDateRange(
+                startingDate, endDate,
+                nameof(PayrollSchedule.StartingDate), nameof(PayrollSchedule.EndDate),
+                "Starting date", "End date").ToList();
+            if (rangeErrors.Count > 0)
+                return rangeErrors[0].ErrorMessage;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return "Selected project was not found.";
+
+            if (InputRules.IsUsableDate(project.StartingDate) && startingDate.Date < project.StartingDate!.Value.Date)
+                return "Starting date cannot be before the project starting date.";
+
+            if (InputRules.IsUsableDate(project.EstimateEndDate) && endDate.Date > project.EstimateEndDate!.Value.Date)
+                return "End date cannot be after the project estimate end date.";
+
+            var overlaps = await _db.PayrollSchedules.AnyAsync(s =>
+                s.ProjectId == projectId &&
+                (!excludeScheduleId.HasValue || s.PayrollScheduleId != excludeScheduleId.Value) &&
+                s.StartingDate.Date <= endDate.Date &&
+                startingDate.Date <= s.EndDate.Date);
+
+            if (overlaps)
+                return "This date range overlaps an existing payroll schedule for the same project.";
+
+            return null;
         }
 
         // POST /Payroll/DeleteSchedule/{id}
