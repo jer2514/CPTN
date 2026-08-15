@@ -14,7 +14,7 @@
         <i class="bi bi-arrow-left"></i> Back
     </a>
 
-    @if (Model.Status != "Submitted")
+    @if (Model.Status == "Draft" || Model.Status == "Correction")
     {
         <a asp-action="PayrollSlip"
            asp-route-employeeId="@Model.EmployeeId"
