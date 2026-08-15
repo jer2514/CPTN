@@ -61,6 +61,14 @@ namespace RSDSystem.Models
                 .HasForeignKey(m => m.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Project>()
+                .Property(p => p.ProjectName)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.Status)
+                .IsRequired(false);
+
             modelBuilder.Entity<PayrollSchedule>()
                 .HasOne(s => s.Project)
                 .WithMany()

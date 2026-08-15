@@ -60,6 +60,34 @@ using (var scope = app.Services.CreateScope())
         try
         {
             db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Projects', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'Status' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN Status nvarchar(max) NULL;
+
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'ProjectName' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN ProjectName nvarchar(150) NULL;
+
+    UPDATE dbo.Projects SET Status = N'Active' WHERE Status IS NULL OR LTRIM(RTRIM(Status)) = N'';
+    UPDATE dbo.Projects SET ProjectName = N'' WHERE ProjectName IS NULL;
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Project null-column fix error: " + ex.Message);
+        }
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
 IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
 AND COL_LENGTH(N'dbo.Employees', N'Email') IS NOT NULL
 BEGIN
