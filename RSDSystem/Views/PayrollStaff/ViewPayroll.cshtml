@@ -16,7 +16,10 @@
 
     @if (Model.Status != "Submitted")
     {
-        <a asp-action="PayrollSlip" asp-route-employeeId="@Model.EmployeeId" asp-route-projectId="@Model.ProjectId"
+        <a asp-action="PayrollSlip"
+           asp-route-employeeId="@Model.EmployeeId"
+           asp-route-projectId="@Model.ProjectId"
+           asp-route-payrollId="@Model.PayrollId"
            class="btn-primary-blue">Edit</a>
     }
 </div>
