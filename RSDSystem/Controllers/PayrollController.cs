@@ -123,7 +123,7 @@ namespace RSDSystem.Controllers
                 ? $"Generated {created} payslip(s) for {project.ProjectName}."
                 : "Payslips for this period already exist.";
 
-            return RedirectToAction(nameof(Period), new
+            return RedirectToAction(nameof(GeneratedPayslips), new
             {
                 projectId,
                 start = start.ToString("yyyy-MM-dd"),
@@ -140,6 +140,40 @@ namespace RSDSystem.Controllers
             return View();
         }
 
+        public async Task<IActionResult> GeneratedPayslips(int projectId, DateTime start, DateTime end, int page = 1)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            const int pageSize = 4;
+            var slips = await _db.Payrolls
+                .Include(p => p.Employee)
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .OrderByDescending(p => p.GeneratedDate)
+                .ThenByDescending(p => p.PayrollId)
+                .ToListAsync();
+
+            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            ViewBag.PageTitle = "View Payroll";
+            ViewBag.ProjectId = projectId;
+            ViewBag.ProjectName = project.ProjectName;
+            ViewBag.Start = start.Date;
+            ViewBag.End = end.Date;
+            ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+        }
+
         public async Task<IActionResult> PrintPayslips(int projectId, DateTime start, DateTime end)
         {
             var blocked = RequireAdmin();
@@ -148,17 +182,15 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var slips = (await _db.Payrolls
+            var slips = await _db.Payrolls
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
-                .ToListAsync())
-                .Where(IsApproved)
-                .OrderBy(p => p.Employee?.LastName)
-                .ThenBy(p => p.Employee?.FirstName)
-                .ToList();
+                .OrderBy(p => p.Employee != null ? p.Employee.LastName : "")
+                .ThenBy(p => p.Employee != null ? p.Employee.FirstName : "")
+                .ToListAsync();
 
             ViewBag.ProjectName = project.ProjectName;
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
@@ -177,17 +209,14 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var slips = await _db.Payrolls
-                .Where(p => p.ProjectId == projectId
-                    && p.PayPeriodStart.Date == start.Date
-                    && p.PayPeriodEnd.Date == end.Date)
-                .ToListAsync();
-            var count = slips.Count(IsApproved);
+            var count = await _db.Payrolls.CountAsync(p => p.ProjectId == projectId
+                && p.PayPeriodStart.Date == start.Date
+                && p.PayPeriodEnd.Date == end.Date);
 
             if (count == 0)
             {
-                TempData["Error"] = "There are no approved payslips to send for this period.";
-                return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+                TempData["Error"] = "There are no payslips to send for this period.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
 
             var staff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff)
@@ -195,7 +224,7 @@ namespace RSDSystem.Controllers
                 : project.AssignedPayrollStaff;
 
             TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
-            return RedirectToAction(nameof(Period), new
+            return RedirectToAction(nameof(GeneratedPayslips), new
             {
                 projectId,
                 start = start.ToString("yyyy-MM-dd"),

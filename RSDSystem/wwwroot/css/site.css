@@ -2491,6 +2491,15 @@ button.badge-btn {
 
 .pred-back {
     margin-bottom: 0;
+    background: #111;
+    color: #fff;
+    border-color: #111;
+    box-shadow: none;
+}
+
+.pred-back:hover {
+    background: #333;
+    color: #fff;
 }
 
 .pred-heading-row {
