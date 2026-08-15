@@ -25,8 +25,10 @@ namespace RSDSystem.Controllers
         };
 
         // GET /Employee
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
+            const int pageSize = 10;
+
             var query = _db.Employees
                            .Include(e => e.Project)
                            .AsQueryable();
@@ -37,25 +39,33 @@ namespace RSDSystem.Controllers
                 query = query.Where(e =>
                     e.FirstName.Contains(s) ||
                     e.LastName.Contains(s) ||
-                    e.JobClassification.Contains(s));
+                    e.JobClassification.Contains(s) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(s)) ||
+                    (e.Email != null && e.Email.Contains(s)) ||
+                    (e.Project != null && e.Project.ProjectName.Contains(s)));
             }
 
             query = sortBy switch
             {
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
-                _ => query.OrderBy(e => e.EmployeeId)
-            }; query = sortBy switch
-            {
-                "lastname" => query.OrderBy(e => e.LastName),
-                "job" => query.OrderBy(e => e.JobClassification),
+                "assigned" => query.OrderBy(e => e.Project!.ProjectName),
+                "status" => query.OrderByDescending(e => e.IsActive),
                 _ => query.OrderByDescending(e => e.DateAdded).ThenByDescending(e => e.EmployeeId)
             };
 
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /Employee/Create
