@@ -27,92 +27,99 @@
             font-size: 13px;
             color: #555;
         }
-        .no-print button {
-            margin-bottom: 8px;
-        }
-        .slip {
+        .no-print button { margin-bottom: 8px; }
+        .sheet {
+            width: 8.5in;
+            height: 11in;
+            margin: 16px auto;
+            padding: 0.28in;
             background: #fff;
             border: 1.5px solid #266DF1;
-            width: 8.5in;
-            min-height: 11in;
-            margin: 16px auto;
-            padding: 0.7in 0.75in;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 0.16in;
+            page-break-after: always;
+        }
+        .sheet:last-child { page-break-after: auto; }
+        .slip {
+            border: 1px solid #266DF1;
+            padding: 10px 12px 8px;
+            overflow: hidden;
+            background: #fff;
         }
         .title {
             text-align: center;
-            font-size: 22px;
+            font-size: 13px;
             font-weight: 700;
             color: #266DF1;
-            letter-spacing: .2px;
         }
         .subtitle {
             text-align: center;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 500;
             color: #000;
-            margin: 4px 0 28px;
+            margin: 1px 0 8px;
         }
         .section {
-            font-size: 13px;
+            font-size: 10.5px;
             font-weight: 700;
             color: #0d7a3e;
             border-bottom: 1px solid #111;
-            padding-bottom: 4px;
-            margin: 22px 0 12px;
+            padding-bottom: 2px;
+            margin: 7px 0 5px;
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            gap: 16px;
+            gap: 6px;
         }
         .period-val {
-            font-size: 13px;
+            font-size: 9px;
             font-weight: 600;
             color: #266DF1;
+            white-space: nowrap;
         }
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            column-gap: 48px;
-            row-gap: 8px;
-            font-size: 13px;
+            column-gap: 10px;
+            row-gap: 3px;
+            font-size: 10px;
         }
         .fields {
             display: grid;
-            grid-template-columns: 170px 1fr;
-            row-gap: 6px;
-            column-gap: 18px;
-            font-size: 13px;
-            max-width: 420px;
+            grid-template-columns: 112px 1fr;
+            row-gap: 2px;
+            column-gap: 8px;
+            font-size: 10px;
         }
-        .fields.pay { margin-top: 2px; }
-        .gap { height: 10px; grid-column: 1 / -1; }
+        .gap { height: 6px; grid-column: 1 / -1; }
         .net-rule {
             border: none;
             border-top: 1px solid #111;
-            margin: 14px 0 10px;
+            margin: 6px 0 5px;
         }
         .lbl { color: #111; }
         .val { color: #266DF1; font-weight: 600; }
         .footer {
-            margin-top: 36px;
-            font-size: 13px;
+            margin-top: 8px;
+            font-size: 10px;
             color: #266DF1;
             font-weight: 600;
         }
         @@page {
             size: letter;
-            margin: 0.4in;
+            margin: 0.25in;
         }
         @@media print {
             body { background: #fff; }
             .no-print { display: none; }
-            .slip {
+            .sheet {
                 width: auto;
-                min-height: calc(10in);
+                height: 10.5in;
                 margin: 0;
-                page-break-after: always;
+                border: none;
             }
-            .slip:last-child { page-break-after: auto; }
         }
     </style>
 </head>
@@ -127,47 +134,52 @@
     }
     else
     {
-        @foreach (var slip in Model)
+        @for (var i = 0; i < Model.Count; i += 4)
         {
-            var job = slip.Employee?.JobClassification;
-            <div class="slip">
-                <div class="title">RSD Construction Services</div>
-                <div class="subtitle">Employee Payslip</div>
+            <div class="sheet">
+                @for (var n = i; n < i + 4 && n < Model.Count; n++)
+                {
+                    var slip = Model[n];
+                    <div class="slip">
+                        <div class="title">RSD Construction Services</div>
+                        <div class="subtitle">Employee Payslip</div>
 
-                <div class="section">Employee Information</div>
-                <div class="info-grid">
-                    <div><span class="lbl">Employee ID: </span><span class="val">@IdFormatter.Format(slip.Employee?.EmployeeCode)</span></div>
-                    <div><span class="lbl">Project Assigned: </span><span class="val">@(slip.Project?.ProjectName ?? projectName)</span></div>
-                    <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "")</span></div>
-                    <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
-                    <div><span class="lbl">Job Classification: </span><span class="val">@job</span></div>
-                    <div><span class="lbl">Rate per hour: </span><span class="val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
-                </div>
+                        <div class="section">Employee Information</div>
+                        <div class="info-grid">
+                            <div><span class="lbl">Employee ID: </span><span class="val">@IdFormatter.Format(slip.Employee?.EmployeeCode)</span></div>
+                            <div><span class="lbl">Project Assigned: </span><span class="val">@(slip.Project?.ProjectName ?? projectName)</span></div>
+                            <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "")</span></div>
+                            <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
+                            <div><span class="lbl">Job Classification: </span><span class="val">@(slip.Employee?.JobClassification)</span></div>
+                            <div><span class="lbl">Rate per hour: </span><span class="val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                        </div>
 
-                <div class="section">
-                    Attendance Summary
-                    <span class="period-val">@slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
-                </div>
-                <div class="fields">
-                    <span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span>
-                    <span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span>
-                    <span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span>
-                </div>
+                        <div class="section">
+                            Attendance Summary
+                            <span class="period-val">@slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
+                        </div>
+                        <div class="fields">
+                            <span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span>
+                            <span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span>
+                            <span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span>
+                        </div>
 
-                <div class="section">Payroll Computation</div>
-                <div class="fields pay">
-                    <span class="lbl">Regular Pay:</span><span class="val">₱@slip.RegularPay.ToString("N2")</span>
-                    <span class="lbl">Overtime Pay:</span><span class="val">₱@slip.OvertimePay.ToString("N2")</span>
-                    <span class="gap"></span>
-                    <span class="lbl">Gross Pay:</span><span class="val">₱@slip.GrossPay.ToString("N2")</span>
-                    <span class="lbl">Cash Advance:</span><span class="val">₱@slip.CashAdvance.ToString("N2")</span>
-                </div>
-                <hr class="net-rule" />
-                <div class="fields">
-                    <span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span>
-                </div>
+                        <div class="section">Payroll Computation</div>
+                        <div class="fields">
+                            <span class="lbl">Regular Pay:</span><span class="val">₱@slip.RegularPay.ToString("N2")</span>
+                            <span class="lbl">Overtime Pay:</span><span class="val">₱@slip.OvertimePay.ToString("N2")</span>
+                            <span class="gap"></span>
+                            <span class="lbl">Gross Pay:</span><span class="val">₱@slip.GrossPay.ToString("N2")</span>
+                            <span class="lbl">Cash Advance:</span><span class="val">₱@slip.CashAdvance.ToString("N2")</span>
+                        </div>
+                        <hr class="net-rule" />
+                        <div class="fields">
+                            <span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span>
+                        </div>
 
-                <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                        <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                    </div>
+                }
             </div>
         }
     }
