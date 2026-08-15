@@ -17,15 +17,40 @@
 </a>
 
 <div class="form-card" style="max-width:680px">
+    @{
+        var currentStatus = ProjectStatusOptions.Normalize(Model.Status);
+    }
 
-    <div class="proj-view-actions">
-        <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
-            <i class="bi bi-pencil-fill"></i>
-        </a>
-        <button type="button" class="action-btn action-delete" title="Delete"
-                onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw(Model.ProjectName.Replace("'", "\\'"))')">
-            <i class="bi bi-trash-fill"></i>
-        </button>
+    <div class="proj-view-toolbar">
+        <div class="proj-status-pills">
+            <span class="form-lbl mb-0">Status:</span>
+            @foreach (var option in ProjectStatusOptions.All)
+            {
+                var pillClass = "proj-status-pill " + ProjectStatusOptions.BadgeClass(option);
+                if (currentStatus == option)
+                {
+                    <span class="@pillClass is-current">@option</span>
+                }
+                else
+                {
+                    <form asp-action="SetStatus" method="post" class="proj-status-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.ProjectId" />
+                        <input type="hidden" name="status" value="@option" />
+                        <button type="submit" class="@pillClass is-idle">@option</button>
+                    </form>
+                }
+            }
+        </div>
+        <div class="proj-view-actions">
+            <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
+                <i class="bi bi-pencil-fill"></i>
+            </a>
+            <button type="button" class="action-btn action-delete" title="Delete"
+                    onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw((Model.ProjectName ?? "").Replace("'", "\\'"))')">
+                <i class="bi bi-trash-fill"></i>
+            </button>
+        </div>
     </div>
 
     <div class="proj-view-group">
@@ -92,13 +117,6 @@
     <div class="proj-view-group">
         <div class="form-lbl">Assigned to Payroll Staff</div>
         <div class="proj-view-field">@(Model.AssignedPayrollStaff ?? "—")</div>
-    </div>
-
-    <div class="proj-view-group">
-        <div class="proj-status-line">
-            <span class="form-lbl mb-0">Status:</span>
-            <span class="proj-status-badge @ProjectStatusOptions.BadgeClass(Model.Status)">@ProjectStatusOptions.Normalize(Model.Status)</span>
-        </div>
     </div>
 
     <div class="proj-view-group mt-3">

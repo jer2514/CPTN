@@ -1420,11 +1420,75 @@ select.form-ctrl {
     }
 
 /* ── Project view page ───────────────────────────────────── */
+.proj-view-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
 .proj-view-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-bottom: 14px;
+    margin-bottom: 0;
+}
+
+.proj-status-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.proj-status-pills .form-lbl {
+    display: inline;
+    margin-bottom: 0;
+    margin-right: 4px;
+}
+
+.proj-status-form {
+    display: inline;
+    margin: 0;
+}
+
+.proj-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 88px;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #111;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.proj-status-pill.is-idle {
+    opacity: 0.38;
+}
+
+.proj-status-pill.is-current {
+    opacity: 1;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(22, 63, 139, 0.35);
+    cursor: default;
+}
+
+.proj-status-finished {
+    background: #266DF1;
+}
+
+.proj-status-ongoing {
+    background: #22c55e;
+}
+
+.proj-status-hold {
+    background: #f59e0b;
 }
 
 .proj-view-group {
@@ -1452,42 +1516,6 @@ select.form-ctrl {
 .proj-emp-count {
     font-size: 12px;
     color: #6b87c0;
-}
-
-.proj-status-line {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.proj-status-line .form-lbl {
-    display: inline;
-    margin-bottom: 0;
-}
-
-.proj-status-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 92px;
-    padding: 6px 16px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #111;
-    line-height: 1.2;
-}
-
-.proj-status-finished {
-    background: #266DF1;
-}
-
-.proj-status-ongoing {
-    background: #22c55e;
-}
-
-.proj-status-hold {
-    background: #f59e0b;
 }
 
 /* ── Assigned Employees action buttons ─────────────────── */

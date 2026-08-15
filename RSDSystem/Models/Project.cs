@@ -165,5 +165,15 @@ namespace RSDSystem.Models
         public static IQueryable<Project> Ongoing(this IQueryable<Project> projects) =>
             projects.Where(p => p.Status == OnGoing || p.Status == "Active"
                 || p.Status == null || p.Status == "");
+
+        public static IQueryable<Project> WithStatus(this IQueryable<Project> projects, string? status)
+        {
+            var filter = Normalize(status);
+            if (filter == Finished)
+                return projects.Where(p => p.Status == Finished || p.Status == "Completed");
+            if (filter == OnHold)
+                return projects.Where(p => p.Status == OnHold || p.Status == "Cancelled");
+            return projects.Ongoing();
+        }
     }
 }
