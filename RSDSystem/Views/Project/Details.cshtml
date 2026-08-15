@@ -21,21 +21,19 @@
 <style>
     .proj-view-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
     .proj-view-toolbar .proj-view-actions { margin-bottom: 0; }
-    .proj-status-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .proj-status-pills .form-lbl { display: inline; margin-bottom: 0; }
-    .proj-status-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 88px; padding: 6px 18px; border-radius: 20px; font-size: 12.5px; font-weight: 600; line-height: 1.2; }
-    .proj-status-badge.badge-ongoing { background: #22c55e; color: #111; }
-    .proj-status-badge.badge-hold { background: #f59e0b; color: #111; }
-    .proj-status-badge.badge-finished { background: #266DF1; color: #fff; }
-    .proj-emp-table-wrap { border: 1.5px solid #C9DAFF; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+    .proj-status-line { display: flex; align-items: center; gap: 8px; }
+    .proj-status-line .form-lbl { display: inline; margin-bottom: 0; }
+    .badge-ongoing { background: #22c55e; color: #111; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
+    .badge-finished { background: #266DF1; color: #fff; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
+    .badge-hold { background: #f59e0b; color: #111; border-radius: 20px; padding: 6px 18px; font-size: 12.5px; font-weight: 600; }
 </style>
 
 <div class="form-card" style="max-width:680px">
 
     <div class="proj-view-toolbar">
-        <div class="proj-status-pills">
+        <div class="proj-status-line">
             <span class="form-lbl">Status:</span>
-            <span class="proj-status-badge @statusClass">@statusLabel</span>
+            <span class="@statusClass">@statusLabel</span>
         </div>
         <div class="proj-view-actions">
             <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
@@ -96,7 +94,7 @@
                 @foreach (var b in budgets)
                 {
                     <div class="proj-month-row">
-                        <span class="proj-month-label">Month of @b.MonthDate.ToString("MMMM", System.Globalization.CultureInfo.InvariantCulture)</span>
+                        <span class="proj-month-label">Month of @b.MonthYear</span>
                         <span class="proj-month-amount">₱@b.Amount.ToString("N2")</span>
                     </div>
                 }
@@ -121,7 +119,33 @@
                 Total Employees: <strong id="empTotalCount">@employees.Count</strong>
             </span>
         </div>
-        <div class="proj-emp-table-wrap">
+        <div class="emp-action-btns">
+            <button type="button" class="btn-outline-blue" onclick="openViewEmpModal()">
+                <i class="bi bi-people-fill"></i> View Employees
+            </button>
+            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
+                <i class="bi bi-person-plus-fill"></i> Add Employees
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ VIEW EMPLOYEES OVERLAY ============ -->
+<div class="del-overlay" id="viewEmpOverlay" onclick="closeViewEmpModal(arguments[0])">
+    <div class="del-modal emp-modal">
+        <div class="emp-modal-head">
+            <span class="emp-modal-title">Assigned Employees</span>
+            <button type="button" class="emp-modal-close" onclick="closeViewEmpModal()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <div class="search-wrap emp-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="viewEmpSearch" placeholder="Search employee..."
+                   onkeyup="filterEmpTable('viewEmpSearch','viewEmpTableBody')" />
+        </div>
+
         <table class="emp-table emp-table-view">
             <thead>
                 <tr>
@@ -154,15 +178,10 @@
                     </tr>
                 }
                 <tr class="no-result-row" style="display:none">
-                    <td colspan="4" class="text-center text-muted py-3">No matching employees.</td></tr>
+                    <td colspan="4" class="text-center text-muted py-3">No matching employees.</td>
+                </tr>
             </tbody>
         </table>
-        </div>
-        <div class="emp-action-btns">
-            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
-                <i class="bi bi-person-plus-fill"></i> Add Employees
-            </button>
-        </div>
     </div>
 </div>
 
@@ -279,6 +298,15 @@
         function closeDeleteModal(e) {
             if (!e || e.target === document.getElementById('deleteOverlay'))
                 document.getElementById('deleteOverlay').classList.remove('open');
+        }
+
+        // ── View Employees modal ──────────────────────────
+        function openViewEmpModal() {
+            document.getElementById('viewEmpOverlay').classList.add('open');
+        }
+        function closeViewEmpModal(e) {
+            if (!e || e.target === document.getElementById('viewEmpOverlay'))
+                document.getElementById('viewEmpOverlay').classList.remove('open');
         }
 
         // ── Add Employees modal ───────────────────────────
@@ -413,7 +441,7 @@
             closeDeactivateModal();
         }
 
-        // ── Add employee via AJAX ──────────────────────────
+                // ── Add employee via AJAX ──────────────────────────
         async function assignEmployee(btn) {
             const employeeId = btn.dataset.id;
             btn.disabled = true;
@@ -464,6 +492,7 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 closeDeleteModal();
+                closeViewEmpModal();
                 closeAddEmpModal();
                 closeDeactivateModal();
             }
