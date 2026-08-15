@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "User Management";
     var sortBy = ViewBag.SortBy as string;
+    var isDefaultSort = string.IsNullOrEmpty(sortBy) || sortBy == "default";
 }
 
 
@@ -29,6 +30,11 @@
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     <li>
+                        <a class="dropdown-item @(isDefaultSort ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="default"
+                           asp-route-search="@ViewBag.Search">Default</a>
+                    </li>
+                    <li>
                         <a class="dropdown-item @(sortBy == "lastname" ? "active" : "")"
                            asp-action="Index" asp-route-sortBy="lastname"
                            asp-route-search="@ViewBag.Search">Last Name</a>
@@ -37,11 +43,6 @@
                         <a class="dropdown-item @(sortBy == "role" ? "active" : "")"
                            asp-action="Index" asp-route-sortBy="role"
                            asp-route-search="@ViewBag.Search">Role</a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item @(sortBy == "email" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="email"
-                           asp-route-search="@ViewBag.Search">Email</a>
                     </li>
                     <li>
                         <a class="dropdown-item @(sortBy == "status" ? "active" : "")"
@@ -114,7 +115,7 @@
                     </td>
                     <td>@(u.Role == "PayrollStaff" ? "Payroll Staff" : u.Role)</td>
                     <td>@u.Email</td>
-                    <td>@u.CreatedAt.ToString("MMM d, yyyy")</td>
+                    <td>@u.CreatedAt.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
                     <td>
                         @if (u.IsActive)
                         {

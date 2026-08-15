@@ -38,13 +38,15 @@ namespace RSDSystem.Controllers
                     (u.Role != null && u.Role.Contains(s)));
             }
 
+            if (string.IsNullOrWhiteSpace(sortBy) || sortBy == "email")
+                sortBy = "default";
+
             query = sortBy switch
             {
-                "lastname" => query.OrderBy(u => u.LastName),
-                "role" => query.OrderBy(u => u.Role),
-                "email" => query.OrderBy(u => u.Email),
-                "status" => query.OrderByDescending(u => u.IsActive),
-                _ => query.OrderByDescending(u => u.CreatedAt)
+                "lastname" => query.OrderBy(u => u.LastName).ThenByDescending(u => u.UserId),
+                "role" => query.OrderBy(u => u.Role).ThenByDescending(u => u.UserId),
+                "status" => query.OrderByDescending(u => u.IsActive).ThenByDescending(u => u.CreatedAt).ThenByDescending(u => u.UserId),
+                _ => query.OrderByDescending(u => u.CreatedAt).ThenByDescending(u => u.UserId)
             };
 
             var totalCount = await query.CountAsync();
