@@ -25,20 +25,22 @@ namespace RSDSystem.Controllers
         }
 
         // GET /Project
-        public async Task<IActionResult> Index(string? search)
+        public async Task<IActionResult> Index(string? search, string? status)
         {
-            var query = _db.Projects.AsQueryable();
+            var filter = ProjectStatusOptions.Normalize(status);
+            var query = _db.Projects.AsNoTracking().WithStatus(filter);
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var s = search.Trim();
                 query = query.Where(p =>
-                    p.ProjectName.Contains(s) ||
+                    (p.ProjectName != null && p.ProjectName.Contains(s)) ||
                     (p.Location != null && p.Location.Contains(s)) ||
                     (p.TypeOfService != null && p.TypeOfService.Contains(s)));
             }
 
             ViewBag.Search = search;
+            ViewBag.Status = filter;
             ViewBag.PageTitle = "Projects";
 
             return View(await query.OrderBy(p => p.ProjectName).ToListAsync());

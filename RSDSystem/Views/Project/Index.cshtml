@@ -1,6 +1,8 @@
 ﻿@model IEnumerable<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Projects";
+    var search = ViewBag.Search as string;
+    var status = ViewBag.Status as string ?? ProjectStatusOptions.OnGoing;
 }
 
 
@@ -9,13 +11,44 @@
 </div>
 
 <div class="page-card">
-    <div class="proj-head">
-        <div class="emp-title">Projects</div>
-        <div class="emp-controls">
-            <form asp-action="Index" method="get" class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search Project" />
-            </form>
+    <div class="emp-title mb-3">Projects</div>
+
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@search" placeholder="Search Project" />
+            <input type="hidden" name="status" value="@status" />
+        </form>
+
+        <div class="list-controls-actions">
+            <div class="dropdown">
+                <button class="btn-outline-blue dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <ul class="dropdown-menu filter-menu">
+                    @foreach (var option in ProjectStatusOptions.All)
+                    {
+                        <li>
+                            @if (status == option)
+                            {
+                                <a class="dropdown-item active"
+                                   asp-action="Index"
+                                   asp-route-status="@option"
+                                   asp-route-search="@search">@option</a>
+                            }
+                            else
+                            {
+                                <a class="dropdown-item"
+                                   asp-action="Index"
+                                   asp-route-status="@option"
+                                   asp-route-search="@search">@option</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+
             <a asp-action="Create" class="btn-primary-blue">Add Project</a>
         </div>
     </div>
@@ -25,7 +58,14 @@
         <div class="text-center text-muted py-5">
             <i class="bi bi-folder2" style="font-size:48px;color:#C9DAFF"></i>
             <div class="mt-2" style="font-size:13px">
-                No projects yet. Click Add Project to get started.
+                @if (!string.IsNullOrWhiteSpace(search))
+                {
+                    <text>No matching @status projects.</text>
+                }
+                else
+                {
+                    <text>No @status projects. Click Add Project to get started, or choose another filter.</text>
+                }
             </div>
         </div>
     }
@@ -35,7 +75,6 @@
             @foreach (var p in Model)
             {
                 <div class="proj-folder-card">
-                    <!-- Folder icon — click to view details -->
                     <a asp-action="Details" asp-route-id="@p.ProjectId"
                        class="proj-folder-link" title="View Project">
                         <div class="proj-folder-icon">
@@ -48,27 +87,9 @@
                             </svg>
                         </div>
                         <div class="proj-folder-name">@p.ProjectName</div>
-                    </a>                  
+                    </a>
                 </div>
             }
         </div>
     }
 </div>
-
-
-@section Scripts {
-    <script>
-        function openDeleteModal(id, name) {
-            document.getElementById('deleteProjName').textContent = name;
-            document.getElementById('deleteForm').action = '/Project/Delete/' + id;
-            document.getElementById('deleteOverlay').classList.add('open');
-        }
-        function closeDeleteModal(e) {
-            if (!e || e.target === document.getElementById('deleteOverlay'))
-                document.getElementById('deleteOverlay').classList.remove('open');
-        }
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeDeleteModal();
-        });
-    </script>
-}
