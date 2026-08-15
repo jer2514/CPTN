@@ -52,26 +52,7 @@
                     <td>@row.OtHours.ToString("0.##")</td>
                     <td>₱@row.NetPay.ToString("N2")</td>
                     <td>
-                        @if (row.Status == "Approved")
-                        {
-                            <span class="badge-active">Approved</span>
-                        }
-                        else if (row.Status == "Submitted")
-                        {
-                            <span class="status-pill status-submitted">Submitted</span>
-                        }
-                        else if (row.Status == "Correction")
-                        {
-                            <span class="status-pill status-correction">Correction</span>
-                        }
-                        else if (row.Status == "Draft")
-                        {
-                            <span class="status-pill status-draft">Draft</span>
-                        }
-                        else
-                        {
-                            <span class="text-muted">—</span>
-                        }
+                        <span class="badge-active">Approved</span>
                     </td>
                     <td>
                         @if (row.PayrollId.HasValue)
@@ -90,39 +71,3 @@
         </tbody>
     </table>
 </div>
-
-<div class="del-overlay" id="generateOverlay" onclick="closeGenerateModal(arguments[0])">
-    <div class="gen-modal" onclick="event.stopPropagation()">
-        <div class="gen-modal-title">Generate Payslips</div>
-        <div class="gen-modal-text">
-            Generate payslips for all employees under <strong>@projectName</strong>.
-        </div>
-        <div class="gen-modal-period-lbl">Payroll Period:</div>
-        <div class="gen-modal-period">@startLabel - @endLabel</div>
-        <div class="gen-modal-actions">
-            <form asp-action="GeneratePayslips" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="projectId" value="@projectId" />
-                <input type="hidden" name="start" value="@start.ToString("yyyy-MM-dd")" />
-                <input type="hidden" name="end" value="@end.ToString("yyyy-MM-dd")" />
-                <button type="submit" class="btn-primary-blue-block gen-modal-btn">Generate Payslips</button>
-            </form>
-            <button type="button" class="gen-modal-cancel" onclick="closeGenerateModal()">Cancel</button>
-        </div>
-    </div>
-</div>
-
-@section Scripts {
-    <script>
-        function openGenerateModal() {
-            document.getElementById('generateOverlay').classList.add('open');
-        }
-        function closeGenerateModal(e) {
-            if (!e || e.target === document.getElementById('generateOverlay'))
-                document.getElementById('generateOverlay').classList.remove('open');
-        }
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') closeGenerateModal();
-        });
-    </script>
-}

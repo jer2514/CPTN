@@ -260,10 +260,9 @@ namespace RSDSystem.Controllers
             var schedules = approvedOnly
                 ? new List<PayrollSchedule>()
                 : await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
-            var payrollQuery = _db.Payrolls.Include(p => p.Project).AsQueryable();
+            var payrolls = await _db.Payrolls.Include(p => p.Project).ToListAsync();
             if (approvedOnly)
-                payrollQuery = payrollQuery.Where(p => p.Status == PayrollStatusOptions.Approved);
-            var payrolls = await payrollQuery.ToListAsync();
+                payrolls = payrolls.Where(IsApproved).ToList();
             var rows = new Dictionary<string, PayrollPeriodRow>(StringComparer.OrdinalIgnoreCase);
 
             void Add(int projectId, string name, DateTime start, DateTime end, string? staff)
@@ -330,16 +329,15 @@ namespace RSDSystem.Controllers
         private async Task<List<PayrollPeriodEmployeeRow>> LoadPeriodEmployeesAsync(
             int projectId, DateTime start, DateTime end, bool approvedOnly = false)
         {
-            var payrollQuery = _db.Payrolls
+            var payrolls = await _db.Payrolls
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start
-                    && p.PayPeriodEnd.Date == end);
+                    && p.PayPeriodEnd.Date == end)
+                .ToListAsync();
 
             if (approvedOnly)
-                payrollQuery = payrollQuery.Where(p => p.Status == PayrollStatusOptions.Approved);
-
-            var payrolls = await payrollQuery.ToListAsync();
+                payrolls = payrolls.Where(IsApproved).ToList();
 
             if (approvedOnly)
             {
@@ -380,6 +378,9 @@ namespace RSDSystem.Controllers
                 };
             }).ToList();
         }
+
+        private static bool IsApproved(Payroll payroll) =>
+            string.Equals(payroll.Status?.Trim(), PayrollStatusOptions.Approved, StringComparison.OrdinalIgnoreCase);
 
         private static Dictionary<int, string> MonthOptions()
         {
