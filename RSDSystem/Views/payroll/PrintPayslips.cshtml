@@ -1,0 +1,58 @@
+@model List<RSDSystem.Models.Payroll>
+@{
+    Layout = null;
+    var projectName = ViewBag.ProjectName as string ?? "Project";
+    var startLabel = ViewBag.StartLabel as string ?? "";
+    var endLabel = ViewBag.EndLabel as string ?? "";
+    var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@fileName</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; color: #111; margin: 24px; }
+        h1 { font-size: 20px; color: #163F8B; margin: 0 0 4px; }
+        .period { color: #555; margin-bottom: 18px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .slip { border: 1px solid #222; padding: 14px 16px; break-inside: avoid; }
+        .slip h2 { font-size: 14px; margin: 0 0 2px; text-align: center; }
+        .slip h3 { font-size: 12px; margin: 0 0 10px; text-align: center; font-weight: 500; }
+        .line { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
+        @@media print {
+            .no-print { display: none; }
+            body { margin: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom:16px">
+        <button onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <h1>@projectName</h1>
+    <div class="period">@startLabel - @endLabel</div>
+    @if (!Model.Any())
+    {
+        <p>No payslips to print.</p>
+    }
+    else
+    {
+        <div class="grid">
+            @foreach (var slip in Model)
+            {
+                <div class="slip">
+                    <h2>RSD Construction Services</h2>
+                    <h3>Employee Payslip</h3>
+                    <div class="line"><span>Employee</span><span>@(slip.Employee?.FullName ?? "—")</span></div>
+                    <div class="line"><span>Job</span><span>@(slip.Employee?.JobClassification ?? "—")</span></div>
+                    <div class="line"><span>Regular days</span><span>@slip.RegularDaysWorked</span></div>
+                    <div class="line"><span>OT hours</span><span>@slip.OvertimeHours.ToString("0.##")</span></div>
+                    <div class="line"><span>Net pay</span><span>₱@slip.NetPay.ToString("N2")</span></div>
+                </div>
+            }
+        </div>
+    }
+    <script>window.addEventListener('load', function () { window.print(); });</script>
+</body>
+</html>
