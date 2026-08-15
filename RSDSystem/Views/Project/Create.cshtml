@@ -23,7 +23,7 @@
     <i class="bi bi-arrow-left"></i> Back
 </a>
 
-<div class="form-card" style="max-width:680px">
+<div class="form-card">
     <form asp-action="Create" method="post" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
         @if (generalErrors.Count > 0)
@@ -122,8 +122,8 @@
         <div class="form-row form-row-1">
             <label class="form-lbl">Monthly Budget <span class="req-star">*</span></label>
 
-            <div id="monthBudgetPlaceholder" class="proj-view-field"
-                 style="color:#9ab0d8;font-size:12.5px; @(postedYears.Any() ? "display:none" : "")">
+            <div id="monthBudgetPlaceholder" class="proj-view-field proj-view-field-muted"
+                 style="@(postedYears.Any() ? "display:none" : "")">
                 Select starting and estimate end dates to generate monthly budget rows.
             </div>
 
