@@ -21,6 +21,9 @@ namespace RSDSystem.Validation
         public const string AddressPattern = @"^[A-Za-z0-9Ññ\s,.\-/#'()&]{5,250}$";
         public const string AddressMessage = "Enter a complete address (Barangay, Municipality/City, Province).";
 
+        public const string ProjectNamePattern = @"^[A-Za-z0-9Ññ][A-Za-z0-9Ññ\s.'\-/&#()]{1,149}$";
+        public const string ProjectNameMessage = "Enter a valid project name.";
+
         public const int MinWorkingAge = 18;
         public const int MaxWorkingAge = 80;
         public const long MaxPhotoBytes = 2 * 1024 * 1024;

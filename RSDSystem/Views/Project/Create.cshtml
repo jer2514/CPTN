@@ -4,6 +4,14 @@
     var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();
     var distros = ViewBag.DistributionOptions as string[] ?? Array.Empty<string>();
     var staffList = ViewBag.PayrollStaffList as List<string> ?? new List<string>();
+    var postedYears = ViewBag.MonthYears as List<string> ?? new List<string>();
+    var postedAmounts = ViewBag.MonthAmounts as List<decimal> ?? new List<decimal>();
+    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
+    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
+    var generalErrors = ViewData.ModelState
+        .Where(kv => string.IsNullOrEmpty(kv.Key))
+        .SelectMany(kv => kv.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+        .ToList();
 }
 
 
@@ -16,78 +24,127 @@
 </a>
 
 <div class="form-card" style="max-width:680px">
-    <form asp-action="Create" method="post">
+    <form asp-action="Create" method="post" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
+        @if (generalErrors.Count > 0)
+        {
+            <div class="form-error-box">
+                @foreach (var err in generalErrors)
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
 
         <!-- Project Name -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Project Name</label>
-                <input type="text" name="ProjectName" class="form-ctrl" required />
+                <label class="form-lbl">Project Name <span class="req-star">*</span></label>
+                <input type="text" name="ProjectName" value="@Model.ProjectName" maxlength="150"
+                       class="@Ctrl("ProjectName")" data-validate="required|projectName" data-label="Project name" />
+                <span class="field-error" data-error-for="ProjectName">@Err("ProjectName")</span>
             </div>
         </div>
 
         <!-- Location -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Location</label>
-                <input type="text" name="Location" class="form-ctrl"
+                <label class="form-lbl">Location <span class="req-star">*</span></label>
+                <input type="text" name="Location" value="@Model.Location" maxlength="250"
+                       class="@Ctrl("Location")" data-validate="required|address" data-label="Location"
                        placeholder="Barangay, Municipality/City, Province" />
+                <span class="field-error" data-error-for="Location">@Err("Location")</span>
             </div>
         </div>
 
         <!-- Type of Service -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Type of Service</label>
-                <select name="TypeOfService" class="form-ctrl">
+                <label class="form-lbl">Type of Service <span class="req-star">*</span></label>
+                <select name="TypeOfService" class="@Ctrl("TypeOfService")"
+                        data-validate="required" data-label="Type of service">
                     <option value="">Select type of service</option>
                     @foreach (var s in services)
                     {
-                        <option value="@s">@s</option>
+                        if (s == Model.TypeOfService)
+                        {
+                            <option value="@s" selected>@s</option>
+                        }
+                        else
+                        {
+                            <option value="@s">@s</option>
+                        }
                     }
                 </select>
+                <span class="field-error" data-error-for="TypeOfService">@Err("TypeOfService")</span>
             </div>
         </div>
 
         <!-- Starting Date | Estimate End Date -->
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Starting Date</label>
-                <input type="date" name="StartingDate" id="startDate" class="form-ctrl"
+                <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
+                <input type="date" name="StartingDate" id="startDate"
+                       value="@Model.StartingDate?.ToString("yyyy-MM-dd")"
+                       class="@Ctrl("StartingDate")" data-validate="required" data-label="Starting date"
                        onchange="generateMonthRows()" />
+                <span class="field-error" data-error-for="StartingDate">@Err("StartingDate")</span>
             </div>
             <div>
-                <label class="form-lbl">Estimate End Date</label>
-                <input type="date" name="EstimateEndDate" id="endDate" class="form-ctrl"
+                <label class="form-lbl">Estimate End Date <span class="req-star">*</span></label>
+                <input type="date" name="EstimateEndDate" id="endDate"
+                       value="@Model.EstimateEndDate?.ToString("yyyy-MM-dd")"
+                       class="@Ctrl("EstimateEndDate")" data-validate="required|dateAfter" data-after="startDate"
+                       data-label="Estimate end date"
                        onchange="generateMonthRows()" />
+                <span class="field-error" data-error-for="EstimateEndDate">@Err("EstimateEndDate")</span>
             </div>
         </div>
 
         <!-- Payroll Budget -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Payroll Budget</label>
+                <label class="form-lbl">Payroll Budget <span class="req-star">*</span></label>
                 <div class="proj-budget-input">
                     <span class="proj-peso">₱</span>
-                    <input type="number" name="PayrollBudget" class="form-ctrl proj-budget-field"
-                           step="0.01" min="0" placeholder="0.00" />
+                    <input type="number" name="PayrollBudget" class="@Ctrl("PayrollBudget") proj-budget-field"
+                           step="0.01" min="0.01" placeholder="0.00"
+                           value="@(Model.PayrollBudget > 0 ? Model.PayrollBudget.Value.ToString("0.00") : "")"
+                           data-validate="money" data-label="Payroll budget" />
                 </div>
+                <span class="field-error" data-error-for="PayrollBudget">@Err("PayrollBudget")</span>
             </div>
         </div>
 
-        <!-- Monthly Budget — dynamically generated from date range -->
+        <!-- Monthly Budget -->
         <div class="form-row form-row-1">
-            <label class="form-lbl">Monthly Budget</label>
+            <label class="form-lbl">Monthly Budget <span class="req-star">*</span></label>
 
             <div id="monthBudgetPlaceholder" class="proj-view-field"
-                 style="color:#9ab0d8;font-size:12.5px">
+                 style="color:#9ab0d8;font-size:12.5px; @(postedYears.Any() ? "display:none" : "")">
                 Select starting and estimate end dates to generate monthly budget rows.
             </div>
 
-            <div id="monthBudgetSection" style="display:none">
+            <div id="monthBudgetSection" style="@(postedYears.Any() ? "" : "display:none")">
                 <div class="proj-monthly-table">
-                    <div id="monthRowsContainer"></div>
+                    <div id="monthRowsContainer">
+                        @for (var i = 0; i < postedYears.Count; i++)
+                        {
+                            if (!DateTime.TryParse(postedYears[i], out var dt)) { continue; }
+                            var amount = i < postedAmounts.Count ? postedAmounts[i] : 0;
+                            <div class="proj-month-row">
+                                <span class="proj-month-label">Month of @dt.ToString("MMMM yyyy")</span>
+                                <div class="proj-budget-input proj-month-input">
+                                    <span class="proj-peso">₱</span>
+                                    <input type="number" name="MonthAmounts"
+                                           class="form-ctrl proj-budget-field"
+                                           step="0.01" min="0" placeholder="0.00"
+                                           value="@amount.ToString("0.00")" />
+                                    <input type="hidden" name="MonthYears" value="@dt.ToString("yyyy-MM-dd")" />
+                                </div>
+                            </div>
+                        }
+                    </div>
                     <div class="text-end" style="padding:8px 14px">
                         <button type="button" class="btn-save-budget" onclick="confirmBudget()">
                             Save Budget
@@ -95,33 +152,52 @@
                     </div>
                 </div>
             </div>
+            <span class="field-error" data-error-for="MonthlyBudget">@Err("MonthlyBudget")</span>
         </div>
 
         <!-- Payroll Distribution -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Payroll Distribution</label>
-                <select name="PayrollDistribution" class="form-ctrl">
+                <label class="form-lbl">Payroll Distribution <span class="req-star">*</span></label>
+                <select name="PayrollDistribution" class="@Ctrl("PayrollDistribution")"
+                        data-validate="required" data-label="Payroll distribution">
                     <option value="">Select distribution</option>
                     @foreach (var d in distros)
                     {
-                        <option value="@d">@d</option>
+                        if (d == Model.PayrollDistribution)
+                        {
+                            <option value="@d" selected>@d</option>
+                        }
+                        else
+                        {
+                            <option value="@d">@d</option>
+                        }
                     }
                 </select>
+                <span class="field-error" data-error-for="PayrollDistribution">@Err("PayrollDistribution")</span>
             </div>
         </div>
 
         <!-- Assigned to Payroll Staff -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Assigned to Payroll Staff</label>
-                <select name="AssignedPayrollStaff" class="form-ctrl">
+                <label class="form-lbl">Assigned to Payroll Staff <span class="req-star">*</span></label>
+                <select name="AssignedPayrollStaff" class="@Ctrl("AssignedPayrollStaff")"
+                        data-validate="required" data-label="Assigned payroll staff">
                     <option value="">Select payroll staff</option>
                     @foreach (var staff in staffList)
                     {
-                        <option value="@staff">@staff</option>
+                        if (staff == Model.AssignedPayrollStaff)
+                        {
+                            <option value="@staff" selected>@staff</option>
+                        }
+                        else
+                        {
+                            <option value="@staff">@staff</option>
+                        }
                     }
                 </select>
+                <span class="field-error" data-error-for="AssignedPayrollStaff">@Err("AssignedPayrollStaff")</span>
             </div>
         </div>
 
@@ -130,6 +206,7 @@
 </div>
 
 @section Scripts {
+    <partial name="_FormValidationScripts" />
     <script>
         function generateMonthRows() {
             const start = document.getElementById('startDate').value;
@@ -137,6 +214,8 @@
             const container = document.getElementById('monthRowsContainer');
             const section    = document.getElementById('monthBudgetSection');
             const placeholder= document.getElementById('monthBudgetPlaceholder');
+            const monthError = document.querySelector('[data-error-for="MonthlyBudget"]');
+            const endInput = document.getElementById('endDate');
 
             container.innerHTML = '';
 
@@ -150,11 +229,18 @@
             const endDt   = new Date(end + 'T00:00:00');
 
             if (startDt > endDt) {
-                alert('Starting Date must be before Estimate End Date.');
+                endInput.classList.add('is-invalid');
+                const dest = document.querySelector('[data-error-for="EstimateEndDate"]');
+                if (dest) dest.textContent = 'Estimate end date must be on or after the starting date.';
+                if (monthError) monthError.textContent = '';
                 section.style.display = 'none';
                 placeholder.style.display = 'block';
                 return;
             }
+
+            endInput.classList.remove('is-invalid');
+            const endErr = document.querySelector('[data-error-for="EstimateEndDate"]');
+            if (endErr) endErr.textContent = '';
 
             const current  = new Date(startDt.getFullYear(), startDt.getMonth(), 1);
             const lastMonth = new Date(endDt.getFullYear(), endDt.getMonth(), 1);
@@ -183,10 +269,29 @@
 
             section.style.display = 'block';
             placeholder.style.display = 'none';
+            if (monthError) monthError.textContent = '';
         }
 
         function confirmBudget() {
+            const amounts = Array.from(document.querySelectorAll('input[name="MonthAmounts"]'));
+            if (amounts.length === 0) {
+                const dest = document.querySelector('[data-error-for="MonthlyBudget"]');
+                if (dest) dest.textContent = 'Select starting and estimate end dates to generate monthly budget rows.';
+                return;
+            }
+            const dest = document.querySelector('[data-error-for="MonthlyBudget"]');
+            if (dest) dest.textContent = '';
             alert('Monthly budget saved. It will be submitted with the project.');
         }
+
+        document.querySelector('form.js-validate')?.addEventListener('submit', function (e) {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const dest = document.querySelector('[data-error-for="MonthlyBudget"]');
+            if (start && end && document.querySelectorAll('input[name="MonthAmounts"]').length === 0) {
+                e.preventDefault();
+                if (dest) dest.textContent = 'Select starting and estimate end dates to generate monthly budget rows.';
+            }
+        });
     </script>
 }

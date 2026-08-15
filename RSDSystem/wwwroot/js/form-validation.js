@@ -4,6 +4,7 @@
     const PHONE_RE = /^09\d{9}$/;
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const ADDRESS_RE = new RegExp("^[A-Za-z0-9Ññ\\s,.\\-/#')(&]{5,250}$");
+    const PROJECT_NAME_RE = new RegExp("^[A-Za-z0-9Ññ][A-Za-z0-9Ññ\\s.'\\-/&#()]{1,149}$");
     const ALLOWED_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
     const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
     const MIN_AGE = 18;
@@ -83,6 +84,16 @@
             }
             if (rule === 'minlen8' && value.length < 8) {
                 return 'Password must be at least 8 characters.';
+            }
+            if (rule === 'projectName' && !PROJECT_NAME_RE.test(value)) {
+                return 'Enter a valid project name.';
+            }
+            if (rule === 'dateAfter') {
+                const otherId = el.getAttribute('data-after');
+                const other = otherId ? document.getElementById(otherId) : null;
+                if (other && other.value && el.value && el.value < other.value) {
+                    return 'Estimate end date must be on or after the starting date.';
+                }
             }
         }
         return '';
