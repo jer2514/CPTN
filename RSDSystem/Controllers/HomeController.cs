@@ -19,16 +19,45 @@ namespace RSDSystem.Controllers
 
         public async Task<IActionResult> Index()
         {
-            // Stat cards
             ViewBag.ActiveProjects = await _db.Projects.CountAsync(p => p.Status == "Active");
             ViewBag.ActiveEmployees = await _db.Employees.CountAsync(e => e.IsActive);
             ViewBag.ActivePayrollStaff = await _db.Users.CountAsync(u => u.Role == "PayrollStaff" && u.IsActive);
 
-            // For the Add/Edit Schedule modal dropdowns
-            var activeProjects = await _db.Projects
-                                          .Where(p => p.Status == "Active")
-                                          .OrderBy(p => p.ProjectName)
-                                          .ToListAsync();
+            var activeProjectRows = await _db.Projects
+                .AsNoTracking()
+                .Where(p => p.Status == "Active")
+                .OrderBy(p => p.ProjectName)
+                .Select(p => new
+                {
+                    p.ProjectId,
+                    ProjectName = p.ProjectName ?? "",
+                    Location = p.Location ?? "",
+                    TypeOfService = p.TypeOfService ?? "",
+                    p.StartingDate,
+                    p.EstimateEndDate,
+                    p.PayrollBudget,
+                    PayrollDistribution = p.PayrollDistribution ?? "",
+                    AssignedPayrollStaff = p.AssignedPayrollStaff ?? "",
+                    Status = p.Status ?? "Active",
+                    p.TaskCompleted
+                })
+                .ToListAsync();
+
+            var activeProjects = activeProjectRows.Select(p => new Project
+            {
+                ProjectId = p.ProjectId,
+                ProjectName = p.ProjectName,
+                Location = p.Location,
+                TypeOfService = p.TypeOfService,
+                StartingDate = p.StartingDate,
+                EstimateEndDate = p.EstimateEndDate,
+                PayrollBudget = p.PayrollBudget,
+                PayrollDistribution = p.PayrollDistribution,
+                AssignedPayrollStaff = p.AssignedPayrollStaff,
+                Status = p.Status,
+                TaskCompleted = p.TaskCompleted
+            }).ToList();
+
             ViewBag.ActiveProjectsList = activeProjects;
             ViewBag.TypeOfServiceOptions = TypeOfServiceOptions.All;
             ViewBag.ProjectTypeMap = activeProjects.ToDictionary(p => p.ProjectId, p => p.TypeOfService ?? "");
@@ -44,25 +73,48 @@ namespace RSDSystem.Controllers
                         : ""
                 });
 
-            // Payroll schedules list
-            ViewBag.PayrollSchedules = await _db.PayrollSchedules
-                                                .Include(s => s.Project)
-                                                .OrderBy(s => s.StartingDate)
-                                                .ToListAsync();
+            var scheduleRows = await _db.PayrollSchedules
+                .AsNoTracking()
+                .OrderBy(s => s.StartingDate)
+                .Select(s => new
+                {
+                    s.PayrollScheduleId,
+                    s.ProjectId,
+                    TypeOfService = s.TypeOfService ?? "",
+                    s.StartingDate,
+                    s.EndDate,
+                    ProjectName = s.Project != null ? s.Project.ProjectName ?? "" : ""
+                })
+                .ToListAsync();
 
-            // Pending Payroll Approval table
+            ViewBag.PayrollSchedules = scheduleRows.Select(s => new PayrollSchedule
+            {
+                PayrollScheduleId = s.PayrollScheduleId,
+                ProjectId = s.ProjectId,
+                TypeOfService = s.TypeOfService,
+                StartingDate = s.StartingDate,
+                EndDate = s.EndDate,
+                Project = new Project
+                {
+                    ProjectId = s.ProjectId,
+                    ProjectName = s.ProjectName
+                }
+            }).ToList();
+
             ViewBag.PendingApprovals = await _db.Payrolls
-                                                .Include(p => p.Project)
-                                                .Where(p => p.Status == PayrollStatusOptions.Submitted)
-                                                .OrderByDescending(p => p.GeneratedDate)
-                                                .Select(p => new PendingApprovalRow
-                                                {
-                                                    PayrollId = p.PayrollId,
-                                                    StaffName = p.GeneratedBy,
-                                                    ProjectName = p.Project != null ? p.Project.ProjectName : "—",
-                                                    Date = p.GeneratedDate
-                                                })
-                                                .ToListAsync();
+                .AsNoTracking()
+                .Where(p => p.Status == PayrollStatusOptions.Submitted)
+                .OrderByDescending(p => p.GeneratedDate)
+                .Select(p => new PendingApprovalRow
+                {
+                    PayrollId = p.PayrollId,
+                    StaffName = p.GeneratedBy ?? "",
+                    ProjectName = p.Project != null && p.Project.ProjectName != null && p.Project.ProjectName != ""
+                        ? p.Project.ProjectName
+                        : "—",
+                    Date = p.GeneratedDate
+                })
+                .ToListAsync();
 
             return View();
         }

@@ -69,6 +69,28 @@ namespace RSDSystem.Models
                 .Property(p => p.Status)
                 .IsRequired(false);
 
+            modelBuilder.Entity<Project>()
+                .Property(p => p.Location)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.TypeOfService)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.PayrollDistribution)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.AssignedPayrollStaff)
+                .IsRequired(false);
+
+            foreach (var property in modelBuilder.Entity<Project>().Metadata.GetProperties())
+            {
+                if (property.ClrType == typeof(string))
+                    property.SetIsNullable(true);
+            }
+
             modelBuilder.Entity<PayrollSchedule>()
                 .HasOne(s => s.Project)
                 .WithMany()
