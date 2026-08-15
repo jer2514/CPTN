@@ -2497,6 +2497,7 @@ button.badge-btn {
 
 .pred-back {
     margin-bottom: 0;
+    position: static;
 }
 
 .pred-heading-row {
@@ -2535,10 +2536,16 @@ button.badge-btn {
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    height: 38px;
 }
 
 .pred-btn-pdf {
     background: #fff;
+    color: #111;
+}
+
+.pred-btn-pdf:hover {
+    background: #f3f3f3;
     color: #111;
 }
 
@@ -2563,59 +2570,110 @@ button.badge-btn {
 }
 
 .pred-slip {
-    border: 1px solid #222;
+    border: 1.5px solid #266DF1;
     border-radius: 4px;
-    padding: 16px 18px;
+    padding: 12px 14px 10px;
     text-decoration: none;
     color: inherit;
-    min-height: 210px;
     background: #fff;
+    display: block;
 }
 
 .pred-slip:hover {
     box-shadow: 0 6px 16px rgba(22, 63, 139, .12);
 }
 
-.pred-slip-title {
+.mini-title {
     text-align: center;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
+    color: #266DF1;
 }
 
-.pred-slip-sub {
+.mini-sub {
     text-align: center;
-    font-size: 12px;
-    margin-bottom: 12px;
+    font-size: 11px;
+    color: #000;
+    margin-bottom: 8px;
 }
 
-.pred-slip-line {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 12px;
-    margin: 6px 0;
-}
-
-.pred-slip-status {
-    margin-top: 12px;
-    font-size: 12px;
+.mini-section {
+    font-size: 10.5px;
     font-weight: 700;
     color: #0d7a3e;
+    border-bottom: 1px solid #111;
+    padding-bottom: 3px;
+    margin: 8px 0 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.mini-period {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #266DF1;
+}
+
+.mini-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    font-size: 10.5px;
+}
+
+.mini-fields {
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    row-gap: 3px;
+    column-gap: 8px;
+    font-size: 10.5px;
+}
+
+.mini-fields-gap {
+    margin-top: 6px;
+}
+
+.mini-net {
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    gap: 8px;
+    font-size: 10.5px;
+    border-top: 1px solid #111;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+.mini-lbl { color: #111; }
+.mini-val { color: #266DF1; font-weight: 600; }
+
+.mini-footer {
+    margin-top: 8px;
+    font-size: 10px;
+    color: #266DF1;
+    font-weight: 600;
 }
 
 .pred-pager {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 16px;
-    color: #163F8B;
-    margin-top: 22px;
+    gap: 8px;
+    color: #fff;
+    margin-top: 16px;
     font-weight: 600;
+}
+
+.pred-pager-arrows {
+    display: flex;
+    gap: 28px;
 }
 
 .pred-pager a,
 .pred-pager span.disabled {
-    color: #163F8B;
+    color: #fff;
     text-decoration: none;
     font-size: 18px;
 }
