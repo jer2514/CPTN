@@ -122,28 +122,13 @@ namespace RSDSystem.Controllers
                 .OrderBy(s => s.StartingDate)
                 .ToListAsync();
 
-            var defaultSchedule = schedules.FirstOrDefault(s =>
-                    s.StartingDate.Date <= DateTime.Today && DateTime.Today <= s.EndDate.Date)
-                ?? schedules.FirstOrDefault(s => s.StartingDate.Date >= DateTime.Today)
-                ?? schedules.LastOrDefault();
+            var projectStart = InputRules.IsUsableDate(project.StartingDate)
+                ? project.StartingDate!.Value.Date : (DateTime?)null;
+            var projectEnd = InputRules.IsUsableDate(project.EstimateEndDate)
+                ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
 
-            string? boundStart = null;
-            string? boundEnd = null;
-            if (schedules.Count > 0)
-            {
-                boundStart = schedules.Min(s => s.StartingDate).ToString("yyyy-MM-dd");
-                boundEnd = schedules.Max(s => s.EndDate).ToString("yyyy-MM-dd");
-            }
-            else if (InputRules.IsUsableDate(project.StartingDate) || InputRules.IsUsableDate(project.EstimateEndDate))
-            {
-                boundStart = InputRules.IsUsableDate(project.StartingDate)
-                    ? project.StartingDate!.Value.ToString("yyyy-MM-dd") : null;
-                boundEnd = InputRules.IsUsableDate(project.EstimateEndDate)
-                    ? project.EstimateEndDate!.Value.ToString("yyyy-MM-dd") : null;
-            }
-
-            var defaultStart = defaultSchedule?.StartingDate.Date ?? DateTime.Today.AddDays(-6);
-            var defaultEnd = defaultSchedule?.EndDate.Date ?? DateTime.Today;
+            var defaultStart = projectStart ?? DateTime.Today.AddDays(-6);
+            var defaultEnd = projectEnd ?? DateTime.Today;
             if (defaultEnd < defaultStart)
                 defaultEnd = defaultStart;
 
@@ -151,11 +136,13 @@ namespace RSDSystem.Controllers
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
+            ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
             ViewBag.DefaultDaysWorked = Math.Max(1, InputRules.CountWeekdays(defaultStart, defaultEnd));
-            ViewBag.MinDate = boundStart ?? "";
-            ViewBag.MaxDate = boundEnd ?? "";
+            ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
 
             return View(emp);
         }
@@ -209,36 +196,17 @@ namespace RSDSystem.Controllers
                 if (overtimeHours > regularDaysWorked * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
-                var schedules = await _db.PayrollSchedules
-                    .Where(s => s.ProjectId == projectId)
-                    .ToListAsync();
+                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
+                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
 
-                if (schedules.Count > 0)
-                {
-                    var covering = schedules.FirstOrDefault(s =>
-                        s.StartingDate.Date <= payPeriodStart.Date && payPeriodEnd.Date <= s.EndDate.Date);
+                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
+                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
 
-                    if (covering == null)
-                    {
-                        var maxEnd = schedules.Max(s => s.EndDate).Date;
-                        var minStart = schedules.Min(s => s.StartingDate).Date;
+                if (InputRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
+                    errors["payPeriodEnd"] = "Pay period cannot end before the project starting date.";
 
-                        if (payPeriodEnd.Date > maxEnd)
-                            errors["payPeriodEnd"] = $"Pay period ending date must be on or before {maxEnd:MM/dd/yyyy}.";
-                        else if (payPeriodStart.Date < minStart)
-                            errors["payPeriodStart"] = $"Pay period starting date must be on or after {minStart:MM/dd/yyyy}.";
-                        else
-                            errors["payPeriodEnd"] = "Pay period must fall within a payroll schedule for this project.";
-                    }
-                }
-                else
-                {
-                    if (InputRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
-                        errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
-
-                    if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
-                        errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
-                }
+                if (InputRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
+                    errors["payPeriodStart"] = "Pay period cannot start after the project estimate end date.";
             }
 
             decimal regularPay = emp.DailyRate * regularDaysWorked;

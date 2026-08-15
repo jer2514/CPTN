@@ -48,8 +48,8 @@
 
         const start = startEl.value;
         const cover = coveringSchedule(start);
-        const rangeMax = cover ? cover.end : boundMax;
-        const rangeMin = boundMin;
+        const rangeMax = earlierDate(cover ? cover.end : boundMax, boundMax);
+        const rangeMin = laterDate(boundMin, cover ? cover.start : boundMin) || boundMin;
 
         startEl.min = rangeMin || '';
         startEl.max = earlierDate(rangeMax, endEl.value) || rangeMax || '';
@@ -138,26 +138,13 @@
             ok = false;
         }
 
-        if (schedules.length && start && end) {
-            const inside = schedules.some(function (s) {
-                return s.start.localeCompare(start) <= 0 && end.localeCompare(s.end) <= 0;
-            });
-            if (!inside) {
-                const maxEnd = schedules.reduce(function (m, s) {
-                    return !m || s.end.localeCompare(m) > 0 ? s.end : m;
-                }, '');
-                const minStart = schedules.reduce(function (m, s) {
-                    return !m || s.start.localeCompare(m) < 0 ? s.start : m;
-                }, '');
-                if (end.localeCompare(maxEnd) > 0) {
-                    showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(maxEnd) + '.');
-                } else if (start.localeCompare(minStart) < 0) {
-                    showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(minStart) + '.');
-                } else {
-                    showFieldError('payPeriodEnd', 'Pay period must fall within a payroll schedule for this project.');
-                }
-                ok = false;
-            }
+        if (boundMin && start && start.localeCompare(boundMin) < 0) {
+            showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(boundMin) + '.');
+            ok = false;
+        }
+        if (boundMax && end && end.localeCompare(boundMax) > 0) {
+            showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(boundMax) + '.');
+            ok = false;
         }
 
         return ok;

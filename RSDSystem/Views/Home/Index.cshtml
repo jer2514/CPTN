@@ -200,6 +200,7 @@
                     <span class="field-error" data-error-for="EndDate"></span>
                 </div>
             </div>
+            <div class="slip-schedule-hint" id="scheduleProjectDateHint" style="display:none;margin-top:8px"></div>
 
             <div class="del-actions mt-3">
                 <button type="button" class="del-btn-cancel" onclick="closeScheduleModal()">Cancel</button>
@@ -246,6 +247,13 @@
             form.querySelectorAll('.field-error').forEach(el => el.textContent = '');
         }
 
+        function formatIsoDate(iso) {
+            if (!iso) return '';
+            const parts = String(iso).split('-');
+            if (parts.length !== 3) return iso;
+            return parts[1] + '/' + parts[2] + '/' + parts[0];
+        }
+
         function applyProjectDateBounds(projectId) {
             const range = projectDateMap[projectId] || {};
             ['scheduleStartDate', 'scheduleEndDate'].forEach(function (id) {
@@ -257,6 +265,19 @@
                 el.min = range.start || '';
                 el.max = range.end || '';
             });
+            const hint = document.getElementById('scheduleProjectDateHint');
+            if (hint) {
+                if (range.start || range.end) {
+                    hint.style.display = 'block';
+                    hint.textContent = 'Must fall within the project dates: '
+                        + (formatIsoDate(range.start) || 'project start')
+                        + ' – '
+                        + (formatIsoDate(range.end) || 'project end');
+                } else {
+                    hint.style.display = 'none';
+                    hint.textContent = '';
+                }
+            }
         }
 
         function autoFillProjectType(projectId) {
