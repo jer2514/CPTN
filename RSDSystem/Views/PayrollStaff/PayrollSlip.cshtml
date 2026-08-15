@@ -17,6 +17,7 @@
     var absentDays = ViewBag.AbsentDays as int? ?? 0;
     var overtimeHours = ViewBag.OvertimeHours as decimal? ?? 0;
     var cashAdvance = ViewBag.CashAdvance as decimal? ?? 0;
+    var returnUrl = ViewBag.ReturnUrl as string ?? "";
     var slipConfig = JsonSerializer.Serialize(new
     {
         dailyRate = Model.DailyRate,
@@ -25,6 +26,7 @@
         boundMax = maxDate,
         isEdit,
         payrollId,
+        returnUrl,
         schedules = schedules.Select(s => new
         {
             start = s.StartingDate.ToString("yyyy-MM-dd"),
@@ -38,7 +40,13 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-@if (isEdit)
+@if (!string.IsNullOrEmpty(returnUrl))
+{
+    <a href="@returnUrl" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+else if (isEdit)
 {
     <a asp-action="ViewPayroll" asp-route-id="@payrollId" class="btn-back">
         <i class="bi bi-arrow-left"></i> Back

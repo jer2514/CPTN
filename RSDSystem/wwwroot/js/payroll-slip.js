@@ -15,6 +15,7 @@
     const boundMax = config.boundMax || '';
     const isEdit = !!config.isEdit;
     const existingPayrollId = Number(config.payrollId || 0);
+    const returnUrl = config.returnUrl || '';
     const submitLabel = isEdit ? 'Save Changes' : 'Generate Payroll';
     const busyLabel = isEdit ? 'Saving...' : 'Generating...';
     let redirectProjectId = null;
@@ -186,6 +187,11 @@
             const data = await res.json();
 
             if (data.success) {
+                const nextUrl = data.returnUrl || returnUrl;
+                if (isEdit && nextUrl) {
+                    window.location.href = nextUrl;
+                    return;
+                }
                 successMsg.textContent = data.message;
                 redirectProjectId = data.projectId;
                 savedPayrollId = Number(data.payrollId || existingPayrollId || 0);
@@ -207,6 +213,10 @@
     });
 
     successOkBtn.addEventListener('click', function () {
+        if (returnUrl) {
+            window.location.href = returnUrl;
+            return;
+        }
         if (isEdit && savedPayrollId) {
             window.location.href = '/PayrollStaff/ViewPayroll/' + savedPayrollId;
             return;

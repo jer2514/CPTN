@@ -20,6 +20,7 @@
            asp-route-employeeId="@Model.EmployeeId"
            asp-route-projectId="@Model.ProjectId"
            asp-route-payrollId="@Model.PayrollId"
+           asp-route-returnUrl="@Url.Action("ViewPayroll", new { id = Model.PayrollId })"
            class="btn-primary-blue">Edit</a>
     }
 </div>
