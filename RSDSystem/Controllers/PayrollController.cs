@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
@@ -24,14 +25,16 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        public async Task<IActionResult> Index(string? projectName, int? month)
+        public async Task<IActionResult> Index(string? projectName, int? projectId, int? month)
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
-            var periods = await LoadPeriodsAsync(projectName, month);
+            await BindProjectSuggestionsAsync();
+            var periods = await LoadPeriodsAsync(projectName, month, projectId);
             ViewBag.PageTitle = "View Payroll";
             ViewBag.ProjectName = projectName ?? "";
+            ViewBag.SelectedProjectId = projectId;
             ViewBag.Month = month;
             ViewBag.Months = MonthOptions();
             return View(periods);
@@ -135,13 +138,15 @@ namespace RSDSystem.Controllers
 
             ViewBag.PageTitle = "Payroll Prediction";
             ViewBag.ProjectNameFilter = projectName ?? "";
+            ViewBag.SelectedProjectId = !start.HasValue || !end.HasValue ? projectId : null;
             ViewBag.Month = month;
             ViewBag.Months = MonthOptions();
 
             if (!projectId.HasValue || !start.HasValue || !end.HasValue)
             {
+                await BindProjectSuggestionsAsync();
                 ViewBag.HasPeriod = false;
-                return View("PredictionList", await LoadPeriodsAsync(projectName, month));
+                return View("PredictionList", await LoadPeriodsAsync(projectName, month, projectId));
             }
 
             var project = await _db.Projects.FindAsync(projectId.Value);
@@ -234,7 +239,22 @@ namespace RSDSystem.Controllers
             });
         }
 
-        private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(string? projectName, int? month)
+        private async Task BindProjectSuggestionsAsync()
+        {
+            var projects = await _db.Projects
+                .OrderBy(p => p.ProjectName)
+                .Select(p => new
+                {
+                    id = p.ProjectId,
+                    name = p.ProjectName,
+                    location = p.Location
+                })
+                .ToListAsync();
+
+            ViewBag.ProjectSuggestionsJson = JsonSerializer.Serialize(projects);
+        }
+
+        private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(string? projectName, int? month, int? projectId = null)
         {
             var schedules = await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
             var payrolls = await _db.Payrolls.Include(p => p.Project).ToListAsync();
@@ -281,7 +301,11 @@ namespace RSDSystem.Controllers
             }
 
             IEnumerable<PayrollPeriodRow> list = rows.Values;
-            if (!string.IsNullOrWhiteSpace(projectName))
+            if (projectId.HasValue && projectId.Value > 0)
+            {
+                list = list.Where(r => r.ProjectId == projectId.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(projectName))
             {
                 var term = projectName.Trim();
                 list = list.Where(r => r.ProjectName.Contains(term, StringComparison.OrdinalIgnoreCase));

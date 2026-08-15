@@ -17,7 +17,10 @@
     <form asp-action="Index" method="get" class="vp-filters">
         <div>
             <label class="form-lbl">Project Name</label>
-            <input type="text" name="projectName" value="@projectName" class="form-ctrl" placeholder="Search project" />
+            @{
+                ViewBag.SuggestProjectName = projectName;
+            }
+            <partial name="_ProjectNameSuggest" />
         </div>
         <div>
             <label class="form-lbl">Payroll Month</label>
@@ -76,3 +79,7 @@
         </div>
     }
 </div>
+
+@section Scripts {
+    <script src="~/js/project-suggest.js" asp-append-version="true"></script>
+}
