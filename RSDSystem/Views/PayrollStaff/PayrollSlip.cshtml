@@ -72,12 +72,17 @@
             </div>
         </div>
 
-        @if (schedules.Any())
+        @if (!string.IsNullOrEmpty(minDate) || !string.IsNullOrEmpty(maxDate))
         {
+            var projectStartLabel = !string.IsNullOrEmpty(minDate)
+                ? DateTime.Parse(minDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "the project start";
+            var projectEndLabel = !string.IsNullOrEmpty(maxDate)
+                ? DateTime.Parse(maxDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "the project end";
             <div class="slip-schedule-hint">
-                Pay period must fall within a payroll schedule:
-                @string.Join(" · ", schedules.Select(s =>
-                    $"{s.StartingDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} – {s.EndDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)}"))
+                Pay period must fall within the project dates:
+                @projectStartLabel – @projectEndLabel
             </div>
         }
 

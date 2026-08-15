@@ -174,6 +174,12 @@ namespace RSDSystem.Controllers
             if (InputRules.IsUsableDate(project.StartingDate) && startingDate.Date < project.StartingDate!.Value.Date)
                 return "Starting date cannot be before the project starting date.";
 
+            if (InputRules.IsUsableDate(project.EstimateEndDate) && startingDate.Date > project.EstimateEndDate!.Value.Date)
+                return "Starting date cannot be after the project estimate end date.";
+
+            if (InputRules.IsUsableDate(project.StartingDate) && endDate.Date < project.StartingDate!.Value.Date)
+                return "End date cannot be before the project starting date.";
+
             if (InputRules.IsUsableDate(project.EstimateEndDate) && endDate.Date > project.EstimateEndDate!.Value.Date)
                 return "End date cannot be after the project estimate end date.";
 
