@@ -182,15 +182,16 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var slips = await _db.Payrolls
+            var slips = (await _db.Payrolls
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
-                .OrderBy(p => p.Employee != null ? p.Employee.LastName : "")
-                .ThenBy(p => p.Employee != null ? p.Employee.FirstName : "")
-                .ToListAsync();
+                .ToListAsync())
+                .OrderBy(p => p.Employee?.LastName)
+                .ThenBy(p => p.Employee?.FirstName)
+                .ToList();
 
             ViewBag.ProjectName = project.ProjectName;
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
