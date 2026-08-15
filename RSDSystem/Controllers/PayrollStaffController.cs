@@ -99,7 +99,7 @@ namespace RSDSystem.Controllers
             var result = employees.Select(e => new
             {
                 e.EmployeeId,
-                DisplayId = IdFormatter.Format(e.EmployeeCode),
+                DisplayId = IdFormatter.FormatEmployee(e.EmployeeCode),
                 Name = e.FullName,
                 e.JobClassification,
                 e.DailyRate,
@@ -159,7 +159,7 @@ namespace RSDSystem.Controllers
                 ?? (existing != null
                     ? Url.Action(nameof(ViewPayroll), new { id = existing.PayrollId })
                     : Url.Action(nameof(GeneratePayroll), new { projectId }));
-            ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
+            ViewBag.DisplayId = IdFormatter.FormatEmployee(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
             ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
@@ -400,7 +400,7 @@ namespace RSDSystem.Controllers
                 .Select(p => new
                 {
                     p.PayrollId,
-                    DisplayId = IdFormatter.Format(p.Employee?.EmployeeCode),
+                    DisplayId = IdFormatter.FormatEmployee(p.Employee?.EmployeeCode),
                     EmployeeName = p.Employee?.FullName,
                     Job = p.Employee?.JobClassification,
                     p.Status,
@@ -421,7 +421,7 @@ namespace RSDSystem.Controllers
             if (payroll == null) return NotFound();
 
             ViewBag.PageTitle = "View Payroll";
-            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
             return View(payroll);
         }
 

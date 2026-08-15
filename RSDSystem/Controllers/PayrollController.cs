@@ -405,7 +405,7 @@ namespace RSDSystem.Controllers
 
             if (payroll == null) return NotFound();
 
-            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
             return View(payroll);
         }
 
@@ -419,7 +419,7 @@ namespace RSDSystem.Controllers
 
             if (payroll == null) return NotFound();
 
-            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = IdFormatter.FormatEmployee(payroll.Employee?.EmployeeCode);
             return PartialView("_PayrollPartial", payroll);
         }
 

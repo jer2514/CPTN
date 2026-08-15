@@ -63,7 +63,7 @@
 
                     <div class="mini-section">Employee Information</div>
                     <div class="mini-info">
-                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@IdFormatter.Format(slip.Employee?.EmployeeCode)</span></div>
+                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@IdFormatter.FormatEmployee(slip.Employee?.EmployeeCode)</span></div>
                         <div><span class="mini-lbl">Project Assigned: </span><span class="mini-val">@(slip.Project?.ProjectName ?? projectName)</span></div>
                         <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
                         <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
