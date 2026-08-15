@@ -10,7 +10,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=4" rel="stylesheet" />
+    <link href="~/css/site.css?v=5" rel="stylesheet" />
 </head>
 
 <body>
@@ -23,35 +23,59 @@
                 <img src="~/Uploads/Images/RSDLogo.png" alt="Logo">
             </div>
 
+            @{
+                var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+                var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+                var isPayrollSection = currentController == "Payroll";
+                var isPayrollPrediction = isPayrollSection && (currentAction == "Prediction" || currentAction == "PrintPayslips");
+            }
             <ul class="menu">
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Home" ? "active" : "")">
+                <li class="@(currentController == "Home" ? "active" : "")">
                     <a asp-controller="Home" asp-action="Index">
                         <i class="bi bi-grid-1x2-fill"></i> Dashboard
                     </a>
                 </li>
 
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "UserManagement" ? "active" : "")">
+                <li class="@(currentController == "UserManagement" ? "active" : "")">
                     <a asp-controller="UserManagement" asp-action="Index">
                         <i class="bi bi-people-fill"></i> User Management
                     </a>
                 </li>
 
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Employee" ? "active" : "")">
+                <li class="@(currentController == "Employee" ? "active" : "")">
                     <a asp-controller="Employee" asp-action="Index">
                         <i class="bi bi-person-badge-fill"></i> Employees
                     </a>
                 </li>
 
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Payroll" ? "active" : "")">
-                    <a asp-controller="Payroll" asp-action="Index">
+                <li>
+                    <a href="#adminPayrollMenu" data-bs-toggle="collapse"
+                       class="menu-dropdown-toggle @(isPayrollSection ? "active" : "")"
+                       role="button" aria-expanded="@(isPayrollSection ? "true" : "false")">
                         <i class="bi bi-cash-coin"></i> Payroll
+                        <i class="bi bi-chevron-down menu-chevron"></i>
                     </a>
+                    <ul class="collapse submenu @(isPayrollSection ? "show" : "")" id="adminPayrollMenu">
+                        <li class="@(!isPayrollPrediction && isPayrollSection ? "active" : "")">
+                            <a asp-controller="Payroll" asp-action="Index">View Payroll</a>
+                        </li>
+                        <li class="@(isPayrollPrediction ? "active" : "")">
+                            <a asp-controller="Payroll" asp-action="Prediction">Payroll Prediction</a>
+                        </li>
+                    </ul>
                 </li>
 
-                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Attendance" ? "active" : "")">
-                    <a asp-controller="Attendance" asp-action="Index">
+                <li>
+                    <a href="#adminAttendanceMenu" data-bs-toggle="collapse"
+                       class="menu-dropdown-toggle @(currentController == "Attendance" ? "active" : "")"
+                       role="button" aria-expanded="@(currentController == "Attendance" ? "true" : "false")">
                         <i class="bi bi-clock-history"></i> Attendance
+                        <i class="bi bi-chevron-down menu-chevron"></i>
                     </a>
+                    <ul class="collapse submenu @(currentController == "Attendance" ? "show" : "")" id="adminAttendanceMenu">
+                        <li><a href="#">Mark Attendance</a></li>
+                        <li><a href="#">Attendance Records</a></li>
+                    </ul>
                 </li>
 
                 <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "Project" ? "active" : "")">

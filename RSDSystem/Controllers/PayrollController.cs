@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Globalization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
 using RSDSystem.Models;
@@ -9,23 +10,340 @@ namespace RSDSystem.Controllers
     public class PayrollController : Controller
     {
         private readonly PayrollDbContext _db;
+        private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
         public PayrollController(PayrollDbContext db)
         {
             _db = db;
         }
 
-        public async Task<IActionResult> Index()
+        private IActionResult? RequireAdmin()
         {
-            var submitted = await _db.Payrolls
-                                     .Include(p => p.Employee)
-                                     .Include(p => p.Project)
-                                     .Where(p => p.Status == PayrollStatusOptions.Submitted)
-                                     .OrderByDescending(p => p.GeneratedDate)
-                                     .ToListAsync();
+            if (HttpContext.Session.GetString("Role") != "Admin")
+                return RedirectToAction("Index", "PayrollStaff");
+            return null;
+        }
 
-            ViewBag.PageTitle = "Payroll";
-            return View(submitted);
+        public async Task<IActionResult> Index(string? projectName, int? month)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var periods = await LoadPeriodsAsync(projectName, month);
+            ViewBag.PageTitle = "View Payroll";
+            ViewBag.ProjectName = projectName ?? "";
+            ViewBag.Month = month;
+            ViewBag.Months = MonthOptions();
+            return View(periods);
+        }
+
+        public async Task<IActionResult> Period(int projectId, DateTime start, DateTime end)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            ViewBag.PageTitle = "View Payroll";
+            ViewBag.ProjectId = projectId;
+            ViewBag.ProjectName = project.ProjectName;
+            ViewBag.Start = start.Date;
+            ViewBag.End = end.Date;
+            ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
+            return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> GeneratePayslips(int projectId, DateTime start, DateTime end)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            var employees = await _db.Employees
+                .Where(e => e.ProjectId == projectId && e.IsActive)
+                .ToListAsync();
+
+            if (employees.Count == 0)
+            {
+                TempData["Error"] = "No active employees are assigned to this project.";
+                return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
+
+            var existing = await _db.Payrolls
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .ToListAsync();
+
+            var daysWorked = Math.Max(1, InputRules.CountWeekdays(start.Date, end.Date));
+            var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
+            var created = 0;
+
+            foreach (var emp in employees)
+            {
+                if (existing.Any(p => p.EmployeeId == emp.EmployeeId))
+                    continue;
+
+                var regularPay = emp.DailyRate * daysWorked;
+                _db.Payrolls.Add(new Payroll
+                {
+                    EmployeeId = emp.EmployeeId,
+                    ProjectId = projectId,
+                    PayPeriodStart = start.Date,
+                    PayPeriodEnd = end.Date,
+                    RegularDaysWorked = daysWorked,
+                    OvertimeHours = 0,
+                    AbsentDays = 0,
+                    RegularPay = regularPay,
+                    OvertimePay = 0,
+                    GrossPay = regularPay,
+                    CashAdvance = 0,
+                    NetPay = regularPay,
+                    Status = PayrollStatusOptions.Draft,
+                    GeneratedBy = generatedBy,
+                    GeneratedDate = DateTime.Now
+                });
+                created++;
+            }
+
+            if (created > 0)
+                await _db.SaveChangesAsync();
+
+            TempData["Success"] = created > 0
+                ? $"Generated {created} payslip(s) for {project.ProjectName}."
+                : "Payslips for this period already exist.";
+
+            return RedirectToAction(nameof(Prediction), new
+            {
+                projectId,
+                start = start.ToString("yyyy-MM-dd"),
+                end = end.ToString("yyyy-MM-dd")
+            });
+        }
+
+        public async Task<IActionResult> Prediction(int? projectId, DateTime? start, DateTime? end,
+            string? projectName, int? month, int page = 1)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            ViewBag.PageTitle = "Payroll Prediction";
+            ViewBag.ProjectNameFilter = projectName ?? "";
+            ViewBag.Month = month;
+            ViewBag.Months = MonthOptions();
+
+            if (!projectId.HasValue || !start.HasValue || !end.HasValue)
+            {
+                ViewBag.HasPeriod = false;
+                return View("PredictionList", await LoadPeriodsAsync(projectName, month));
+            }
+
+            var project = await _db.Projects.FindAsync(projectId.Value);
+            if (project == null) return NotFound();
+
+            const int pageSize = 4;
+            var slips = await _db.Payrolls
+                .Include(p => p.Employee)
+                .Where(p => p.ProjectId == projectId.Value
+                    && p.PayPeriodStart.Date == start.Value.Date
+                    && p.PayPeriodEnd.Date == end.Value.Date)
+                .OrderByDescending(p => p.GeneratedDate)
+                .ThenByDescending(p => p.PayrollId)
+                .ToListAsync();
+
+            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            ViewBag.HasPeriod = true;
+            ViewBag.ProjectId = projectId.Value;
+            ViewBag.ProjectName = project.ProjectName;
+            ViewBag.Start = start.Value.Date;
+            ViewBag.End = end.Value.Date;
+            ViewBag.StartLabel = start.Value.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.EndLabel = end.Value.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.FileName = PayslipFileName(project.ProjectName, start.Value, end.Value);
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            ViewBag.TotalSlips = slips.Count;
+
+            return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+        }
+
+        public async Task<IActionResult> PrintPayslips(int projectId, DateTime start, DateTime end)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            var slips = await _db.Payrolls
+                .Include(p => p.Employee)
+                .Include(p => p.Project)
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .OrderBy(p => p.Employee!.LastName)
+                .ThenBy(p => p.Employee!.FirstName)
+                .ToListAsync();
+
+            ViewBag.ProjectName = project.ProjectName;
+            ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
+            ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
+            ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
+            return View(slips);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendToStaff(int projectId, DateTime start, DateTime end)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            var count = await _db.Payrolls.CountAsync(p =>
+                p.ProjectId == projectId
+                && p.PayPeriodStart.Date == start.Date
+                && p.PayPeriodEnd.Date == end.Date);
+
+            if (count == 0)
+            {
+                TempData["Error"] = "Generate payslips before sending them to payroll staff.";
+                return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
+
+            var staff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff)
+                ? "payroll staff"
+                : project.AssignedPayrollStaff;
+
+            TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
+            return RedirectToAction(nameof(Prediction), new
+            {
+                projectId,
+                start = start.ToString("yyyy-MM-dd"),
+                end = end.ToString("yyyy-MM-dd")
+            });
+        }
+
+        private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(string? projectName, int? month)
+        {
+            var schedules = await _db.PayrollSchedules.Include(s => s.Project).ToListAsync();
+            var payrolls = await _db.Payrolls.Include(p => p.Project).ToListAsync();
+            var rows = new Dictionary<string, PayrollPeriodRow>(StringComparer.OrdinalIgnoreCase);
+
+            void Add(int projectId, string name, DateTime start, DateTime end, string? staff)
+            {
+                var key = projectId + "|" + start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
+                if (!rows.TryGetValue(key, out var row))
+                {
+                    rows[key] = new PayrollPeriodRow
+                    {
+                        ProjectId = projectId,
+                        ProjectName = string.IsNullOrWhiteSpace(name) ? "—" : name,
+                        StartDate = start.Date,
+                        EndDate = end.Date,
+                        PayrollStaff = string.IsNullOrWhiteSpace(staff) ? "—" : staff.Trim()
+                    };
+                    return;
+                }
+
+                if (row.PayrollStaff == "—" && !string.IsNullOrWhiteSpace(staff))
+                    row.PayrollStaff = staff.Trim();
+            }
+
+            foreach (var schedule in schedules)
+            {
+                Add(schedule.ProjectId, schedule.Project?.ProjectName ?? "—",
+                    schedule.StartingDate, schedule.EndDate, schedule.Project?.AssignedPayrollStaff);
+            }
+
+            foreach (var group in payrolls.GroupBy(p => new
+            {
+                p.ProjectId,
+                Start = p.PayPeriodStart.Date,
+                End = p.PayPeriodEnd.Date
+            }))
+            {
+                var sample = group.First();
+                var staff = group.Select(p => p.GeneratedBy).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v))
+                    ?? sample.Project?.AssignedPayrollStaff;
+                Add(group.Key.ProjectId, sample.Project?.ProjectName ?? "—",
+                    group.Key.Start, group.Key.End, staff);
+            }
+
+            IEnumerable<PayrollPeriodRow> list = rows.Values;
+            if (!string.IsNullOrWhiteSpace(projectName))
+            {
+                var term = projectName.Trim();
+                list = list.Where(r => r.ProjectName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (month is >= 1 and <= 12)
+                list = list.Where(r => r.StartDate.Month == month || r.EndDate.Month == month);
+
+            return list
+                .OrderByDescending(r => r.StartDate)
+                .ThenByDescending(r => r.EndDate)
+                .ThenBy(r => r.ProjectName)
+                .ToList();
+        }
+
+        private async Task<List<PayrollPeriodEmployeeRow>> LoadPeriodEmployeesAsync(
+            int projectId, DateTime start, DateTime end)
+        {
+            var employees = await _db.Employees
+                .Where(e => e.ProjectId == projectId && e.IsActive)
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
+
+            var payrolls = await _db.Payrolls
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start
+                    && p.PayPeriodEnd.Date == end)
+                .ToListAsync();
+
+            return employees.Select(emp =>
+            {
+                var slip = payrolls.FirstOrDefault(p => p.EmployeeId == emp.EmployeeId);
+                return new PayrollPeriodEmployeeRow
+                {
+                    PayrollId = slip?.PayrollId,
+                    EmployeeName = emp.FullName,
+                    Job = emp.JobClassification,
+                    RegularHours = slip == null ? 0 : slip.RegularDaysWorked * 8,
+                    OtHours = slip?.OvertimeHours ?? 0,
+                    NetPay = slip?.NetPay ?? 0,
+                    Status = slip?.Status ?? "—"
+                };
+            }).ToList();
+        }
+
+        private static Dictionary<int, string> MonthOptions()
+        {
+            return Enumerable.Range(1, 12).ToDictionary(
+                m => m,
+                m => DateCulture.DateTimeFormat.GetMonthName(m));
+        }
+
+        private static string PayslipFileName(string projectName, DateTime start, DateTime end)
+        {
+            var safe = new string((projectName ?? "Project").Where(char.IsLetterOrDigit).ToArray());
+            if (string.IsNullOrEmpty(safe)) safe = "Project";
+            return safe + "_Payslip_"
+                + start.ToString("MMMdd", DateCulture)
+                + "-"
+                + end.ToString("MMMdd", DateCulture)
+                + ".pdf";
         }
 
         // GET /Payroll/View/{id}

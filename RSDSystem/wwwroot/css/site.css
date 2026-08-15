@@ -241,9 +241,14 @@ body {
 /* ── Topbar (bell button row) ───────────────────────────── */
 .content-topbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 20px;
     margin-bottom:35px;
+}
+
+.content-topbar .bell-btn {
+    margin-left: auto;
 }
 
 .bell-btn {
@@ -1668,6 +1673,13 @@ button.badge-btn {
             color: #163F8B;
         }
 
+    .submenu li.active a,
+    .menu li a.menu-dropdown-toggle.active {
+        background: #C9DAFF;
+        color: #163F8B;
+        font-weight: 600;
+    }
+
 .menu-logout {
     padding: 0 10px 10px;
 }
@@ -2233,5 +2245,303 @@ button.badge-btn {
     font-size: 13px;
     color: #6b4d00;
     line-height: 1.5;
+}
+
+/* ── Admin View Payroll / Prediction ─────────────────────── */
+.vp-filters {
+    display: grid;
+    grid-template-columns: 1fr 220px auto;
+    gap: 14px;
+    align-items: end;
+    margin-bottom: 22px;
+}
+
+.vp-filter-submit {
+    padding-bottom: 1px;
+}
+
+.vp-period-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.vp-period-card {
+    border: 1.5px solid #d7e3ff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.vp-period-head,
+.vp-period-body {
+    display: grid;
+    grid-template-columns: 1.2fr 1.2fr 1.2fr 140px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+}
+
+.vp-period-head {
+    background: #dce8ff;
+    font-size: 12px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.vp-period-body {
+    background: #eef4ff;
+    font-size: 13px;
+}
+
+.vp-detail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.vp-inline-back {
+    margin-bottom: 0;
+    position: static;
+}
+
+.vp-detail-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-top: 8px;
+}
+
+.vp-detail-dates {
+    font-size: 13px;
+    color: #4a4a4a;
+    margin: 4px 0 18px;
+}
+
+.vp-employee-table tbody tr:nth-child(even) td {
+    background: #f4f8ff;
+}
+
+.gen-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px 32px 24px;
+    width: min(460px, calc(100vw - 32px));
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .2);
+}
+
+.gen-modal-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-bottom: 16px;
+}
+
+.gen-modal-text {
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.gen-modal-text strong {
+    color: #266DF1;
+}
+
+.gen-modal-period-lbl {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.gen-modal-period {
+    color: #266DF1;
+    font-weight: 600;
+    margin-bottom: 22px;
+}
+
+.gen-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.gen-modal-btn {
+    width: auto;
+    margin: 0;
+}
+
+.gen-modal-cancel {
+    background: #8a8a8a;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 28px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.gen-modal-cancel:hover {
+    background: #6f6f6f;
+}
+
+.send-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0 22px;
+    font-weight: 600;
+}
+
+.send-file-row i {
+    font-size: 28px;
+    color: #266DF1;
+}
+
+.pred-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.pred-back {
+    margin-bottom: 0;
+}
+
+.pred-heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.pred-project {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.pred-dates {
+    color: #d5e2ff;
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.pred-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.pred-btn-pdf,
+.pred-btn-send {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.pred-btn-pdf {
+    background: #fff;
+    color: #111;
+}
+
+.pred-btn-send {
+    background: #22a35a;
+    color: #fff;
+}
+
+.pred-btn-send:hover {
+    background: #1b8448;
+    color: #fff;
+}
+
+.pred-card {
+    min-height: 420px;
+}
+
+.pred-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.pred-slip {
+    border: 1px solid #222;
+    border-radius: 4px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+    min-height: 210px;
+    background: #fff;
+}
+
+.pred-slip:hover {
+    box-shadow: 0 6px 16px rgba(22, 63, 139, .12);
+}
+
+.pred-slip-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.pred-slip-sub {
+    text-align: center;
+    font-size: 12px;
+    margin-bottom: 12px;
+}
+
+.pred-slip-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12px;
+    margin: 6px 0;
+}
+
+.pred-slip-status {
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0d7a3e;
+}
+
+.pred-pager {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    color: #fff;
+    margin-top: 16px;
+    font-weight: 600;
+}
+
+.pred-pager a,
+.pred-pager span.disabled {
+    color: #fff;
+    text-decoration: none;
+    font-size: 18px;
+}
+
+.pred-pager span.disabled {
+    opacity: .4;
+}
+
+@media (max-width: 900px) {
+    .vp-filters,
+    .vp-period-head,
+    .vp-period-body,
+    .pred-grid,
+    .pred-heading-row {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+    }
 }
 

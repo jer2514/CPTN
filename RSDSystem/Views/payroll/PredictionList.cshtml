@@ -1,20 +1,20 @@
-﻿@model List<RSDSystem.Models.PayrollPeriodRow>
+@model List<RSDSystem.Models.PayrollPeriodRow>
 @{
-    ViewData["Title"] = "View Payroll";
-    var projectName = ViewBag.ProjectName as string ?? "";
+    ViewData["Title"] = "Payroll Prediction";
+    var projectName = ViewBag.ProjectNameFilter as string ?? "";
     int? selectedMonth = ViewBag.Month is int monthVal ? monthVal : (int?)null;
     var months = ViewBag.Months as Dictionary<int, string> ?? new Dictionary<int, string>();
 }
 
 <div class="content-topbar">
-    <div class="page-label">View Payroll (Admin)</div>
+    <div class="page-label">Payroll Prediction (Admin)</div>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
 <div class="page-card">
-    <div class="emp-title mb-3">View Payroll</div>
+    <div class="emp-title mb-3">Payroll Prediction</div>
 
-    <form asp-action="Index" method="get" class="vp-filters">
+    <form asp-action="Prediction" method="get" class="vp-filters">
         <div>
             <label class="form-lbl">Project Name</label>
             <input type="text" name="projectName" value="@projectName" class="form-ctrl" placeholder="Search project" />
@@ -63,7 +63,7 @@
                         <span>@row.PayrollStaff</span>
                         <span>
                             <a class="pill-btn pill-view"
-                               asp-action="Period"
+                               asp-action="Prediction"
                                asp-route-projectId="@row.ProjectId"
                                asp-route-start="@row.StartDate.ToString("yyyy-MM-dd")"
                                asp-route-end="@row.EndDate.ToString("yyyy-MM-dd")">
