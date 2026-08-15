@@ -142,12 +142,18 @@ namespace RSDSystem.Controllers
                     ? project.EstimateEndDate!.Value.ToString("yyyy-MM-dd") : null;
             }
 
+            var defaultStart = defaultSchedule?.StartingDate.Date ?? DateTime.Today.AddDays(-6);
+            var defaultEnd = defaultSchedule?.EndDate.Date ?? DateTime.Today;
+            if (defaultEnd < defaultStart)
+                defaultEnd = defaultStart;
+
             ViewBag.PageTitle = "Generate Payroll Slip";
             ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
-            ViewBag.DefaultStart = (defaultSchedule?.StartingDate ?? DateTime.Today.AddDays(-6)).ToString("yyyy-MM-dd");
-            ViewBag.DefaultEnd = (defaultSchedule?.EndDate ?? DateTime.Today).ToString("yyyy-MM-dd");
+            ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
+            ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
+            ViewBag.DefaultDaysWorked = Math.Max(1, InputRules.CountWeekdays(defaultStart, defaultEnd));
             ViewBag.MinDate = boundStart ?? "";
             ViewBag.MaxDate = boundEnd ?? "";
 
@@ -196,8 +202,6 @@ namespace RSDSystem.Controllers
                 && payPeriodEnd.Date >= payPeriodStart.Date)
             {
                 var periodDays = InputRules.InclusiveDays(payPeriodStart, payPeriodEnd);
-                if (periodDays > 31)
-                    errors["payPeriodEnd"] = "Pay period cannot be longer than 31 days.";
 
                 if (regularDaysWorked + absentDays > periodDays)
                     errors["regularDaysWorked"] = "Days worked plus absences cannot exceed the pay period.";
