@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -77,7 +79,9 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Project");
             ModelState.Remove("EmployeeCode");
 
-            CapitalizeEmployee(emp);
+            NormalizeEmployee(emp);
+            ClarifyNumericErrors(ModelState);
+            ValidatePhoto(photo);
 
             if (await IsDuplicateEmployeeAsync(emp))
             {
@@ -137,7 +141,9 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Project");
             ModelState.Remove("EmployeeCode");
 
-            CapitalizeEmployee(emp);
+            NormalizeEmployee(emp);
+            ClarifyNumericErrors(ModelState);
+            ValidatePhoto(photo);
 
             if (await IsDuplicateEmployeeAsync(emp, emp.EmployeeId))
             {
@@ -180,12 +186,50 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private static void CapitalizeEmployee(Employee emp)
+        private static void NormalizeEmployee(Employee emp)
         {
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            emp.FirstName = ti.ToTitleCase(emp.FirstName.Trim().ToLower());
-            emp.LastName = ti.ToTitleCase(emp.LastName.Trim().ToLower());
-            emp.MiddleInitial = emp.MiddleInitial?.Trim().ToUpper();
+            emp.FirstName = TitleCase(emp.FirstName, ti);
+            emp.LastName = TitleCase(emp.LastName, ti);
+            emp.MiddleInitial = string.IsNullOrWhiteSpace(emp.MiddleInitial)
+                ? null
+                : emp.MiddleInitial.Trim().ToUpperInvariant();
+            emp.Email = emp.Email?.Trim();
+            emp.ContactNumber = emp.ContactNumber?.Trim();
+            emp.Address = emp.Address?.Trim();
+            emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
+            emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
+        }
+
+        private static string TitleCase(string? value, System.Globalization.TextInfo ti)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLower());
+        }
+
+        private void ValidatePhoto(IFormFile? photo)
+        {
+            if (!InputRules.TryValidatePhoto(photo, out var error) && error != null)
+                ModelState.AddModelError("photo", error);
+        }
+
+        private static void ClarifyNumericErrors(ModelStateDictionary modelState)
+        {
+            foreach (var key in new[] { "DailyRate", "RatePerHour" })
+            {
+                if (!modelState.TryGetValue(key, out var entry)) continue;
+
+                var hasBindingError = entry.Errors.Any(e =>
+                    e.Exception != null ||
+                    e.ErrorMessage.Contains("is not valid", StringComparison.OrdinalIgnoreCase) ||
+                    e.ErrorMessage.Contains("is invalid", StringComparison.OrdinalIgnoreCase));
+
+                if (!hasBindingError) continue;
+
+                entry.Errors.Clear();
+                var label = key == "DailyRate" ? "Rate per day" : "Rate per hour";
+                entry.Errors.Add($"{label} is required.");
+            }
         }
 
         // Returns true if another employee already has the same

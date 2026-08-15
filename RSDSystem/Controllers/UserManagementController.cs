@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Validation;
 using BCrypt.Net;
 
 namespace RSDSystem.Controllers
@@ -80,18 +81,34 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
 
+            if (string.IsNullOrWhiteSpace(Password))
+                ModelState.AddModelError("Password", "Password is required.");
+            else if (Password.Length < 8)
+                ModelState.AddModelError("Password", "Password must be at least 8 characters.");
+
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
 
-            var usernameTaken = await _db.Users
-                .AnyAsync(u => u.Username == user.Username.Trim());
-            if (usernameTaken)
-                ModelState.AddModelError("Username", "This username is already taken.");
+            if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
+                ModelState.AddModelError("photo", photoError);
 
-            var emailTaken = await _db.Users
-                .AnyAsync(u => u.Email == user.Email.Trim());
-            if (emailTaken)
-                ModelState.AddModelError("Email", "This email is already registered.");
+            var username = user.Username?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(username))
+            {
+                var usernameTaken = await _db.Users
+                    .AnyAsync(u => u.Username == username);
+                if (usernameTaken)
+                    ModelState.AddModelError("Username", "This username is already taken.");
+            }
+
+            var email = user.Email?.Trim();
+            if (!string.IsNullOrEmpty(email))
+            {
+                var emailTaken = await _db.Users
+                    .AnyAsync(u => u.Email == email);
+                if (emailTaken)
+                    ModelState.AddModelError("Email", "This email is already registered.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -147,18 +164,34 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
 
-            if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
-                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+            if (!string.IsNullOrWhiteSpace(NewPassword))
+            {
+                if (NewPassword.Length < 8)
+                    ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+                if (NewPassword != ConfirmPassword)
+                    ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+            }
 
-            var usernameTaken = await _db.Users
-                .AnyAsync(u => u.Username == user.Username.Trim() && u.UserId != user.UserId);
-            if (usernameTaken)
-                ModelState.AddModelError("Username", "This username is already taken.");
+            if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
+                ModelState.AddModelError("photo", photoError);
 
-            var emailTaken = await _db.Users
-                .AnyAsync(u => u.Email == user.Email.Trim() && u.UserId != user.UserId);
-            if (emailTaken)
-                ModelState.AddModelError("Email", "This email is already registered.");
+            var username = user.Username?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(username))
+            {
+                var usernameTaken = await _db.Users
+                    .AnyAsync(u => u.Username == username && u.UserId != user.UserId);
+                if (usernameTaken)
+                    ModelState.AddModelError("Username", "This username is already taken.");
+            }
+
+            var email = user.Email?.Trim();
+            if (!string.IsNullOrEmpty(email))
+            {
+                var emailTaken = await _db.Users
+                    .AnyAsync(u => u.Email == email && u.UserId != user.UserId);
+                if (emailTaken)
+                    ModelState.AddModelError("Email", "This email is already registered.");
+            }
 
             if (!ModelState.IsValid)
             {
