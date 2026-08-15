@@ -57,6 +57,8 @@ namespace RSDSystem.Controllers
 
             var employees = await _db.Employees
                                      .Where(e => e.ProjectId == id)
+                                     .OrderBy(e => e.LastName)
+                                     .ThenBy(e => e.FirstName)
                                      .ToListAsync();
 
             var unassignedEmployees = await _db.Employees
