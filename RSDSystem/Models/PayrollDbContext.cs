@@ -34,6 +34,10 @@ namespace RSDSystem.Models
                 .HasIndex(e => e.Email)
                 .IsUnique();
 
+            modelBuilder.Entity<Employee>()
+                .Ignore(e => e.FullName)
+                .Ignore(e => e.Age);
+
             modelBuilder.Entity<User>()
                 .Ignore(u => u.FullName)
                 .Ignore(u => u.Age);

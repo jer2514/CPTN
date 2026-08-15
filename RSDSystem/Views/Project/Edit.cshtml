@@ -167,10 +167,38 @@
             <div>
                 <label class="form-lbl">Status</label>
                 <select name="Status" class="form-ctrl">
-                    <option value="Active" selected="@(Model.Status == "Active")">Active</option>
-                    <option value="Completed" selected="@(Model.Status == "Completed")">Completed</option>
-                    <option value="On Hold" selected="@(Model.Status == "On Hold")">On Hold</option>
-                    <option value="Cancelled" selected="@(Model.Status == "Cancelled")">Cancelled</option>
+                    @if (Model.Status == "Active")
+                    {
+                        <option value="Active" selected>Active</option>
+                    }
+                    else
+                    {
+                        <option value="Active">Active</option>
+                    }
+                    @if (Model.Status == "Completed")
+                    {
+                        <option value="Completed" selected>Completed</option>
+                    }
+                    else
+                    {
+                        <option value="Completed">Completed</option>
+                    }
+                    @if (Model.Status == "On Hold")
+                    {
+                        <option value="On Hold" selected>On Hold</option>
+                    }
+                    else
+                    {
+                        <option value="On Hold">On Hold</option>
+                    }
+                    @if (Model.Status == "Cancelled")
+                    {
+                        <option value="Cancelled" selected>Cancelled</option>
+                    }
+                    else
+                    {
+                        <option value="Cancelled">Cancelled</option>
+                    }
                 </select>
             </div>
         </div>
