@@ -56,17 +56,17 @@ namespace RSDSystem.Models
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
 
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? TimeIn1 { get; set; }
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? TimeOut1 { get; set; }
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? TimeIn2 { get; set; }
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? TimeOut2 { get; set; }
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? OvertimeIn { get; set; }
-        [MaxLength(20)]
+        [MaxLength(40)]
         public string? OvertimeOut { get; set; }
 
         [Column(TypeName = "decimal(10,2)")]

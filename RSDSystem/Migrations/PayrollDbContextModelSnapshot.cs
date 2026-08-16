@@ -462,12 +462,12 @@ namespace RSDSystem.Migrations
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<string>("OvertimeIn")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("OvertimeOut")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<DateTime?>("PeriodEnd")
                         .HasColumnType("datetime2");
@@ -481,20 +481,20 @@ namespace RSDSystem.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("TimeIn1")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("TimeIn2")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("TimeOut1")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<string>("TimeOut2")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<DateTime?>("WorkDate")
                         .HasColumnType("datetime2");
@@ -530,7 +530,7 @@ namespace RSDSystem.Migrations
                     b.HasOne("RSDSystem.Models.Employee", "Employee")
                         .WithMany()
                         .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("RSDSystem.Models.AttendanceImport", "Import")
                         .WithMany("Records")

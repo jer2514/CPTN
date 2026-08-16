@@ -149,59 +149,7 @@ END");
 
         try
         {
-            db.Database.ExecuteSqlRaw(@"
-IF OBJECT_ID(N'dbo.AttendanceImports', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.AttendanceImports (
-        AttendanceImportId int IDENTITY(1,1) NOT NULL CONSTRAINT PK_AttendanceImports PRIMARY KEY,
-        ProjectId int NOT NULL,
-        FileName nvarchar(260) NOT NULL,
-        Source nvarchar(20) NOT NULL,
-        Format nvarchar(30) NOT NULL,
-        PeriodStart datetime2 NULL,
-        PeriodEnd datetime2 NULL,
-        ImportedBy nvarchar(150) NULL,
-        ImportedAt datetime2 NOT NULL,
-        RowCount int NOT NULL,
-        CONSTRAINT FK_AttendanceImports_Projects_ProjectId
-            FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(ProjectId) ON DELETE CASCADE
-    );
-    CREATE INDEX IX_AttendanceImports_ProjectId ON dbo.AttendanceImports(ProjectId);
-END
-
-IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.AttendanceRecords (
-        AttendanceRecordId int IDENTITY(1,1) NOT NULL CONSTRAINT PK_AttendanceRecords PRIMARY KEY,
-        AttendanceImportId int NOT NULL,
-        EmployeeId int NULL,
-        ExternalUserId nvarchar(40) NOT NULL,
-        EmployeeName nvarchar(150) NOT NULL,
-        WorkDate datetime2 NULL,
-        PeriodStart datetime2 NULL,
-        PeriodEnd datetime2 NULL,
-        TimeIn1 nvarchar(20) NULL,
-        TimeOut1 nvarchar(20) NULL,
-        TimeIn2 nvarchar(20) NULL,
-        TimeOut2 nvarchar(20) NULL,
-        OvertimeIn nvarchar(20) NULL,
-        OvertimeOut nvarchar(20) NULL,
-        WorkHoursNormal decimal(10,2) NOT NULL,
-        WorkHoursActual decimal(10,2) NOT NULL,
-        LateMinutes int NOT NULL,
-        EarlyMinutes int NOT NULL,
-        OvertimeHours decimal(10,2) NOT NULL,
-        AbsenceDays decimal(10,2) NOT NULL,
-        Status nvarchar(20) NOT NULL,
-        Matched bit NOT NULL,
-        CONSTRAINT FK_AttendanceRecords_AttendanceImports_AttendanceImportId
-            FOREIGN KEY (AttendanceImportId) REFERENCES dbo.AttendanceImports(AttendanceImportId) ON DELETE CASCADE,
-        CONSTRAINT FK_AttendanceRecords_Employees_EmployeeId
-            FOREIGN KEY (EmployeeId) REFERENCES dbo.Employees(EmployeeId) ON DELETE SET NULL
-    );
-    CREATE INDEX IX_AttendanceRecords_AttendanceImportId ON dbo.AttendanceRecords(AttendanceImportId);
-    CREATE INDEX IX_AttendanceRecords_EmployeeId ON dbo.AttendanceRecords(EmployeeId);
-END");
+            AttendanceSchema.Ensure(db);
         }
         catch (Exception ex)
         {

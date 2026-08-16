@@ -68,35 +68,46 @@ namespace RSDSystem.Controllers
         [RequestSizeLimit(20_000_000)]
         public async Task<IActionResult> ImportFile(int? projectId, string? projectName, IFormFile? file, string? overridesJson)
         {
-            var check = ValidateUpload(file);
-            if (check != null)
-                return Json(new { success = false, message = check });
-
-            await using var stream = file!.OpenReadStream();
-            var result = await _imports.ImportAsync(
-                projectId,
-                projectName,
-                stream,
-                file.FileName,
-                ImportedBy(),
-                AttendanceImportSources.Manual,
-                StaffScope(),
-                overridesJson,
-                HttpContext.RequestAborted);
-
-            if (result.Error != null)
-                return Json(new { success = false, message = result.Error });
-
-            return Json(new
+            try
             {
-                success = true,
-                message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
-                result.ImportId,
-                result.ProjectId,
-                result.RowCount,
-                result.MatchedCount,
-                result.UnmatchedCount
-            });
+                var check = ValidateUpload(file);
+                if (check != null)
+                    return Json(new { success = false, message = check });
+
+                await using var stream = file!.OpenReadStream();
+                var result = await _imports.ImportAsync(
+                    projectId,
+                    projectName,
+                    stream,
+                    file.FileName,
+                    ImportedBy(),
+                    AttendanceImportSources.Manual,
+                    StaffScope(),
+                    overridesJson,
+                    HttpContext.RequestAborted);
+
+                if (result.Error != null)
+                    return Json(new { success = false, message = result.Error });
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    result.ImportId,
+                    result.ProjectId,
+                    result.RowCount,
+                    result.MatchedCount,
+                    result.UnmatchedCount
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Could not import the attendance file. " + ex.GetBaseException().Message
+                });
+            }
         }
 
         [HttpGet]

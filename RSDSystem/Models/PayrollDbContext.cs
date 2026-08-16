@@ -121,7 +121,7 @@ namespace RSDSystem.Models
                 .HasOne(r => r.Employee)
                 .WithMany()
                 .HasForeignKey(r => r.EmployeeId)
-                .OnDelete(DeleteBehavior.SetNull)
+                .OnDelete(DeleteBehavior.NoAction)
                 .IsRequired(false);
         }
     }
