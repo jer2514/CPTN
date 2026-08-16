@@ -101,20 +101,37 @@ namespace RSDSystem.Controllers
                 }
             }).ToList();
 
-            ViewBag.PendingApprovals = await _db.Set<Payroll>()
+            var submitted = await _db.Set<Payroll>()
                 .AsNoTracking()
                 .Where(p => p.Status == PayrollStatusOptions.Submitted)
-                .OrderByDescending(p => p.GeneratedDate)
-                .Select(p => new PendingApprovalRow
+                .Select(p => new
                 {
-                    PayrollId = p.PayrollId,
-                    StaffName = p.GeneratedBy ?? "",
-                    ProjectName = p.Project != null && p.Project.ProjectName != null && p.Project.ProjectName != ""
-                        ? p.Project.ProjectName
-                        : "—",
-                    Date = p.GeneratedDate
+                    p.ProjectId,
+                    p.GeneratedBy,
+                    p.GeneratedDate,
+                    ProjectName = p.Project != null ? p.Project.ProjectName ?? "" : "",
+                    AssignedStaff = p.Project != null ? p.Project.AssignedPayrollStaff ?? "" : ""
                 })
                 .ToListAsync();
+
+            ViewBag.PendingApprovals = submitted
+                .GroupBy(p => p.ProjectId)
+                .Select(g =>
+                {
+                    var latest = g.OrderByDescending(x => x.GeneratedDate).First();
+                    var staffName = !string.IsNullOrWhiteSpace(latest.GeneratedBy)
+                        ? latest.GeneratedBy
+                        : latest.AssignedStaff;
+                    return new PendingApprovalRow
+                    {
+                        ProjectId = g.Key,
+                        StaffName = string.IsNullOrWhiteSpace(staffName) ? "Payroll Staff" : staffName,
+                        ProjectName = string.IsNullOrWhiteSpace(latest.ProjectName) ? "—" : latest.ProjectName,
+                        Date = latest.GeneratedDate
+                    };
+                })
+                .OrderByDescending(r => r.Date)
+                .ToList();
 
             return View();
         }

@@ -31,65 +31,21 @@ else
     </a>
 }
 
-<div class="payslip-card">
-    <div class="payslip-title">RSD Construction Services</div>
-    <div class="payslip-subtitle">Employee Payslip</div>
+<partial name="_PayslipCard" model="Model" />
 
-    <div class="payslip-section-lbl">Employee Information</div>
-    <div class="payslip-row2">
-        <div><span class="payslip-lbl">Employee ID: </span><span class="payslip-val">@ViewBag.DisplayId</span></div>
-        <div><span class="payslip-lbl">Project Assigned: </span><span class="payslip-val">@(Model.Project?.ProjectName ?? "—")</span></div>
+@if (Model.Status == RSDSystem.Models.PayrollStatusOptions.Submitted)
+{
+    <div class="payslip-approve-row">
+        <button type="button" class="btn-approve" onclick="approvePayroll()">Approve</button>
+        <button type="button" class="btn-return" onclick="openCorrectionModal()">Return for Correction</button>
     </div>
-    <div class="payslip-row2">
-        <div><span class="payslip-lbl">Employee Name: </span><span class="payslip-val">@Model.Employee?.FullName</span></div>
-        <div><span class="payslip-lbl">Rate per day: </span><span class="payslip-val">₱@Model.Employee?.DailyRate.ToString("N2")</span></div>
+}
+else
+{
+    <div class="payslip-approve-row">
+        <span class="status-pill status-@Model.Status.ToLower()">@Model.Status</span>
     </div>
-    <div class="payslip-row2">
-        <div><span class="payslip-lbl">Job Classification: </span><span class="payslip-val">@Model.Employee?.JobClassification</span></div>
-        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@Model.Employee?.RatePerHour.ToString("N2")</span></div>
-    </div>
-
-    <div class="payslip-section-lbl">
-        Attendance Summary
-        <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture) - @Model.PayPeriodEnd.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)</span>
-    </div>
-    <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
-    <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours hours</span></div>
-    <div class="payslip-line"><span>Absent:</span><span class="payslip-val">@Model.AbsentDays Days</span></div>
-
-    <div class="payslip-section-lbl">Payroll Computation</div>
-    <div class="payslip-line"><span>Regular Pay:</span><span class="payslip-val">₱@Model.RegularPay.ToString("N2")</span></div>
-    <div class="payslip-line"><span>Overtime Pay:</span><span class="payslip-val">₱@Model.OvertimePay.ToString("N2")</span></div>
-    <div class="payslip-line payslip-line-strong"><span>Gross Pay:</span><span class="payslip-val">₱@Model.GrossPay.ToString("N2")</span></div>
-    <div class="payslip-line"><span>Cash Advance:</span><span class="payslip-val">₱@Model.CashAdvance.ToString("N2")</span></div>
-    <div class="payslip-line payslip-line-strong"><span>Net Pay:</span><span class="payslip-val">₱@Model.NetPay.ToString("N2")</span></div>
-
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)</div>
-
-    @if (Model.Status == RSDSystem.Models.PayrollStatusOptions.Correction && !string.IsNullOrWhiteSpace(Model.CorrectionReason))
-    {
-        <div class="correction-banner">
-            <div class="correction-banner-title">
-                <i class="bi bi-exclamation-triangle-fill"></i> Reason for Correction
-            </div>
-            <div class="correction-banner-text">@Model.CorrectionReason</div>
-        </div>
-    }
-
-    @if (Model.Status == RSDSystem.Models.PayrollStatusOptions.Submitted)
-    {
-        <div class="payslip-approve-row">
-            <button type="button" class="btn-approve" onclick="approvePayroll()">Approve</button>
-            <button type="button" class="btn-return" onclick="openCorrectionModal()">Return for Correction</button>
-        </div>
-    }
-    else
-    {
-        <div class="payslip-approve-row">
-            <span class="status-pill status-@Model.Status.ToLower()">@Model.Status</span>
-        </div>
-    }
-</div>
+}
 
 <!-- Reason for Correction Modal -->
 <div class="del-overlay" id="correctionOverlay">
