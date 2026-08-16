@@ -45,12 +45,12 @@ BEGIN
         [WorkDate] datetime2 NULL,
         [PeriodStart] datetime2 NULL,
         [PeriodEnd] datetime2 NULL,
-        [TimeIn1] nvarchar(20) NULL,
-        [TimeOut1] nvarchar(20) NULL,
-        [TimeIn2] nvarchar(20) NULL,
-        [TimeOut2] nvarchar(20) NULL,
-        [OvertimeIn] nvarchar(20) NULL,
-        [OvertimeOut] nvarchar(20) NULL,
+        [TimeIn1] nvarchar(40) NULL,
+        [TimeOut1] nvarchar(40) NULL,
+        [TimeIn2] nvarchar(40) NULL,
+        [TimeOut2] nvarchar(40) NULL,
+        [OvertimeIn] nvarchar(40) NULL,
+        [OvertimeOut] nvarchar(40) NULL,
         [WorkHoursNormal] decimal(10,2) NOT NULL,
         [WorkHoursActual] decimal(10,2) NOT NULL,
         [LateMinutes] int NOT NULL,
@@ -61,7 +61,7 @@ BEGIN
         [Matched] bit NOT NULL,
         CONSTRAINT [PK_AttendanceRecords] PRIMARY KEY ([AttendanceRecordId]),
         CONSTRAINT [FK_AttendanceRecords_AttendanceImports_AttendanceImportId] FOREIGN KEY ([AttendanceImportId]) REFERENCES [AttendanceImports] ([AttendanceImportId]) ON DELETE CASCADE,
-        CONSTRAINT [FK_AttendanceRecords_Employees_EmployeeId] FOREIGN KEY ([EmployeeId]) REFERENCES [Employees] ([EmployeeId]) ON DELETE SET NULL
+        CONSTRAINT [FK_AttendanceRecords_Employees_EmployeeId] FOREIGN KEY ([EmployeeId]) REFERENCES [Employees] ([EmployeeId]) ON DELETE NO ACTION
     );
     CREATE INDEX [IX_AttendanceRecords_AttendanceImportId] ON [AttendanceRecords] ([AttendanceImportId]);
     CREATE INDEX [IX_AttendanceRecords_EmployeeId] ON [AttendanceRecords] ([EmployeeId]);

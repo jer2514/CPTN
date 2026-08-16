@@ -79,15 +79,27 @@ namespace RSDSystem.Services
                 return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
             }
 
+            try
+            {
+                await AttendanceSchema.EnsureAsync(_db, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return new AttendanceImportResult
+                {
+                    Error = "Could not prepare the attendance tables. " + DescribeSaveError(ex)
+                };
+            }
+
             var batch = new AttendanceImport
             {
                 ProjectId = preview.Project.ProjectId,
-                FileName = Path.GetFileName(fileName),
-                Source = source,
-                Format = preview.Format,
+                FileName = Clip(Path.GetFileName(fileName), 260) ?? "attendance.xls",
+                Source = Clip(source, 20) ?? AttendanceImportSources.Manual,
+                Format = Clip(preview.Format, 30) ?? AttendanceFormats.Daily,
                 PeriodStart = preview.PeriodStart,
                 PeriodEnd = preview.PeriodEnd,
-                ImportedBy = importedBy,
+                ImportedBy = Clip(importedBy, 150),
                 ImportedAt = DateTime.Now,
                 RowCount = preview.Rows.Count
             };
@@ -97,30 +109,37 @@ namespace RSDSystem.Services
                 batch.Records.Add(new AttendanceRecord
                 {
                     EmployeeId = row.EmployeeId,
-                    ExternalUserId = row.ExternalUserId,
-                    EmployeeName = row.EmployeeName,
+                    ExternalUserId = Clip(row.ExternalUserId, 40) ?? "",
+                    EmployeeName = Clip(row.EmployeeName, 150) ?? "",
                     WorkDate = row.WorkDate,
                     PeriodStart = preview.PeriodStart,
                     PeriodEnd = preview.PeriodEnd,
-                    TimeIn1 = row.TimeIn1,
-                    TimeOut1 = row.TimeOut1,
-                    TimeIn2 = row.TimeIn2,
-                    TimeOut2 = row.TimeOut2,
-                    OvertimeIn = row.OvertimeIn,
-                    OvertimeOut = row.OvertimeOut,
+                    TimeIn1 = ClipTime(row.TimeIn1),
+                    TimeOut1 = ClipTime(row.TimeOut1),
+                    TimeIn2 = ClipTime(row.TimeIn2),
+                    TimeOut2 = ClipTime(row.TimeOut2),
+                    OvertimeIn = ClipTime(row.OvertimeIn),
+                    OvertimeOut = ClipTime(row.OvertimeOut),
                     WorkHoursNormal = row.WorkHoursNormal,
                     WorkHoursActual = row.WorkHoursActual,
                     LateMinutes = row.LateMinutes,
                     EarlyMinutes = row.EarlyMinutes,
                     OvertimeHours = row.OvertimeHours,
                     AbsenceDays = row.AbsenceDays,
-                    Status = row.Status,
+                    Status = Clip(row.Status, 20) ?? AttendanceStatuses.Incomplete,
                     Matched = row.Matched
                 });
             }
 
             _db.AttendanceImports.Add(batch);
-            await _db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return new AttendanceImportResult { Error = DescribeSaveError(ex) };
+            }
 
             return new AttendanceImportResult
             {
@@ -569,6 +588,51 @@ namespace RSDSystem.Services
                 return 0;
 
             return Math.Max(0, (int)(firstIn - new TimeSpan(8, 0, 0)).TotalMinutes);
+        }
+
+        private static string DescribeSaveError(Exception ex)
+        {
+            var sql = ex.GetBaseException().Message;
+            if (sql.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
+            {
+                return "The attendance tables are missing. Restart the app and import again.";
+            }
+
+            if (sql.Contains("truncated", StringComparison.OrdinalIgnoreCase))
+            {
+                return "A time or name was too long for the database. Edit the row and try again.";
+            }
+
+            if (sql.Contains("FOREIGN KEY", StringComparison.OrdinalIgnoreCase) ||
+                sql.Contains("conflicted with the FOREIGN KEY", StringComparison.OrdinalIgnoreCase))
+            {
+                return "A project or employee reference was invalid. Reload the project and try again.";
+            }
+
+            if (sql.Contains("multiple cascade paths", StringComparison.OrdinalIgnoreCase))
+            {
+                return "The attendance tables could not be created because of a database constraint. Restart the app and try again.";
+            }
+
+            return sql;
+        }
+
+        private static string? Clip(string? value, int max)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            var text = value.Trim();
+            return text.Length <= max ? text : text[..max];
+        }
+
+        private static string? ClipTime(string? value)
+        {
+            var clock = AttendanceDisplay.Clock(value);
+            if (string.IsNullOrWhiteSpace(clock))
+                return null;
+
+            return Clip(clock, 40);
         }
     }
 

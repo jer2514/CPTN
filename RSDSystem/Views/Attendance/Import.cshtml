@@ -303,8 +303,18 @@
             if (edits.length) form.append('overridesJson', JSON.stringify(edits));
             if (token) form.append('__RequestVerificationToken', token);
 
-            const res = await fetch(url, { method: 'POST', body: form });
-            return res.json();
+            const res = await fetch(url, {
+                method: 'POST',
+                body: form,
+                headers: { 'Accept': 'application/json' }
+            });
+            const text = await res.text();
+            let data = null;
+            try { data = JSON.parse(text); } catch { data = null; }
+            if (data) return data;
+            if (res.status === 401 || res.status === 302)
+                throw new Error('Your session expired. Refresh the page and sign in again.');
+            throw new Error('Could not save the attendance file. Restart the app and try Import again.');
         }
 
         document.getElementById('loadFileBtn').addEventListener('click', async function () {
@@ -357,8 +367,8 @@
                 }
                 alert(data.message);
                 window.location = '/Attendance/Records';
-            } catch {
-                alert('Could not import the attendance file.');
+            } catch (err) {
+                alert((err && err.message) ? err.message : 'Could not import the attendance file.');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Import Attendance';
