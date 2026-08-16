@@ -142,7 +142,8 @@ namespace RSDSystem.Controllers
         }
 
         // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
-        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null, string? returnUrl = null)
+        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null, string? returnUrl = null,
+            int? daysWorked = null, int? absentDays = null, decimal? overtimeHours = null)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             var project = await _db.Projects.FindAsync(projectId);
@@ -183,7 +184,10 @@ namespace RSDSystem.Controllers
                         employeeId,
                         projectId,
                         payrollId = existing.PayrollId,
-                        returnUrl
+                        returnUrl,
+                        daysWorked,
+                        absentDays,
+                        overtimeHours
                     });
                 }
             }
@@ -221,10 +225,11 @@ namespace RSDSystem.Controllers
             ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
-            ViewBag.DefaultDaysWorked = existing?.RegularDaysWorked
+            ViewBag.DefaultDaysWorked = daysWorked
+                ?? existing?.RegularDaysWorked
                 ?? Math.Max(1, DateRules.CountWeekdays(defaultStart, defaultEnd));
-            ViewBag.AbsentDays = existing?.AbsentDays ?? 0;
-            ViewBag.OvertimeHours = existing?.OvertimeHours ?? 0;
+            ViewBag.AbsentDays = absentDays ?? existing?.AbsentDays ?? 0;
+            ViewBag.OvertimeHours = overtimeHours ?? existing?.OvertimeHours ?? 0;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
             ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";

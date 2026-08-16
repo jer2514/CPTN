@@ -3087,8 +3087,111 @@ button.badge-btn {
     background: #eef4ff;
 }
 
+.att-edit-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(22, 63, 139, 0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 24px;
+}
+
+.att-edit-overlay[hidden] {
+    display: none;
+}
+
+.att-edit-panel {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    box-shadow: 0 16px 40px rgba(22, 63, 139, 0.18);
+}
+
+.att-edit-live {
+    margin-top: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #163F8B;
+}
+
+.att-summary {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.att-summary-chip {
+    background: #f3f7ff;
+    border: 1px solid #d7e4ff;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.att-summary-chip span {
+    display: block;
+    font-size: 11px;
+    color: #5b6f94;
+    font-weight: 600;
+}
+
+.att-summary-chip strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 18px;
+    color: #163F8B;
+}
+
+.att-quick-btn {
+    background: #eef4ff;
+    color: #266DF1;
+    border: 1px solid #c9daff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.att-quick-btn:hover {
+    background: #dce8ff;
+}
+
+.att-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.att-hours-cell {
+    text-align: center;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.att-ot-hours {
+    font-size: 11px;
+    font-weight: 600;
+    color: #7a93c4;
+}
+
+.att-quick-cell {
+    white-space: nowrap;
+}
+
+.att-row-edited td {
+    background: #f3f8ff;
+}
+
 @media (max-width: 900px) {
     .att-edit-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .att-summary {
         grid-template-columns: 1fr 1fr;
     }
 }

@@ -55,8 +55,8 @@ namespace RSDSystem.Controllers
                 projectName = preview.Project?.ProjectName,
                 fileName = preview.FileName,
                 format = preview.Format,
-                periodStart = preview.PeriodStart?.ToString("MMMM dd, yyyy"),
-                periodEnd = preview.PeriodEnd?.ToString("MMMM dd, yyyy"),
+                periodStart = AttendanceDisplay.LongDate(preview.PeriodStart),
+                periodEnd = AttendanceDisplay.LongDate(preview.PeriodEnd),
                 matchedCount = preview.MatchedCount,
                 unmatchedCount = preview.UnmatchedCount,
                 rows = preview.Rows.Select(r => ToRowJson(r))
@@ -66,7 +66,7 @@ namespace RSDSystem.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
-        public async Task<IActionResult> ImportFile(int? projectId, string? projectName, IFormFile? file)
+        public async Task<IActionResult> ImportFile(int? projectId, string? projectName, IFormFile? file, string? overridesJson)
         {
             var check = ValidateUpload(file);
             if (check != null)
@@ -81,6 +81,7 @@ namespace RSDSystem.Controllers
                 ImportedBy(),
                 AttendanceImportSources.Manual,
                 StaffScope(),
+                overridesJson,
                 HttpContext.RequestAborted);
 
             if (result.Error != null)
@@ -249,7 +250,8 @@ namespace RSDSystem.Controllers
             row.DisplayId,
             row.ExternalUserId,
             row.EmployeeName,
-            workDate = row.WorkDate?.ToString("MMMM dd, yyyy"),
+            workDate = AttendanceDisplay.LongDate(row.WorkDate),
+            workDateIso = row.WorkDate?.ToString("yyyy-MM-dd"),
             timeIn1 = AttendanceDisplay.Clock(row.TimeIn1),
             timeOut1 = AttendanceDisplay.Clock(row.TimeOut1),
             timeIn2 = AttendanceDisplay.Clock(row.TimeIn2),
@@ -267,7 +269,7 @@ namespace RSDSystem.Controllers
             row.Matched,
             row.Note,
             format,
-            importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt"),
+            importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
             actionLabel = row.Status == AttendanceStatuses.Complete ? "Request Edit" : "Edit"
         };
     }

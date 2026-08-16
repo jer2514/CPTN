@@ -59,7 +59,8 @@ namespace RSDSystem.Controllers
                 "n8n",
                 AttendanceImportSources.N8n,
                 assignedStaff: null,
-                HttpContext.RequestAborted);
+                overridesJson: null,
+                cancellationToken: HttpContext.RequestAborted);
 
             if (result.Error != null)
                 return BadRequest(new { success = false, message = result.Error });
