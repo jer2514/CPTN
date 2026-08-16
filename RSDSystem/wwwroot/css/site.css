@@ -3041,3 +3041,55 @@ button.badge-btn {
     grid-column: 1 / -1;
 }
 
+.att-edit-sub {
+    font-size: 13px;
+    color: #5b6f94;
+    margin: -8px 0 18px;
+}
+
+.att-edit-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.att-card-table thead th {
+    text-align: center;
+}
+
+.att-time-input {
+    min-width: 118px;
+    padding: 6px 8px;
+    height: 36px;
+}
+
+.att-day-cell {
+    min-width: 140px;
+}
+
+.att-day-label {
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.att-day-full {
+    font-size: 11px;
+    color: #7a93c4;
+    margin-top: 2px;
+}
+
+.att-weekend .att-day-label {
+    color: #c0392b;
+}
+
+.att-day-focus td {
+    background: #eef4ff;
+}
+
+@media (max-width: 900px) {
+    .att-edit-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+

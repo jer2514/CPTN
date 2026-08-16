@@ -165,8 +165,58 @@ namespace RSDSystem.Services
 
             if (result.Rows.Count == 0)
                 result.Error = "No time-card rows were found in the file.";
+            else
+                ExpandToFullMonth(result);
 
             return result;
+        }
+
+        public static void ExpandToFullMonth(AttendanceParseResult result)
+        {
+            var anchor = result.PeriodStart
+                ?? result.Rows.Select(r => r.WorkDate).FirstOrDefault(d => d.HasValue);
+            if (!anchor.HasValue || result.Rows.Count == 0)
+                return;
+
+            var monthStart = new DateTime(anchor.Value.Year, anchor.Value.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            result.PeriodStart = monthStart;
+            result.PeriodEnd = monthEnd;
+
+            var expanded = new List<AttendanceRecord>();
+            foreach (var group in result.Rows.GroupBy(r => (r.ExternalUserId, r.EmployeeName)))
+            {
+                var byDate = new Dictionary<DateTime, AttendanceRecord>();
+                foreach (var row in group.Where(r => r.WorkDate.HasValue))
+                    byDate[row.WorkDate!.Value.Date] = row;
+
+                var sample = group.First();
+                for (var day = monthStart; day <= monthEnd; day = day.AddDays(1))
+                {
+                    if (byDate.TryGetValue(day, out var existing))
+                    {
+                        existing.PeriodStart = monthStart;
+                        existing.PeriodEnd = monthEnd;
+                        existing.WorkDate = day;
+                        if (string.IsNullOrWhiteSpace(existing.Status))
+                            existing.Status = DeriveStatus(existing);
+                        expanded.Add(existing);
+                        continue;
+                    }
+
+                    expanded.Add(new AttendanceRecord
+                    {
+                        ExternalUserId = sample.ExternalUserId,
+                        EmployeeName = sample.EmployeeName,
+                        WorkDate = day,
+                        PeriodStart = monthStart,
+                        PeriodEnd = monthEnd,
+                        Status = AttendanceStatuses.Absent
+                    });
+                }
+            }
+
+            result.Rows = expanded;
         }
 
         private static List<EmployeeBlock> FindEmployeeBlocks(DataTable table)
@@ -518,6 +568,8 @@ namespace RSDSystem.Services
 
             if (result.Rows.Count == 0)
                 result.Error = "No attendance rows were found in the file.";
+            else if (result.Format == AttendanceFormats.Daily)
+                ExpandToFullMonth(result);
 
             return result;
         }

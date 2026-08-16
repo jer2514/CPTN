@@ -144,6 +144,37 @@ namespace RSDSystem.Controllers
             });
         }
 
+        public async Task<IActionResult> Edit(int id)
+        {
+            var model = await _imports.GetMonthEditAsync(id, HttpContext.RequestAborted);
+            if (model == null)
+                return NotFound();
+
+            ViewBag.PageTitle = "Edit Attendance";
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(AttendanceMonthEdit model)
+        {
+            if (model.Days.Count == 0)
+            {
+                TempData["Error"] = "No attendance days to save.";
+                return RedirectToAction(nameof(Records));
+            }
+
+            var error = await _imports.SaveMonthEditAsync(model, HttpContext.RequestAborted);
+            if (error != null)
+            {
+                TempData["Error"] = error;
+                return View(model);
+            }
+
+            TempData["Success"] = $"Saved {model.MonthLabel} attendance for {model.EmployeeName}.";
+            return RedirectToAction(nameof(Records));
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateRecord(

@@ -1,0 +1,114 @@
+@model RSDSystem.Models.AttendanceMonthEdit
+@using RSDSystem.Helpers
+@using RSDSystem.Models
+@{
+    ViewData["Title"] = "Edit Attendance";
+    Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="Records" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="page-card">
+    <div class="att-page-title">Edit Attendance</div>
+    <div class="att-edit-sub">Enter times on each date. Empty days stay Absent until a punch is saved.</div>
+
+    <div class="att-edit-meta">
+        <div>
+            <div class="form-lbl">Employee ID</div>
+            <div class="slip-value">@Model.DisplayId</div>
+        </div>
+        <div>
+            <div class="form-lbl">Employee Name</div>
+            <div class="slip-value">@Model.EmployeeName</div>
+        </div>
+        <div>
+            <div class="form-lbl">Project</div>
+            <div class="slip-value">@Model.ProjectName</div>
+        </div>
+        <div>
+            <div class="form-lbl">Month</div>
+            <div class="slip-value">@Model.MonthLabel</div>
+        </div>
+    </div>
+
+    <form asp-action="Edit" method="post" class="att-month-form">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="FocusRecordId" />
+        <input type="hidden" asp-for="AttendanceImportId" />
+        <input type="hidden" asp-for="ProjectId" />
+        <input type="hidden" asp-for="ProjectName" />
+        <input type="hidden" asp-for="EmployeeId" />
+        <input type="hidden" asp-for="ExternalUserId" />
+        <input type="hidden" asp-for="DisplayId" />
+        <input type="hidden" asp-for="EmployeeName" />
+        <input type="hidden" asp-for="MonthLabel" />
+        <input type="hidden" asp-for="MonthStart" />
+        <input type="hidden" asp-for="Matched" />
+
+        <div class="att-table-wrap">
+            <table class="emp-table att-table att-card-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">Date</th>
+                        <th colspan="2">Before Noon</th>
+                        <th colspan="2">After Noon</th>
+                        <th colspan="2">Overtime</th>
+                        <th rowspan="2">Status</th>
+                    </tr>
+                    <tr>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th>In</th>
+                        <th>Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Days.Count; i++)
+                    {
+                        var day = Model.Days[i];
+                        var weekend = day.WorkDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+                        var focus = day.RecordId == Model.FocusRecordId && day.RecordId > 0;
+                        <tr class="@(weekend ? "att-weekend" : "") @(focus ? "att-day-focus" : "")"
+                            id="att-day-@day.WorkDate.ToString("yyyyMMdd")">
+                            <td class="att-day-cell">
+                                <input type="hidden" asp-for="Days[i].RecordId" />
+                                <input type="hidden" asp-for="Days[i].WorkDate" />
+                                <div class="att-day-label">@AttendanceDisplay.DayLabel(day.WorkDate)</div>
+                                <div class="att-day-full">@day.WorkDate.ToString("MMMM dd, yyyy")</div>
+                            </td>
+                            <td><input asp-for="Days[i].TimeIn1" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].TimeOut1" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].TimeIn2" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].TimeOut2" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].OvertimeIn" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].OvertimeOut" type="time" class="form-ctrl att-time-input" /></td>
+                            <td>
+                                <span class="status-pill @AttendanceStatuses.CssClass(day.Status)">@day.Status</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="att-preview-footer">
+            <a asp-action="Records" class="btn-outline-blue">Cancel</a>
+            <button type="submit" class="btn-primary-blue-solid">Save Attendance</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        const focus = document.querySelector('.att-day-focus');
+        if (focus) focus.scrollIntoView({ block: 'center' });
+    </script>
+}

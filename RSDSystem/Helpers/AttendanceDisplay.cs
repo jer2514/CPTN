@@ -6,6 +6,16 @@ namespace RSDSystem.Helpers
     {
         public const string Empty = "——";
 
+        public static string HtmlTime(string? value)
+        {
+            if (!TryParseTime(value, out var time))
+                return "";
+            return DateTime.Today.Add(time).ToString("HH:mm", CultureInfo.InvariantCulture);
+        }
+
+        public static string DayLabel(DateTime date) =>
+            date.ToString("dd", CultureInfo.InvariantCulture) + " " + date.ToString("ddd", CultureInfo.InvariantCulture)[..2];
+
         public static string? Clock(string? value)
         {
             if (string.IsNullOrWhiteSpace(value) || value.Trim() == Empty)

@@ -87,40 +87,6 @@
     </div>
 </div>
 
-<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content att-edit-modal">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Attendance</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="editRecordId" />
-                <div class="att-edit-grid">
-                    <label>Time In (1)<input id="editIn1" class="form-ctrl" /></label>
-                    <label>Time Out (1)<input id="editOut1" class="form-ctrl" /></label>
-                    <label>Time In (2)<input id="editIn2" class="form-ctrl" /></label>
-                    <label>Time Out (2)<input id="editOut2" class="form-ctrl" /></label>
-                    <label>Overtime In<input id="editOtIn" class="form-ctrl" /></label>
-                    <label>Overtime Out<input id="editOtOut" class="form-ctrl" /></label>
-                    <label class="att-edit-status">Status
-                        <select id="editStatus" class="form-ctrl">
-                            <option>Complete</option>
-                            <option>Incomplete</option>
-                            <option>Late</option>
-                            <option>Absent</option>
-                        </select>
-                    </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-outline-blue" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="saveEditBtn" class="btn-primary-blue-solid">Save</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
     <script>
@@ -134,10 +100,8 @@
         const projectInput = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
         const suggestList = document.getElementById('projectSuggestions');
-        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]')?.value;
         let statusFilter = 'all';
         let currentPage = 1;
-        let editModal;
 
         function renderSuggestions(matches) {
             if (matches.length === 0) {
@@ -232,7 +196,7 @@
                         <td>${timeCell(r.overtimeIn)}</td>
                         <td>${timeCell(r.overtimeOut)}</td>
                         <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
-                        <td><button type="button" class="att-action-link" data-edit='${JSON.stringify(r).replace(/'/g, "&#39;")}'>${r.actionLabel}</button></td>
+                        <td><a class="att-action-link" href="/Attendance/Edit/${r.recordId}">${r.actionLabel}</a></td>
                     </tr>`).join('');
 
                 document.getElementById('recordsPager').innerHTML =
@@ -259,45 +223,5 @@
             loadRecords();
         });
 
-        document.getElementById('recordsBody').addEventListener('click', function (e) {
-            const btn = e.target.closest('[data-edit]');
-            if (!btn) return;
-            const row = JSON.parse(btn.dataset.edit.replace(/&#39;/g, "'"));
-            document.getElementById('editRecordId').value = row.recordId;
-            document.getElementById('editIn1').value = row.timeIn1 || '';
-            document.getElementById('editOut1').value = row.timeOut1 || '';
-            document.getElementById('editIn2').value = row.timeIn2 || '';
-            document.getElementById('editOut2').value = row.timeOut2 || '';
-            document.getElementById('editOtIn').value = row.overtimeIn || '';
-            document.getElementById('editOtOut').value = row.overtimeOut || '';
-            document.getElementById('editStatus').value = row.status;
-            editModal.show();
-        });
-
-        document.getElementById('saveEditBtn').addEventListener('click', async function () {
-            const form = new FormData();
-            form.append('recordId', document.getElementById('editRecordId').value);
-            form.append('timeIn1', document.getElementById('editIn1').value);
-            form.append('timeOut1', document.getElementById('editOut1').value);
-            form.append('timeIn2', document.getElementById('editIn2').value);
-            form.append('timeOut2', document.getElementById('editOut2').value);
-            form.append('overtimeIn', document.getElementById('editOtIn').value);
-            form.append('overtimeOut', document.getElementById('editOtOut').value);
-            form.append('status', document.getElementById('editStatus').value);
-            if (token) form.append('__RequestVerificationToken', token);
-
-            const res = await fetch('/Attendance/UpdateRecord', { method: 'POST', body: form });
-            const data = await res.json();
-            if (!data.success) {
-                alert(data.message || 'Could not save the row.');
-                return;
-            }
-            editModal.hide();
-            loadRecords();
-        });
-
-        document.addEventListener('DOMContentLoaded', function () {
-            editModal = new bootstrap.Modal(document.getElementById('editModal'));
-        });
     </script>
 }
