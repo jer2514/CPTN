@@ -520,13 +520,10 @@ namespace RSDSystem.Controllers
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
-            if (payroll.Status != PayrollStatusOptions.Draft)
-                return Json(new { success = false, message = "Only draft payroll records can be deleted." });
-
             _db.Set<Payroll>().Remove(payroll);
             await _db.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Draft payroll deleted." });
+            return Json(new { success = true, message = "Payroll record deleted." });
         }
 
         public IActionResult Logout()
