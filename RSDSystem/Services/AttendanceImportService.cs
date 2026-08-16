@@ -319,7 +319,7 @@ namespace RSDSystem.Services
         public string? Error { get; set; }
         public Project? Project { get; set; }
         public string FileName { get; set; } = "";
-        public string Format { get; set; } = AttendanceFormats.Statistic;
+        public string Format { get; set; } = AttendanceFormats.Daily;
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
         public List<AttendancePreviewRow> Rows { get; set; } = new();

@@ -19,7 +19,7 @@ namespace RSDSystem.Models
         public string Source { get; set; } = AttendanceImportSources.Manual;
 
         [MaxLength(30)]
-        public string Format { get; set; } = AttendanceFormats.Statistic;
+        public string Format { get; set; } = AttendanceFormats.Daily;
 
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
