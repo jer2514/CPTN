@@ -221,7 +221,7 @@ namespace RSDSystem.Services
 
         private static List<EmployeeBlock> FindEmployeeBlocks(DataTable table)
         {
-            var labelCols = new List<int>();
+            var starts = new SortedSet<int>();
             var scan = Math.Min(table.Rows.Count, 20);
             for (var r = 0; r < scan; r++)
             {
@@ -231,26 +231,16 @@ namespace RSDSystem.Services
                     var key = NormalizeHeader(values[c]);
                     var inline = InlineField.Match(values[c]);
                     if (key is "name" or "userid" or "employeeid" || inline.Success)
-                    {
-                        if (!labelCols.Any(existing => Math.Abs(existing - c) <= 1))
-                            labelCols.Add(c);
-                    }
+                        starts.Add(SnapBlockStart(table, c));
                 }
             }
 
-            labelCols.Sort();
-            var starts = new List<int>();
-            foreach (var col in labelCols)
-            {
-                if (starts.Count == 0 || col - starts[^1] >= 10)
-                    starts.Add(col);
-            }
-
+            var edges = starts.ToList();
             var blocks = new List<EmployeeBlock>();
-            for (var i = 0; i < starts.Count; i++)
+            for (var i = 0; i < edges.Count; i++)
             {
-                var start = starts[i];
-                var end = i + 1 < starts.Count ? starts[i + 1] - 1 : table.Columns.Count - 1;
+                var start = edges[i];
+                var end = i + 1 < edges.Count ? edges[i + 1] - 1 : table.Columns.Count - 1;
                 if (end - start < 6)
                     end = Math.Min(table.Columns.Count - 1, start + 15);
 
@@ -260,6 +250,42 @@ namespace RSDSystem.Services
             }
 
             return blocks;
+        }
+
+        private static int SnapBlockStart(DataTable table, int anchor)
+        {
+            var start = anchor;
+            var foundEdge = false;
+            for (var c = anchor; c >= 0; c--)
+            {
+                var keys = ColumnKeys(table, c);
+                var isEdge = keys.Contains("dept") || keys.Contains("department")
+                    || keys.Contains("timecard") || keys.Contains("date") || keys.Contains("dateweekday");
+                var isSeparator = foundEdge && c < anchor && keys.Count == 0;
+                if (isSeparator)
+                    break;
+
+                start = c;
+                if (isEdge)
+                    foundEdge = true;
+            }
+
+            return start;
+        }
+
+        private static HashSet<string> ColumnKeys(DataTable table, int col)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var scan = Math.Min(table.Rows.Count, 25);
+            for (var r = 0; r < scan; r++)
+            {
+                var values = RowValues(table, r);
+                if (col >= values.Length || string.IsNullOrWhiteSpace(values[col]))
+                    continue;
+                keys.Add(NormalizeHeader(values[col]));
+            }
+
+            return keys;
         }
 
         private static EmployeeBlock? ReadEmployeeHeader(DataTable table, int colStart, int colEnd)
@@ -354,7 +380,7 @@ namespace RSDSystem.Services
                     continue;
                 }
 
-                if (IsSectionLabel(dateText))
+                if (IsSectionLabel(dateText) || IsPeriodText(dateText))
                     continue;
 
                 var workDate = ResolveCardDate(dateText, result.PeriodStart, result.PeriodEnd, columns != null);
@@ -382,7 +408,7 @@ namespace RSDSystem.Services
                     OvertimeOut = NormalizeTime(CellAt(values, columns?.OtOut))
                 };
 
-                if (columns == null)
+                if (columns == null || TimesEmpty(row))
                     ApplyFallbackTimes(values, block.ColStart, block.ColEnd, dateText, row);
 
                 row.Status = DeriveStatus(row);
@@ -398,10 +424,16 @@ namespace RSDSystem.Services
                 var next = r + 1 < table.Rows.Count ? RowValues(table, r + 1) : values;
                 var joined = (string.Join(" ", Slice(values, colStart, colEnd)) + " "
                     + string.Join(" ", Slice(next, colStart, colEnd))).ToLowerInvariant();
-                if (!joined.Contains("in"))
+                var hasInOutHeader = Slice(values, colStart, colEnd).Concat(Slice(next, colStart, colEnd))
+                    .Any(v =>
+                    {
+                        var key = NormalizeHeader(v);
+                        return key is "in" or "out";
+                    });
+                if (!hasInOutHeader)
                     continue;
                 if (!(joined.Contains("noon") || joined.Contains("overtime") || joined.Contains("date")
-                      || joined.Contains("weekday")))
+                      || joined.Contains("weekday") || joined.Contains("time card")))
                     continue;
                 var map = new TimeCardColumns { DateCol = colStart, DataStartRow = r + 1 };
                 var group = "";
@@ -421,12 +453,17 @@ namespace RSDSystem.Services
                     else if (parent.Contains("overtime"))
                         group = "ot";
 
-                    var inOut = child is "in" or "out" ? child : parent is "in" or "out" ? parent : "";
+                    var inOut = child is "in" or "out" ? child
+                        : parent is "in" or "out" ? parent
+                        : "";
                     if (inOut == "in")
                         AssignIn(map, group, c);
                     else if (inOut == "out")
                         AssignOut(map, group, c);
                 }
+
+                if (map.In1 == null && map.In2 == null && map.Out1 == null && map.Out2 == null)
+                    ApplyPositionalTimeColumns(map);
 
                 if (map.In1 == null && map.In2 == null && map.Out1 == null && map.Out2 == null)
                     continue;
@@ -462,6 +499,25 @@ namespace RSDSystem.Services
             else if (map.Out2 == null) map.Out2 = col;
             else map.OtOut ??= col;
         }
+
+        private static void ApplyPositionalTimeColumns(TimeCardColumns map)
+        {
+            var offset = 1;
+            map.In1 ??= map.DateCol + offset;
+            map.Out1 ??= map.DateCol + offset + 1;
+            map.In2 ??= map.DateCol + offset + 2;
+            map.Out2 ??= map.DateCol + offset + 3;
+            map.OtIn ??= map.DateCol + offset + 4;
+            map.OtOut ??= map.DateCol + offset + 5;
+        }
+
+        private static bool TimesEmpty(AttendanceRecord row) =>
+            string.IsNullOrWhiteSpace(row.TimeIn1)
+            && string.IsNullOrWhiteSpace(row.TimeOut1)
+            && string.IsNullOrWhiteSpace(row.TimeIn2)
+            && string.IsNullOrWhiteSpace(row.TimeOut2)
+            && string.IsNullOrWhiteSpace(row.OvertimeIn)
+            && string.IsNullOrWhiteSpace(row.OvertimeOut);
 
         private static void ApplyFallbackTimes(
             string[] values, int colStart, int colEnd, string dateText, AttendanceRecord row)
@@ -595,6 +651,9 @@ namespace RSDSystem.Services
 
         private static DateTime? ResolveCardDate(string text, DateTime? periodStart, DateTime? periodEnd, bool allowBareDay)
         {
+            if (string.IsNullOrWhiteSpace(text) || IsPeriodText(text) || IsSectionLabel(text))
+                return null;
+
             var parsed = ParseDate(text);
             if (parsed.HasValue)
                 return parsed;
@@ -748,21 +807,65 @@ namespace RSDSystem.Services
                 return "";
 
             if (value is DateTime dt)
+                return FormatDateTime(dt);
+
+            if (value is TimeSpan span)
+                return $"{(int)span.TotalHours:00}:{span.Minutes:00}";
+
+            if (value is IConvertible && value is not string)
             {
-                if (dt.Year <= 1900)
-                    return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
-                if (dt.TimeOfDay == TimeSpan.Zero)
-                    return dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-                return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+                try
+                {
+                    var number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                    var formatted = FormatNumericCell(number);
+                    if (formatted != null)
+                        return formatted;
+                }
+                catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException)
+                {
+                }
             }
 
-            if (value is double number && number > 0 && number < 1)
+            return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? "";
+        }
+
+        private static string FormatDateTime(DateTime dt)
+        {
+            if (dt.Year <= 1900)
+                return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+            if (dt.TimeOfDay == TimeSpan.Zero)
+                return dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+        }
+
+        private static string? FormatNumericCell(double number)
+        {
+            if (double.IsNaN(number) || double.IsInfinity(number))
+                return null;
+
+            var fraction = Math.Abs(number - Math.Truncate(number));
+            if (number > 0 && number < 1)
             {
                 var ts = TimeSpan.FromDays(number);
                 return $"{(int)ts.TotalHours:00}:{ts.Minutes:00}";
             }
 
-            return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? "";
+            if (fraction > 0.0000001 && number > 60 && number < 2958466)
+            {
+                try
+                {
+                    var oa = DateTime.FromOADate(number);
+                    if (oa.TimeOfDay > TimeSpan.Zero)
+                        return oa.ToString("HH:mm", CultureInfo.InvariantCulture);
+                    return oa.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                }
+                catch (ArgumentException)
+                {
+                    return null;
+                }
+            }
+
+            return null;
         }
 
         private static string[] Slice(string[] values, int start, int end)
@@ -804,18 +907,40 @@ namespace RSDSystem.Services
 
         private static string? NormalizeTime(string? value)
         {
-            if (string.IsNullOrWhiteSpace(value) || IsFieldLabel(value) || IsSectionLabel(value))
+            if (string.IsNullOrWhiteSpace(value) || IsFieldLabel(value) || IsSectionLabel(value) || IsPeriodText(value))
                 return null;
 
             var text = value.Trim();
+            if (CardDate.IsMatch(text) || BareDay.IsMatch(text))
+                return null;
+
             if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
                 || DateTime.TryParse(text, out dt))
+            {
+                if (dt.TimeOfDay == TimeSpan.Zero && text.Length > 8)
+                    return null;
                 return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+            }
 
             if (TimeSpan.TryParse(text, CultureInfo.InvariantCulture, out var ts))
                 return $"{(int)ts.TotalHours:00}:{ts.Minutes:00}";
 
-            return text;
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var number))
+            {
+                var formatted = FormatNumericCell(number);
+                if (formatted != null && formatted.Contains(':'))
+                    return formatted;
+                return null;
+            }
+
+            return text.Contains(':') ? text : null;
+        }
+
+        private static bool IsPeriodText(string value)
+        {
+            var text = (value ?? "").Trim();
+            return text.Contains('~') || text.Contains("Attendance", StringComparison.OrdinalIgnoreCase)
+                || BareDateRange.IsMatch(text);
         }
 
         private static decimal ParseDec(string value)
@@ -836,6 +961,8 @@ namespace RSDSystem.Services
         {
             if (string.IsNullOrWhiteSpace(value)) return null;
             var text = value.Trim();
+            if (Regex.IsMatch(text, @"^\d{1,2}:\d{2}"))
+                return null;
             if (text.Contains(' ') && DateTime.TryParse(text.Split(' ')[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out var iso)
                 && Regex.IsMatch(text.Split(' ')[0], @"^\d{4}-\d{2}-\d{2}$"))
                 return iso.Date;
