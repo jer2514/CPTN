@@ -21,11 +21,25 @@ namespace RSDSystem.Controllers
         // GET /PayrollStaff  → "To do task" dashboard
         public async Task<IActionResult> Index()
         {
-            var tasks = await _db.Projects
-                 .Where(p => p.AssignedPayrollStaff == CurrentStaffName)
-                 .Ongoing()
-                 .OrderBy(p => p.StartingDate)
-                 .ToListAsync();
+            var staffName = StaffName();
+            if (string.IsNullOrWhiteSpace(staffName))
+            {
+                ViewBag.PageTitle = "To do task";
+                return View(new List<PayrollSchedule>());
+            }
+
+            var tasks = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .Where(s => s.Project != null
+                    && s.Project.AssignedPayrollStaff != null
+                    && s.Project.AssignedPayrollStaff.Trim() == staffName)
+                .Where(s => s.Project!.Status == ProjectStatusOptions.OnGoing
+                    || s.Project.Status == "Active"
+                    || s.Project.Status == null
+                    || s.Project.Status == "")
+                .OrderBy(s => s.StartingDate)
+                .ThenBy(s => s.Project!.ProjectName)
+                .ToListAsync();
 
             ViewBag.PageTitle = "To do task";
             return View(tasks);
@@ -36,14 +50,24 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleTask(int id)
         {
-            var project = await _db.Projects.FindAsync(id);
-            if (project != null)
+            var staffName = StaffName();
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id);
+
+            if (schedule?.Project != null
+                && (string.IsNullOrWhiteSpace(staffName)
+                    || string.Equals(schedule.Project.AssignedPayrollStaff?.Trim(), staffName, StringComparison.Ordinal)))
             {
-                project.TaskCompleted = !project.TaskCompleted;
+                schedule.TaskCompleted = !schedule.TaskCompleted;
                 await _db.SaveChangesAsync();
             }
+
             return RedirectToAction(nameof(Index));
         }
+
+        private string StaffName() =>
+            (HttpContext.Session.GetString("FullName") ?? CurrentStaffName).Trim();
 
 
 

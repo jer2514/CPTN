@@ -32,6 +32,8 @@ namespace RSDSystem.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+        public bool TaskCompleted { get; set; } = false;
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             foreach (var result in DateRules.ValidateDateRange(

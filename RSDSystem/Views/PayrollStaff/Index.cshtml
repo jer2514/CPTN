@@ -1,4 +1,4 @@
-﻿@model List<RSDSystem.Models.Project>
+﻿@model List<RSDSystem.Models.PayrollSchedule>
 @{
     ViewData["Title"] = "To do task";
     Layout = "_PayrollStaffLayout";
@@ -28,18 +28,18 @@
                     <td colspan="5" class="text-center text-muted py-4">No tasks assigned.</td>
                 </tr>
             }
-            @foreach (var p in Model)
+            @foreach (var s in Model)
             {
                 <tr>
-                    <td>@p.ProjectName</td>
-                    <td>@(p.TypeOfService ?? "—")</td>
-                    <td>@(p.StartingDate?.ToString("MMMM d, yyyy") ?? "—")</td>
-                    <td>@(p.EstimateEndDate?.ToString("MMMM d, yyyy") ?? "—")</td>
+                    <td>@(s.Project?.ProjectName ?? "—")</td>
+                    <td>@(s.TypeOfService ?? s.Project?.TypeOfService ?? "—")</td>
+                    <td>@s.StartingDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                    <td>@s.EndDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
                     <td class="text-center">
-                        <form asp-action="ToggleTask" asp-route-id="@p.ProjectId" method="post" class="d-inline">
+                        <form asp-action="ToggleTask" asp-route-id="@s.PayrollScheduleId" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="task-check-btn @(p.TaskCompleted ? "checked" : "")" title="Mark as done">
-                                @if (p.TaskCompleted)
+                            <button type="submit" class="task-check-btn @(s.TaskCompleted ? "checked" : "")" title="Mark as done">
+                                @if (s.TaskCompleted)
                                 {
                                     <i class="bi bi-check-square-fill"></i>
                                 }
