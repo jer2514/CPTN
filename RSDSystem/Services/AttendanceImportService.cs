@@ -37,6 +37,7 @@ namespace RSDSystem.Services
                 return new AttendancePreviewResult { Error = parsed.Error, Project = project };
             }
 
+            await ApplyAdminTaskWindowAsync(project.ProjectId, parsed, cancellationToken);
             var rows = MapRows(parsed, employees);
             return new AttendancePreviewResult
             {
@@ -232,15 +233,18 @@ namespace RSDSystem.Services
             if (focus?.Import == null || !focus.WorkDate.HasValue)
                 return null;
 
-            var monthStart = new DateTime(focus.WorkDate.Value.Year, focus.WorkDate.Value.Month, 1);
-            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var periodStart = focus.Import.PeriodStart?.Date ?? focus.WorkDate.Value.Date;
+            var periodEnd = focus.Import.PeriodEnd?.Date ?? focus.WorkDate.Value.Date;
+            if (periodEnd < periodStart)
+                periodEnd = periodStart;
+
             var project = await _db.Projects.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ProjectId == focus.Import.ProjectId, cancellationToken);
 
             var existing = await _db.AttendanceRecords
                 .Where(r => r.AttendanceImportId == focus.AttendanceImportId
-                    && r.WorkDate >= monthStart
-                    && r.WorkDate <= monthEnd
+                    && r.WorkDate >= periodStart
+                    && r.WorkDate <= periodEnd
                     && ((focus.EmployeeId.HasValue && r.EmployeeId == focus.EmployeeId)
                         || r.ExternalUserId == focus.ExternalUserId))
                 .ToListAsync(cancellationToken);
@@ -260,12 +264,12 @@ namespace RSDSystem.Services
                 ExternalUserId = focus.ExternalUserId,
                 DisplayId = AttendanceDisplay.EmployeeId(focus.Employee?.EmployeeCode ?? focus.ExternalUserId),
                 EmployeeName = focus.Employee?.FullName ?? focus.EmployeeName,
-                MonthLabel = monthStart.ToString("MMMM yyyy", AttendanceDisplay.English),
-                MonthStart = monthStart,
+                MonthLabel = AttendanceDisplay.LongDate(periodStart) + " – " + AttendanceDisplay.LongDate(periodEnd),
+                MonthStart = periodStart,
                 Matched = focus.Matched
             };
 
-            for (var day = monthStart; day <= monthEnd; day = day.AddDays(1))
+            for (var day = periodStart; day <= periodEnd; day = day.AddDays(1))
             {
                 byDate.TryGetValue(day, out var row);
                 edit.Days.Add(new AttendanceDayEdit
@@ -300,10 +304,14 @@ namespace RSDSystem.Services
             if (import == null)
                 return "Attendance import not found.";
 
-            var monthStart = model.MonthStart.Date;
-            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-            import.PeriodStart = monthStart;
-            import.PeriodEnd = monthEnd;
+            var periodStart = model.Days.Count > 0
+                ? model.Days.Min(d => d.WorkDate).Date
+                : model.MonthStart.Date;
+            var periodEnd = model.Days.Count > 0
+                ? model.Days.Max(d => d.WorkDate).Date
+                : periodStart;
+            import.PeriodStart = periodStart;
+            import.PeriodEnd = periodEnd;
 
             foreach (var day in model.Days.OrderBy(d => d.WorkDate))
             {
@@ -324,16 +332,16 @@ namespace RSDSystem.Services
                         ExternalUserId = model.ExternalUserId,
                         EmployeeName = model.EmployeeName,
                         WorkDate = workDate,
-                        PeriodStart = monthStart,
-                        PeriodEnd = monthEnd,
+                        PeriodStart = periodStart,
+                        PeriodEnd = periodEnd,
                         Matched = model.Matched
                     };
                     _db.AttendanceRecords.Add(record);
                 }
 
                 record.WorkDate = workDate;
-                record.PeriodStart = monthStart;
-                record.PeriodEnd = monthEnd;
+                record.PeriodStart = periodStart;
+                record.PeriodEnd = periodEnd;
                 record.TimeIn1 = EmptyToNull(day.TimeIn1);
                 record.TimeOut1 = EmptyToNull(day.TimeOut1);
                 record.TimeIn2 = EmptyToNull(day.TimeIn2);
@@ -352,6 +360,54 @@ namespace RSDSystem.Services
                 r => r.AttendanceImportId == model.AttendanceImportId, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
             return null;
+        }
+
+        private async Task ApplyAdminTaskWindowAsync(
+            int projectId,
+            AttendanceParseResult parsed,
+            CancellationToken cancellationToken)
+        {
+            if (parsed.Rows.Count == 0)
+                return;
+
+            var window = await ResolveTaskWindowAsync(projectId, parsed.PeriodStart, parsed.PeriodEnd, cancellationToken);
+            if (window == null)
+                return;
+
+            AttendanceFileParser.ExpandToDateRange(parsed, window.Value.Start, window.Value.End);
+        }
+
+        private async Task<(DateTime Start, DateTime End)?> ResolveTaskWindowAsync(
+            int projectId,
+            DateTime? fileStart,
+            DateTime? fileEnd,
+            CancellationToken cancellationToken)
+        {
+            var schedules = await _db.PayrollSchedules
+                .AsNoTracking()
+                .Where(s => s.ProjectId == projectId)
+                .OrderBy(s => s.StartingDate)
+                .ThenBy(s => s.EndDate)
+                .ToListAsync(cancellationToken);
+
+            if (schedules.Count == 0)
+                return null;
+
+            var open = schedules.Where(s => !s.TaskCompleted).ToList();
+            var pool = open.Count > 0 ? open : schedules;
+
+            if (fileStart.HasValue)
+            {
+                var end = (fileEnd ?? fileStart).Value.Date;
+                var start = fileStart.Value.Date;
+                var overlap = pool
+                    .Where(s => s.StartingDate.Date <= end && s.EndDate.Date >= start)
+                    .ToList();
+                if (overlap.Count > 0)
+                    pool = overlap;
+            }
+
+            return (pool.Min(s => s.StartingDate.Date), pool.Max(s => s.EndDate.Date));
         }
 
         private async Task<Project?> ResolveProjectAsync(
