@@ -217,6 +217,125 @@ namespace RSDSystem.Services
             return null;
         }
 
+        public async Task<AttendanceMonthEdit?> GetMonthEditAsync(int recordId, CancellationToken cancellationToken = default)
+        {
+            var focus = await _db.AttendanceRecords
+                .Include(r => r.Import)
+                .Include(r => r.Employee)
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId, cancellationToken);
+            if (focus?.Import == null || !focus.WorkDate.HasValue)
+                return null;
+
+            var monthStart = new DateTime(focus.WorkDate.Value.Year, focus.WorkDate.Value.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == focus.Import.ProjectId, cancellationToken);
+
+            var existing = await _db.AttendanceRecords
+                .Where(r => r.AttendanceImportId == focus.AttendanceImportId
+                    && r.WorkDate >= monthStart
+                    && r.WorkDate <= monthEnd
+                    && ((focus.EmployeeId.HasValue && r.EmployeeId == focus.EmployeeId)
+                        || r.ExternalUserId == focus.ExternalUserId))
+                .ToListAsync(cancellationToken);
+
+            var byDate = existing
+                .Where(r => r.WorkDate.HasValue)
+                .GroupBy(r => r.WorkDate!.Value.Date)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var edit = new AttendanceMonthEdit
+            {
+                FocusRecordId = focus.AttendanceRecordId,
+                AttendanceImportId = focus.AttendanceImportId,
+                ProjectId = focus.Import.ProjectId,
+                ProjectName = project?.ProjectName ?? "",
+                EmployeeId = focus.EmployeeId,
+                ExternalUserId = focus.ExternalUserId,
+                DisplayId = AttendanceDisplay.EmployeeId(focus.Employee?.EmployeeCode ?? focus.ExternalUserId),
+                EmployeeName = focus.Employee?.FullName ?? focus.EmployeeName,
+                MonthLabel = monthStart.ToString("MMMM yyyy"),
+                MonthStart = monthStart,
+                Matched = focus.Matched
+            };
+
+            for (var day = monthStart; day <= monthEnd; day = day.AddDays(1))
+            {
+                byDate.TryGetValue(day, out var row);
+                edit.Days.Add(new AttendanceDayEdit
+                {
+                    RecordId = row?.AttendanceRecordId ?? 0,
+                    WorkDate = day,
+                    TimeIn1 = AttendanceDisplay.HtmlTime(row?.TimeIn1),
+                    TimeOut1 = AttendanceDisplay.HtmlTime(row?.TimeOut1),
+                    TimeIn2 = AttendanceDisplay.HtmlTime(row?.TimeIn2),
+                    TimeOut2 = AttendanceDisplay.HtmlTime(row?.TimeOut2),
+                    OvertimeIn = AttendanceDisplay.HtmlTime(row?.OvertimeIn),
+                    OvertimeOut = AttendanceDisplay.HtmlTime(row?.OvertimeOut),
+                    Status = row?.Status ?? AttendanceStatuses.Absent
+                });
+            }
+
+            return edit;
+        }
+
+        public async Task<string?> SaveMonthEditAsync(AttendanceMonthEdit model, CancellationToken cancellationToken = default)
+        {
+            var import = await _db.AttendanceImports
+                .FirstOrDefaultAsync(i => i.AttendanceImportId == model.AttendanceImportId, cancellationToken);
+            if (import == null)
+                return "Attendance import not found.";
+
+            var monthStart = model.MonthStart.Date;
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            import.PeriodStart = monthStart;
+            import.PeriodEnd = monthEnd;
+
+            foreach (var day in model.Days.OrderBy(d => d.WorkDate))
+            {
+                var workDate = day.WorkDate.Date;
+                AttendanceRecord? record = null;
+                if (day.RecordId > 0)
+                {
+                    record = await _db.AttendanceRecords.FirstOrDefaultAsync(
+                        r => r.AttendanceRecordId == day.RecordId, cancellationToken);
+                }
+
+                if (record == null)
+                {
+                    record = new AttendanceRecord
+                    {
+                        AttendanceImportId = model.AttendanceImportId,
+                        EmployeeId = model.EmployeeId,
+                        ExternalUserId = model.ExternalUserId,
+                        EmployeeName = model.EmployeeName,
+                        WorkDate = workDate,
+                        PeriodStart = monthStart,
+                        PeriodEnd = monthEnd,
+                        Matched = model.Matched
+                    };
+                    _db.AttendanceRecords.Add(record);
+                }
+
+                record.WorkDate = workDate;
+                record.PeriodStart = monthStart;
+                record.PeriodEnd = monthEnd;
+                record.TimeIn1 = EmptyToNull(day.TimeIn1);
+                record.TimeOut1 = EmptyToNull(day.TimeOut1);
+                record.TimeIn2 = EmptyToNull(day.TimeIn2);
+                record.TimeOut2 = EmptyToNull(day.TimeOut2);
+                record.OvertimeIn = EmptyToNull(day.OvertimeIn);
+                record.OvertimeOut = EmptyToNull(day.OvertimeOut);
+                record.Status = AttendanceFileParser.DeriveStatus(record);
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            import.RowCount = await _db.AttendanceRecords.CountAsync(
+                r => r.AttendanceImportId == model.AttendanceImportId, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+
         private async Task<Project?> ResolveProjectAsync(
             int? projectId,
             string? projectName,
