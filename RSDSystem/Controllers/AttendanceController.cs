@@ -141,7 +141,7 @@ namespace RSDSystem.Controllers
                     Status = r.Status,
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
-                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Statistic, r.Import?.ImportedAt))
+                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt))
             });
         }
 

@@ -33,7 +33,7 @@ Attendance → Attendance Records (staff / admin review and edit)
 
 | Piece | Role |
 | --- | --- |
-| `AttendanceFileParser` | Reads `.xls`, `.xlsx`, and `.csv`. Detects the biometric **Attendance Statistic Table** or a daily punch sheet. |
+| `AttendanceFileParser` | Reads `.xls`, `.xlsx`, and `.csv`. Primary format is the biometric **Employee Attendance Table** (side-by-side time cards). |
 | `AttendanceImportService` | Resolves the project, matches employees, previews, and saves a batch. |
 | `AttendanceController` | Staff/admin UI: preview, import, records, row edit. |
 | `AttendanceApiController` | n8n endpoint. No login cookie. Uses `X-Api-Key`. |
@@ -43,21 +43,28 @@ Startup also creates `AttendanceImports` and `AttendanceRecords` if they are mis
 
 ## File formats the parser accepts
 
-### 1. Biometric statistic export (primary)
+### 1. Employee Attendance Table (primary)
 
 Typical device file: `1_(August)Attendance Report.xls`
 
-- Title row: **Attendance Statistic Table**
-- Period row such as `Date:2026-08-01~2026-08-16`
-- Headers: User ID, Name, Department, Worktime (Normal / Actual), Late, Early, Overtime, Workday, Absence, …
+- Title: **Employee Attendance Table**
+- Period: `Attendance date: 2026-08-01 ~ 2026-08-16`
+- Employees are laid out **side by side**, each with Name, User ID, and a **Time Card**
+- Time Card columns: Date (`01 Sa` … `16 Su`), Before Noon In/Out, After Noon In/Out, Overtime In/Out
 
-Each person becomes one imported row for that date range. Status is derived when the file has no Status column.
+Each person-day becomes one preview row:
 
-### 2. Daily punch sheet (optional)
+| Employee ID | Employee Name | Date | Time In (1) | Time Out (1) | Time In (2) | Time Out (2) | Overtime In | Overtime Out | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | jun | August 16, 2026 | — | — | 12:52 | 14:02 | — | — | Complete |
+| 2 | raph | August 16, 2026 | — | — | — | 14:02 | — | — | Incomplete |
+| 3 | j | August 16, 2026 | — | — | — | — | — | — | Absent |
 
-If the file has **Date**, **Time In (1)**, **Time Out (1)** (and optional second pair / overtime in-out), the preview uses the daily columns from the mockup.
+Days with no punches import as **Absent**. A sample of this layout is in `docs/samples/attendance-timecard-sample.csv`.
 
-CSV with those headers also works. A trimmed example of the statistic layout is in `docs/samples/attendance-statistic-sample.csv` for n8n or curl tests.
+### 2. Flat daily or statistic sheet (fallback)
+
+A single-table sheet with User ID / Employee ID headers still works if someone exports a flat list instead of the tiled time card.
 
 ## How employees are matched
 
@@ -81,10 +88,10 @@ When the file has no Status column:
 
 | Condition | Status |
 | --- | --- |
-| Absence days and no actual hours / punches | **Absent** |
+| No punches that day | **Absent** |
 | Late minutes &gt; 0 | **Late** |
-| Time in without time out, or actual hours well below normal | **Incomplete** |
-| Actual hours or a complete in/out pair | **Complete** |
+| In without out (or out without in) | **Incomplete** |
+| A complete Before Noon or After Noon pair | **Complete** |
 
 Staff can change punches and status later from **Attendance Records**.
 
@@ -139,8 +146,8 @@ Success (200):
   "projectId": 3,
   "projectName": "Mandani Bay",
   "fileName": "1_(August)Attendance Report.xls",
-  "format": "Statistic",
-  "rowCount": 4,
+  "format": "Daily",
+  "rowCount": 48,
   "matchedCount": 3,
   "unmatchedCount": 1
 }
@@ -218,7 +225,7 @@ If the device writes one file per cut-off, run the workflow after that time inst
 | --- | --- |
 | 401 Invalid or missing X-Api-Key | Header name is exactly `X-Api-Key`. Value matches `Attendance:ApiKey`. |
 | Project not found | `projectName` must match the project record. Staff spelling and extra spaces matter. |
-| Could not find attendance headers | File is not the statistic table or a daily punch sheet. Open it and confirm a **User ID** or **Employee ID** column. |
+| Could not find employee time cards | File should be the **Employee Attendance Table** with Name, User ID, and a Time Card (Before Noon / After Noon). |
 | Could not read the attendance file | `.xls` needs `System.Text.Encoding.CodePages` (already registered at startup). Confirm the file is not password-protected. |
 | Every row unmatched | Employee codes in RSD should be the biometric sequence (`00001`). Device prefixes such as `26000001` are stripped to that sequence. Assign the employee to the project. |
 | Tables missing | Restart the app so `Program.cs` can create `AttendanceImports` / `AttendanceRecords`, or apply the EF migration. |
