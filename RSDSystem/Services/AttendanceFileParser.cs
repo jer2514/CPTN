@@ -172,38 +172,42 @@ namespace RSDSystem.Services
 
             if (result.Rows.Count == 0)
                 result.Error = "No time-card rows were found in the file.";
-            else
-                ExpandToFullMonth(result);
 
             return result;
         }
 
-        public static void ExpandToFullMonth(AttendanceParseResult result)
+        public static void ExpandToDateRange(AttendanceParseResult result, DateTime start, DateTime end)
         {
-            var anchor = result.PeriodStart
-                ?? result.Rows.Select(r => r.WorkDate).FirstOrDefault(d => d.HasValue);
-            if (!anchor.HasValue || result.Rows.Count == 0)
+            if (result.Rows.Count == 0)
                 return;
 
-            var monthStart = new DateTime(anchor.Value.Year, anchor.Value.Month, 1);
-            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-            result.PeriodStart = monthStart;
-            result.PeriodEnd = monthEnd;
+            var rangeStart = start.Date;
+            var rangeEnd = end.Date;
+            if (rangeEnd < rangeStart)
+                rangeEnd = rangeStart;
+
+            result.PeriodStart = rangeStart;
+            result.PeriodEnd = rangeEnd;
 
             var expanded = new List<AttendanceRecord>();
             foreach (var group in result.Rows.GroupBy(r => (r.ExternalUserId, r.EmployeeName)))
             {
                 var byDate = new Dictionary<DateTime, AttendanceRecord>();
                 foreach (var row in group.Where(r => r.WorkDate.HasValue))
-                    byDate[row.WorkDate!.Value.Date] = row;
+                {
+                    var day = row.WorkDate!.Value.Date;
+                    if (day < rangeStart || day > rangeEnd)
+                        continue;
+                    byDate[day] = row;
+                }
 
                 var sample = group.First();
-                for (var day = monthStart; day <= monthEnd; day = day.AddDays(1))
+                for (var day = rangeStart; day <= rangeEnd; day = day.AddDays(1))
                 {
                     if (byDate.TryGetValue(day, out var existing))
                     {
-                        existing.PeriodStart = monthStart;
-                        existing.PeriodEnd = monthEnd;
+                        existing.PeriodStart = rangeStart;
+                        existing.PeriodEnd = rangeEnd;
                         existing.WorkDate = day;
                         if (string.IsNullOrWhiteSpace(existing.Status))
                             existing.Status = DeriveStatus(existing);
@@ -216,8 +220,8 @@ namespace RSDSystem.Services
                         ExternalUserId = sample.ExternalUserId,
                         EmployeeName = sample.EmployeeName,
                         WorkDate = day,
-                        PeriodStart = monthStart,
-                        PeriodEnd = monthEnd,
+                        PeriodStart = rangeStart,
+                        PeriodEnd = rangeEnd,
                         Status = AttendanceStatuses.Absent
                     });
                 }
@@ -674,8 +678,6 @@ namespace RSDSystem.Services
 
             if (result.Rows.Count == 0)
                 result.Error = "No attendance rows were found in the file.";
-            else if (result.Format == AttendanceFormats.Daily)
-                ExpandToFullMonth(result);
 
             return result;
         }

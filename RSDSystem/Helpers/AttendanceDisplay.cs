@@ -16,7 +16,7 @@ namespace RSDSystem.Helpers
         public static readonly CultureInfo English = CultureInfo.GetCultureInfo("en-US");
 
         public static string LongDate(DateTime? date) =>
-            date?.ToString("MMMM dd, yyyy", English) ?? Empty;
+            date?.ToString("MMMM d, yyyy", English) ?? Empty;
 
         public static string DayLabel(DateTime date) =>
             date.ToString("dd", English) + " " + date.ToString("ddd", English)[..2];
