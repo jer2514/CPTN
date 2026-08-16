@@ -8,7 +8,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card task-page-card">
     <div class="task-card-title">To do task</div>
 
     <table class="task-table">
@@ -25,7 +25,7 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="5" class="text-center text-muted py-4">No tasks assigned.</td>
+                    <td colspan="5" class="task-empty">No tasks assigned.</td>
                 </tr>
             }
             @foreach (var s in Model)
@@ -35,8 +35,8 @@
                     <td>@(s.TypeOfService ?? s.Project?.TypeOfService ?? "—")</td>
                     <td>@s.StartingDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
                     <td>@s.EndDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
-                    <td class="text-center">
-                        <form asp-action="ToggleTask" asp-route-id="@s.PayrollScheduleId" method="post" class="d-inline">
+                    <td>
+                        <form asp-action="ToggleTask" asp-route-id="@s.PayrollScheduleId" method="post" class="task-check-form">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="task-check-btn @(s.TaskCompleted ? "checked" : "")" title="Mark as done">
                                 @if (s.TaskCompleted)
