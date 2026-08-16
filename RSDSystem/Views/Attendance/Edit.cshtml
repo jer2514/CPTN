@@ -4,6 +4,7 @@
 @{
     ViewData["Title"] = "Edit Attendance";
     Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
+    var canPayroll = Model.EmployeeId.HasValue && Model.EmployeeId.Value > 0;
 }
 
 <div class="content-topbar">
@@ -16,7 +17,7 @@
 
 <div class="page-card">
     <div class="att-page-title">Edit Attendance</div>
-    <div class="att-edit-sub">Enter times on each date. Empty days stay Absent until a punch is saved.</div>
+    <div class="att-edit-sub">Fix punches on each date. Hours and status update as you type so payroll can use this month.</div>
 
     <div class="att-edit-meta">
         <div>
@@ -37,7 +38,16 @@
         </div>
     </div>
 
-    <form asp-action="Edit" method="post" class="att-month-form">
+    <div class="att-summary" id="attSummary">
+        <div class="att-summary-chip"><span>Days worked</span><strong id="sumWorked">@Model.DaysWorked</strong></div>
+        <div class="att-summary-chip"><span>Absent</span><strong id="sumAbsent">@Model.DaysAbsent</strong></div>
+        <div class="att-summary-chip"><span>Late</span><strong id="sumLate">@Model.DaysLate</strong></div>
+        <div class="att-summary-chip"><span>Incomplete</span><strong id="sumIncomplete">@Model.DaysIncomplete</strong></div>
+        <div class="att-summary-chip"><span>Regular hours</span><strong id="sumRegular">@Model.RegularHours.ToString("0.00")</strong></div>
+        <div class="att-summary-chip"><span>Overtime hours</span><strong id="sumOt">@Model.OvertimeHours.ToString("0.00")</strong></div>
+    </div>
+
+    <form asp-action="Edit" method="post" class="att-month-form" id="attMonthForm">
         @Html.AntiForgeryToken()
         <input type="hidden" asp-for="FocusRecordId" />
         <input type="hidden" asp-for="AttendanceImportId" />
@@ -59,7 +69,9 @@
                         <th colspan="2">Before Noon</th>
                         <th colspan="2">After Noon</th>
                         <th colspan="2">Overtime</th>
+                        <th rowspan="2">Hours</th>
                         <th rowspan="2">Status</th>
+                        <th rowspan="2">Quick fill</th>
                     </tr>
                     <tr>
                         <th>In</th>
@@ -76,22 +88,31 @@
                         var day = Model.Days[i];
                         var weekend = day.WorkDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
                         var focus = day.RecordId == Model.FocusRecordId && day.RecordId > 0;
-                        <tr class="@(weekend ? "att-weekend" : "") @(focus ? "att-day-focus" : "")"
+                        <tr class="att-day-row @(weekend ? "att-weekend" : "") @(focus ? "att-day-focus" : "")"
                             id="att-day-@day.WorkDate.ToString("yyyyMMdd")">
                             <td class="att-day-cell">
                                 <input type="hidden" asp-for="Days[i].RecordId" />
                                 <input type="hidden" asp-for="Days[i].WorkDate" />
                                 <div class="att-day-label">@AttendanceDisplay.DayLabel(day.WorkDate)</div>
-                                <div class="att-day-full">@day.WorkDate.ToString("MMMM dd, yyyy")</div>
+                                <div class="att-day-full">@AttendanceDisplay.LongDate(day.WorkDate)</div>
                             </td>
-                            <td><input asp-for="Days[i].TimeIn1" type="time" class="form-ctrl att-time-input" /></td>
-                            <td><input asp-for="Days[i].TimeOut1" type="time" class="form-ctrl att-time-input" /></td>
-                            <td><input asp-for="Days[i].TimeIn2" type="time" class="form-ctrl att-time-input" /></td>
-                            <td><input asp-for="Days[i].TimeOut2" type="time" class="form-ctrl att-time-input" /></td>
-                            <td><input asp-for="Days[i].OvertimeIn" type="time" class="form-ctrl att-time-input" /></td>
-                            <td><input asp-for="Days[i].OvertimeOut" type="time" class="form-ctrl att-time-input" /></td>
+                            <td><input asp-for="Days[i].TimeIn1" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td><input asp-for="Days[i].TimeOut1" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td><input asp-for="Days[i].TimeIn2" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td><input asp-for="Days[i].TimeOut2" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td><input asp-for="Days[i].OvertimeIn" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td><input asp-for="Days[i].OvertimeOut" type="time" class="form-ctrl att-time-input js-att-time" /></td>
+                            <td class="att-hours-cell">
+                                <div class="js-reg-hours">@day.RegularHours.ToString("0.00")</div>
+                                <div class="att-ot-hours js-ot-hours">OT @day.OvertimeHours.ToString("0.00")</div>
+                            </td>
                             <td>
-                                <span class="status-pill @AttendanceStatuses.CssClass(day.Status)">@day.Status</span>
+                                <span class="status-pill @AttendanceStatuses.CssClass(day.Status) js-status">@day.Status</span>
+                            </td>
+                            <td class="att-quick-cell">
+                                <button type="button" class="att-quick-btn" data-fill="standard">8–5</button>
+                                <button type="button" class="att-quick-btn" data-fill="copy">Copy</button>
+                                <button type="button" class="att-quick-btn" data-fill="clear">Clear</button>
                             </td>
                         </tr>
                     }
@@ -101,14 +122,124 @@
 
         <div class="att-preview-footer">
             <a asp-action="Records" class="btn-outline-blue">Cancel</a>
-            <button type="submit" class="btn-primary-blue-solid">Save Attendance</button>
+            <div class="att-edit-actions">
+                @if (canPayroll)
+                {
+                    <a id="payrollLink" class="btn-outline-blue"
+                       href="/PayrollStaff/PayrollSlip?employeeId=@Model.EmployeeId&amp;projectId=@Model.ProjectId&amp;daysWorked=@Model.DaysWorked&amp;absentDays=@Model.DaysAbsent&amp;overtimeHours=@Model.OvertimeHours.ToString(System.Globalization.CultureInfo.InvariantCulture)&amp;returnUrl=@Uri.EscapeDataString($"/Attendance/Edit/{Model.FocusRecordId}")">
+                        Use in Generate Payroll
+                    </a>
+                }
+                <button type="submit" class="btn-primary-blue-solid">Save Attendance</button>
+            </div>
         </div>
     </form>
 </div>
 
 @section Scripts {
     <script>
+        const statusClass = {
+            Complete: 'att-status-complete',
+            Incomplete: 'att-status-incomplete',
+            Late: 'att-status-late',
+            Absent: 'att-status-absent'
+        };
+
+        function hoursBetween(a, b) {
+            if (!a || !b) return 0;
+            const [ah, am] = a.split(':').map(Number);
+            const [bh, bm] = b.split(':').map(Number);
+            let mins = (bh * 60 + bm) - (ah * 60 + am);
+            if (mins < 0) mins += 1440;
+            return Math.round((mins / 60) * 100) / 100;
+        }
+
+        function deriveStatus(in1, out1, in2, out2, otIn, otOut) {
+            const any = in1 || out1 || in2 || out2 || otIn || otOut;
+            if (!any) return 'Absent';
+            if (in1) {
+                const [h, m] = in1.split(':').map(Number);
+                if (h * 60 + m > 8 * 60 + 15) return 'Late';
+            }
+            if ((!!in1 !== !!out1) || (!!in2 !== !!out2) || (otIn && !otOut))
+                return 'Incomplete';
+            if ((in1 && out1) || (in2 && out2)) return 'Complete';
+            return 'Incomplete';
+        }
+
+        function rowTimes(row) {
+            const inputs = row.querySelectorAll('.js-att-time');
+            return [...inputs].map(i => i.value);
+        }
+
+        function refreshRow(row) {
+            const [in1, out1, in2, out2, otIn, otOut] = rowTimes(row);
+            const regular = hoursBetween(in1, out1) + hoursBetween(in2, out2);
+            const ot = hoursBetween(otIn, otOut);
+            const status = deriveStatus(in1, out1, in2, out2, otIn, otOut);
+            row.querySelector('.js-reg-hours').textContent = regular.toFixed(2);
+            row.querySelector('.js-ot-hours').textContent = 'OT ' + ot.toFixed(2);
+            const pill = row.querySelector('.js-status');
+            pill.textContent = status;
+            pill.className = 'status-pill js-status ' + (statusClass[status] || 'att-status-incomplete');
+        }
+
+        function refreshSummary() {
+            const rows = [...document.querySelectorAll('.att-day-row')];
+            let worked = 0, absent = 0, late = 0, incomplete = 0, regular = 0, ot = 0;
+            rows.forEach(row => {
+                refreshRow(row);
+                const status = row.querySelector('.js-status').textContent;
+                const [in1, out1, in2, out2, otIn, otOut] = rowTimes(row);
+                regular += hoursBetween(in1, out1) + hoursBetween(in2, out2);
+                ot += hoursBetween(otIn, otOut);
+                if (status === 'Complete' || status === 'Late') worked++;
+                if (status === 'Absent') absent++;
+                if (status === 'Late') late++;
+                if (status === 'Incomplete') incomplete++;
+            });
+            document.getElementById('sumWorked').textContent = worked;
+            document.getElementById('sumAbsent').textContent = absent;
+            document.getElementById('sumLate').textContent = late;
+            document.getElementById('sumIncomplete').textContent = incomplete;
+            document.getElementById('sumRegular').textContent = regular.toFixed(2);
+            document.getElementById('sumOt').textContent = ot.toFixed(2);
+
+            const payroll = document.getElementById('payrollLink');
+            if (payroll) {
+                const url = new URL(payroll.href, window.location.origin);
+                url.searchParams.set('daysWorked', worked);
+                url.searchParams.set('absentDays', absent);
+                url.searchParams.set('overtimeHours', ot.toFixed(2));
+                payroll.href = url.pathname + '?' + url.searchParams.toString();
+            }
+        }
+
+        document.getElementById('attMonthForm').addEventListener('input', function (e) {
+            if (e.target.classList.contains('js-att-time')) refreshSummary();
+        });
+
+        document.getElementById('attMonthForm').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-fill]');
+            if (!btn) return;
+            const row = btn.closest('.att-day-row');
+            const inputs = row.querySelectorAll('.js-att-time');
+            if (btn.dataset.fill === 'standard') {
+                const values = ['08:00', '12:00', '13:00', '17:00', '', ''];
+                inputs.forEach((input, i) => input.value = values[i]);
+            } else if (btn.dataset.fill === 'clear') {
+                inputs.forEach(input => input.value = '');
+            } else if (btn.dataset.fill === 'copy') {
+                const prev = row.previousElementSibling;
+                if (!prev) return;
+                const prevInputs = prev.querySelectorAll('.js-att-time');
+                inputs.forEach((input, i) => input.value = prevInputs[i].value);
+            }
+            refreshSummary();
+        });
+
         const focus = document.querySelector('.att-day-focus');
         if (focus) focus.scrollIntoView({ block: 'center' });
+        refreshSummary();
     </script>
 }

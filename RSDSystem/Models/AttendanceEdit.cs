@@ -13,6 +13,12 @@ namespace RSDSystem.Models
         public string MonthLabel { get; set; } = "";
         public DateTime MonthStart { get; set; }
         public bool Matched { get; set; }
+        public int DaysWorked { get; set; }
+        public int DaysAbsent { get; set; }
+        public int DaysLate { get; set; }
+        public int DaysIncomplete { get; set; }
+        public decimal RegularHours { get; set; }
+        public decimal OvertimeHours { get; set; }
         public List<AttendanceDayEdit> Days { get; set; } = new();
     }
 
@@ -27,5 +33,7 @@ namespace RSDSystem.Models
         public string? OvertimeIn { get; set; }
         public string? OvertimeOut { get; set; }
         public string Status { get; set; } = AttendanceStatuses.Absent;
+        public decimal RegularHours { get; set; }
+        public decimal OvertimeHours { get; set; }
     }
 }

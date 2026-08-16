@@ -13,8 +13,30 @@ namespace RSDSystem.Helpers
             return DateTime.Today.Add(time).ToString("HH:mm", CultureInfo.InvariantCulture);
         }
 
+        public static readonly CultureInfo English = CultureInfo.GetCultureInfo("en-US");
+
+        public static string LongDate(DateTime? date) =>
+            date?.ToString("MMMM dd, yyyy", English) ?? Empty;
+
         public static string DayLabel(DateTime date) =>
-            date.ToString("dd", CultureInfo.InvariantCulture) + " " + date.ToString("ddd", CultureInfo.InvariantCulture)[..2];
+            date.ToString("dd", English) + " " + date.ToString("ddd", English)[..2];
+
+        public static decimal HoursBetween(string? timeIn, string? timeOut)
+        {
+            if (!TryParseTime(timeIn, out var start) || !TryParseTime(timeOut, out var end))
+                return 0;
+
+            var span = end - start;
+            if (span < TimeSpan.Zero)
+                span += TimeSpan.FromDays(1);
+            return Math.Round((decimal)span.TotalHours, 2);
+        }
+
+        public static decimal RegularHours(string? in1, string? out1, string? in2, string? out2) =>
+            HoursBetween(in1, out1) + HoursBetween(in2, out2);
+
+        public static decimal OvertimeHours(string? overtimeIn, string? overtimeOut) =>
+            HoursBetween(overtimeIn, overtimeOut);
 
         public static string? Clock(string? value)
         {

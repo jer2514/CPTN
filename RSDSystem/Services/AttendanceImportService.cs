@@ -59,6 +59,7 @@ namespace RSDSystem.Services
             string importedBy,
             string source,
             string? assignedStaff,
+            string? overridesJson = null,
             CancellationToken cancellationToken = default)
         {
             using var buffer = new MemoryStream();
@@ -66,6 +67,7 @@ namespace RSDSystem.Services
             buffer.Position = 0;
 
             var preview = await PreviewAsync(projectId, projectName, buffer, fileName, assignedStaff, cancellationToken);
+            ApplyOverrides(preview.Rows, overridesJson);
             if (preview.Error != null || preview.Project == null)
             {
                 return new AttendanceImportResult { Error = preview.Error ?? "Import failed." };
@@ -201,6 +203,10 @@ namespace RSDSystem.Services
             record.TimeOut2 = EmptyToNull(timeOut2);
             record.OvertimeIn = EmptyToNull(overtimeIn);
             record.OvertimeOut = EmptyToNull(overtimeOut);
+            record.WorkHoursActual = AttendanceDisplay.RegularHours(
+                record.TimeIn1, record.TimeOut1, record.TimeIn2, record.TimeOut2);
+            record.OvertimeHours = AttendanceDisplay.OvertimeHours(record.OvertimeIn, record.OvertimeOut);
+            record.LateMinutes = LateMinutesFrom(record.TimeIn1);
 
             if (!string.IsNullOrWhiteSpace(status) &&
                 AttendanceStatuses.All.Contains(status.Trim(), StringComparer.OrdinalIgnoreCase))
@@ -254,7 +260,7 @@ namespace RSDSystem.Services
                 ExternalUserId = focus.ExternalUserId,
                 DisplayId = AttendanceDisplay.EmployeeId(focus.Employee?.EmployeeCode ?? focus.ExternalUserId),
                 EmployeeName = focus.Employee?.FullName ?? focus.EmployeeName,
-                MonthLabel = monthStart.ToString("MMMM yyyy"),
+                MonthLabel = monthStart.ToString("MMMM yyyy", AttendanceDisplay.English),
                 MonthStart = monthStart,
                 Matched = focus.Matched
             };
@@ -272,10 +278,18 @@ namespace RSDSystem.Services
                     TimeOut2 = AttendanceDisplay.HtmlTime(row?.TimeOut2),
                     OvertimeIn = AttendanceDisplay.HtmlTime(row?.OvertimeIn),
                     OvertimeOut = AttendanceDisplay.HtmlTime(row?.OvertimeOut),
-                    Status = row?.Status ?? AttendanceStatuses.Absent
+                    Status = row?.Status ?? AttendanceStatuses.Absent,
+                    RegularHours = AttendanceDisplay.RegularHours(row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2),
+                    OvertimeHours = AttendanceDisplay.OvertimeHours(row?.OvertimeIn, row?.OvertimeOut)
                 });
             }
 
+            edit.DaysWorked = edit.Days.Count(d => d.Status is AttendanceStatuses.Complete or AttendanceStatuses.Late);
+            edit.DaysAbsent = edit.Days.Count(d => d.Status == AttendanceStatuses.Absent);
+            edit.DaysLate = edit.Days.Count(d => d.Status == AttendanceStatuses.Late);
+            edit.DaysIncomplete = edit.Days.Count(d => d.Status == AttendanceStatuses.Incomplete);
+            edit.RegularHours = edit.Days.Sum(d => d.RegularHours);
+            edit.OvertimeHours = edit.Days.Sum(d => d.OvertimeHours);
             return edit;
         }
 
@@ -326,6 +340,10 @@ namespace RSDSystem.Services
                 record.TimeOut2 = EmptyToNull(day.TimeOut2);
                 record.OvertimeIn = EmptyToNull(day.OvertimeIn);
                 record.OvertimeOut = EmptyToNull(day.OvertimeOut);
+                record.WorkHoursActual = AttendanceDisplay.RegularHours(
+                    record.TimeIn1, record.TimeOut1, record.TimeIn2, record.TimeOut2);
+                record.OvertimeHours = AttendanceDisplay.OvertimeHours(record.OvertimeIn, record.OvertimeOut);
+                record.LateMinutes = LateMinutesFrom(record.TimeIn1);
                 record.Status = AttendanceFileParser.DeriveStatus(record);
             }
 
@@ -428,12 +446,73 @@ namespace RSDSystem.Services
             return rows;
         }
 
+        private static void ApplyOverrides(List<AttendancePreviewRow> rows, string? overridesJson)
+        {
+            if (string.IsNullOrWhiteSpace(overridesJson) || rows.Count == 0)
+                return;
+
+            List<AttendanceDayOverride>? edits;
+            try
+            {
+                edits = System.Text.Json.JsonSerializer.Deserialize<List<AttendanceDayOverride>>(
+                    overridesJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return;
+            }
+
+            if (edits == null || edits.Count == 0)
+                return;
+
+            foreach (var edit in edits)
+            {
+                var date = edit.WorkDate.Date;
+                var row = rows.FirstOrDefault(r =>
+                    r.WorkDate?.Date == date &&
+                    (string.Equals(r.ExternalUserId, edit.ExternalUserId, StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(r.EmployeeName, edit.EmployeeName, StringComparison.OrdinalIgnoreCase)));
+                if (row == null)
+                    continue;
+
+                row.TimeIn1 = EmptyToNull(edit.TimeIn1);
+                row.TimeOut1 = EmptyToNull(edit.TimeOut1);
+                row.TimeIn2 = EmptyToNull(edit.TimeIn2);
+                row.TimeOut2 = EmptyToNull(edit.TimeOut2);
+                row.OvertimeIn = EmptyToNull(edit.OvertimeIn);
+                row.OvertimeOut = EmptyToNull(edit.OvertimeOut);
+                row.WorkHoursActual = AttendanceDisplay.RegularHours(
+                    row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
+                row.OvertimeHours = AttendanceDisplay.OvertimeHours(row.OvertimeIn, row.OvertimeOut);
+                row.LateMinutes = LateMinutesFrom(row.TimeIn1);
+                row.Status = AttendanceFileParser.DeriveStatus(new AttendanceRecord
+                {
+                    TimeIn1 = row.TimeIn1,
+                    TimeOut1 = row.TimeOut1,
+                    TimeIn2 = row.TimeIn2,
+                    TimeOut2 = row.TimeOut2,
+                    OvertimeIn = row.OvertimeIn,
+                    OvertimeOut = row.OvertimeOut,
+                    WorkHoursActual = row.WorkHoursActual,
+                    LateMinutes = row.LateMinutes
+                });
+            }
+        }
+
         private static string? EmptyToNull(string? value)
         {
             var text = (value ?? "").Trim();
             if (text.Length == 0 || text == "—" || text == "——")
                 return null;
             return text;
+        }
+
+        private static int LateMinutesFrom(string? timeIn)
+        {
+            if (!AttendanceDisplay.TryParseTime(timeIn, out var firstIn) || firstIn <= new TimeSpan(8, 15, 0))
+                return 0;
+
+            return Math.Max(0, (int)(firstIn - new TimeSpan(8, 0, 0)).TotalMinutes);
         }
     }
 
@@ -472,6 +551,19 @@ namespace RSDSystem.Services
         public string Status { get; set; } = AttendanceStatuses.Incomplete;
         public bool Matched { get; set; }
         public string? Note { get; set; }
+    }
+
+    public class AttendanceDayOverride
+    {
+        public string? ExternalUserId { get; set; }
+        public string? EmployeeName { get; set; }
+        public DateTime WorkDate { get; set; }
+        public string? TimeIn1 { get; set; }
+        public string? TimeOut1 { get; set; }
+        public string? TimeIn2 { get; set; }
+        public string? TimeOut2 { get; set; }
+        public string? OvertimeIn { get; set; }
+        public string? OvertimeOut { get; set; }
     }
 
     public class AttendanceImportResult
