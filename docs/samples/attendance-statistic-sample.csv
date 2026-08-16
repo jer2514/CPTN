@@ -1,0 +1,7 @@
+Attendance Statistic Table
+Date:2026-08-01~2026-08-16
+User ID,Name,Department,Worktime Normal,Worktime Actual,Late Times,Late Minute,Early Times,Early Minute,Overtime Normal,Overtime Holiday,Workday,Absence
+1,jun,COMPANY,65.3,1.0,0,0,1,178,0,0,16/1,15
+2,raph,COMPANY,65.3,0.0,0,0,0,0,0,0,16/0,16
+3,i,COMPANY,65.3,0.0,0,0,0,0,0,0,16/0,16
+26000001,admin,COMPANY,65.3,0.0,0,0,0,0,0,0,16/0,16
