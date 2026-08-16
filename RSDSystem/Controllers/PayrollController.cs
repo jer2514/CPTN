@@ -409,6 +409,39 @@ namespace RSDSystem.Controllers
             return View(payroll);
         }
 
+        // GET /Payroll/ReviewProject?projectId=
+        public async Task<IActionResult> ReviewProject(int projectId, int page = 1)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
+            const int pageSize = 2;
+            var slips = await _db.Set<Payroll>()
+                .Include(p => p.Employee)
+                .Include(p => p.Project)
+                .Where(p => p.ProjectId == projectId && p.Status == PayrollStatusOptions.Submitted)
+                .ToListAsync();
+
+            if (slips.Count == 0)
+                return RedirectToAction("Index", "Home");
+
+            slips = slips
+                .OrderBy(p => p.Employee?.LastName ?? "")
+                .ThenBy(p => p.Employee?.FirstName ?? "")
+                .ThenBy(p => p.PayPeriodStart)
+                .ToList();
+
+            var totalPages = Math.Max(1, (int)Math.Ceiling(slips.Count / (double)pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            ViewBag.ProjectId = projectId;
+            ViewBag.ProjectName = slips[0].Project?.ProjectName ?? "Project";
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+        }
+
         [HttpGet]
         public async Task<IActionResult> ViewPartial(int id)
         {
@@ -437,7 +470,16 @@ namespace RSDSystem.Controllers
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Payroll has been approved." });
+            var remaining = await _db.Set<Payroll>().CountAsync(p =>
+                p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
+
+            return Json(new
+            {
+                success = true,
+                message = "Payroll has been approved.",
+                remaining,
+                projectId = payroll.ProjectId
+            });
         }
 
         // POST /Payroll/ReturnForCorrection/{id}
@@ -456,7 +498,16 @@ namespace RSDSystem.Controllers
             payroll.CorrectionReason = reason.Trim();
             await _db.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Payroll has been returned for correction." });
+            var remaining = await _db.Set<Payroll>().CountAsync(p =>
+                p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
+
+            return Json(new
+            {
+                success = true,
+                message = "Payroll has been returned for correction.",
+                remaining,
+                projectId = payroll.ProjectId
+            });
         }
 
 

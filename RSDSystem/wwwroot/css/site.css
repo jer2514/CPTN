@@ -2198,10 +2198,10 @@ button.badge-btn {
 }
 
 .btn-approve {
-    background: #0d7a3e;
+    background: #22c55e;
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 10px 32px;
     font-size: 13px;
     font-weight: 600;
@@ -2209,14 +2209,14 @@ button.badge-btn {
 }
 
     .btn-approve:hover {
-        background: #0a5c2f;
+        background: #16a34a;
     }
 
 .btn-return {
-    background: #E1962B;
+    background: #f59e0b;
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 10px 22px;
     font-size: 13px;
     font-weight: 600;
@@ -2224,8 +2224,54 @@ button.badge-btn {
 }
 
     .btn-return:hover {
-        background: #c07d1c;
+        background: #d97706;
     }
+
+.review-slip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    align-items: start;
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.review-slip-col .payslip-card {
+    max-width: none;
+    margin: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+
+.review-slip-col .payslip-approve-row {
+    margin-top: 14px;
+}
+
+.hidden-token-form {
+    display: none;
+}
+
+.del-icon-success {
+    background: #d4f7e0;
+}
+
+.del-icon-success-i {
+    color: #0d7a3e;
+    font-size: 28px;
+}
+
+.btn-return-confirm {
+    background: #E1962B;
+}
+
+.btn-result-ok {
+    background: #266DF1;
+}
+
+@media (max-width: 980px) {
+    .review-slip-grid {
+        grid-template-columns: 1fr;
+    }
+}
 
 .correction-modal {
     text-align: left;

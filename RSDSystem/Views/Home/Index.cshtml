@@ -82,7 +82,7 @@
                             <td>@p.ProjectName</td>
                             <td>@p.Date.ToString("MM-dd-yy")</td>
                             <td>
-                                <a href="@Url.Action("View", "Payroll", new { id = p.PayrollId })"
+                                <a href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })"
                                    class="pill-btn pill-view">Review</a>
                             </td>
                         </tr>

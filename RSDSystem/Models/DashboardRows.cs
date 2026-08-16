@@ -8,7 +8,7 @@ namespace RSDSystem.Models
 
     public class PendingApprovalRow
     {
-        public int PayrollId { get; set; }
+        public int ProjectId { get; set; }
         public string? StaffName { get; set; }
         public string ProjectName { get; set; } = "—";
         public DateTime Date { get; set; }
