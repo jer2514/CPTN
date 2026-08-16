@@ -38,16 +38,16 @@
                     <td>
                         <form asp-action="ToggleTask" asp-route-id="@s.PayrollScheduleId" method="post" class="task-check-form">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="task-check-btn @(s.TaskCompleted ? "checked" : "")" title="Mark as done">
-                                @if (s.TaskCompleted)
-                                {
-                                    <i class="bi bi-check-square-fill"></i>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-square"></i>
-                                }
-                            </button>
+                            @if (s.TaskCompleted)
+                            {
+                                <input type="checkbox" class="tbl-check" title="Mark as done" checked
+                                       onchange="this.form.submit()" />
+                            }
+                            else
+                            {
+                                <input type="checkbox" class="tbl-check" title="Mark as done"
+                                       onchange="this.form.submit()" />
+                            }
                         </form>
                     </td>
                 </tr>
