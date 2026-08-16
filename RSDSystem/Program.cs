@@ -127,6 +127,20 @@ END");
             Console.WriteLine("Employee email schema fix error: " + ex.Message);
         }
 
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.PayrollSchedules', N'TaskCompleted') IS NULL
+BEGIN
+    ALTER TABLE dbo.PayrollSchedules ADD TaskCompleted bit NOT NULL CONSTRAINT DF_PayrollSchedules_TaskCompleted DEFAULT(0);
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule task column fix error: " + ex.Message);
+        }
+
         var toAdd = new List<User>();
 
         if (!db.Users.Any(u => u.Username == "demo"))

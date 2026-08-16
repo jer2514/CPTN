@@ -196,6 +196,9 @@ namespace RSDSystem.Migrations
                     b.Property<DateTime>("StartingDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("TaskCompleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("TypeOfService")
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
