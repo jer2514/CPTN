@@ -80,6 +80,11 @@ namespace RSDSystem.Services
             if (row.LateMinutes > 0)
                 return AttendanceStatuses.Late;
 
+            // 8:01 AM stays Complete in the staff table; 8:20 AM is Late.
+            if (AttendanceDisplay.TryParseTime(row.TimeIn1, out var firstIn)
+                && firstIn > new TimeSpan(8, 15, 0))
+                return AttendanceStatuses.Late;
+
             if ((hasIn1 ^ hasOut1) || (hasIn2 ^ hasOut2) || (hasOtIn && !hasOtOut))
                 return AttendanceStatuses.Incomplete;
 

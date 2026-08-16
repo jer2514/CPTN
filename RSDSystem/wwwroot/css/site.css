@@ -2925,6 +2925,11 @@ button.badge-btn {
     white-space: nowrap;
 }
 
+.att-table .att-empty {
+    color: #9aa3b5;
+    letter-spacing: 1px;
+}
+
 .att-row-unmatched td {
     background: #fff4f4;
 }
