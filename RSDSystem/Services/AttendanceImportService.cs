@@ -281,9 +281,8 @@ namespace RSDSystem.Services
                 rows.Add(new AttendancePreviewRow
                 {
                     EmployeeId = employeeId,
-                    DisplayId = employee != null
-                        ? EmployeeIds.Format(employee.EmployeeCode)
-                        : (string.IsNullOrWhiteSpace(row.ExternalUserId) ? "—" : row.ExternalUserId),
+                    DisplayId = AttendanceDisplay.EmployeeId(
+                        employee?.EmployeeCode ?? row.ExternalUserId),
                     ExternalUserId = row.ExternalUserId,
                     EmployeeName = employee?.FullName ?? row.EmployeeName,
                     WorkDate = row.WorkDate ?? parsed.PeriodStart,
@@ -310,8 +309,13 @@ namespace RSDSystem.Services
             return rows;
         }
 
-        private static string? EmptyToNull(string? value) =>
-            string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        private static string? EmptyToNull(string? value)
+        {
+            var text = (value ?? "").Trim();
+            if (text.Length == 0 || text == "—" || text == "——")
+                return null;
+            return text;
+        }
     }
 
     public class AttendancePreviewResult

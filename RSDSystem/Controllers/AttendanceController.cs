@@ -120,9 +120,8 @@ namespace RSDSystem.Controllers
                 rows = rows.Select(r => ToRowJson(new AttendancePreviewRow
                 {
                     EmployeeId = r.EmployeeId,
-                    DisplayId = r.Employee != null
-                        ? EmployeeIds.Format(r.Employee.EmployeeCode)
-                        : (string.IsNullOrWhiteSpace(r.ExternalUserId) ? "—" : r.ExternalUserId),
+                    DisplayId = AttendanceDisplay.EmployeeId(
+                        r.Employee?.EmployeeCode ?? r.ExternalUserId),
                     ExternalUserId = r.ExternalUserId,
                     EmployeeName = r.Employee?.FullName ?? r.EmployeeName,
                     WorkDate = r.WorkDate,
@@ -220,12 +219,12 @@ namespace RSDSystem.Controllers
             row.ExternalUserId,
             row.EmployeeName,
             workDate = row.WorkDate?.ToString("MMMM dd, yyyy"),
-            row.TimeIn1,
-            row.TimeOut1,
-            row.TimeIn2,
-            row.TimeOut2,
-            row.OvertimeIn,
-            row.OvertimeOut,
+            timeIn1 = AttendanceDisplay.Clock(row.TimeIn1),
+            timeOut1 = AttendanceDisplay.Clock(row.TimeOut1),
+            timeIn2 = AttendanceDisplay.Clock(row.TimeIn2),
+            timeOut2 = AttendanceDisplay.Clock(row.TimeOut2),
+            overtimeIn = AttendanceDisplay.Clock(row.OvertimeIn),
+            overtimeOut = AttendanceDisplay.Clock(row.OvertimeOut),
             row.WorkHoursNormal,
             row.WorkHoursActual,
             row.LateMinutes,

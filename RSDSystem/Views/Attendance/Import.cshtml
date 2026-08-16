@@ -183,44 +183,37 @@
             });
         }
 
-        function dash(v) { return v == null || v === '' ? '—' : v; }
+        function dash(v) {
+            return v == null || v === '' || v === '—' ? '——' : v;
+        }
+
+        function timeCell(v) {
+            const text = dash(v);
+            return text === '——' ? `<span class="att-empty">${text}</span>` : text;
+        }
 
         function renderPreview() {
             const rows = filteredRows();
             const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
             if (currentPage > totalPages) currentPage = totalPages;
             const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-            const daily = previewFormat === 'Daily';
 
-            document.getElementById('previewHead').innerHTML = daily
-                ? `<tr>
+            document.getElementById('previewHead').innerHTML = `<tr>
                     <th>Employee ID</th><th>Employee Name</th><th>Date</th>
-                    <th>Time In (1)</th><th>Time Out (1)</th><th>Time In (2)</th><th>Time Out (2)</th>
+                    <th>Time In</th><th>Time Out</th><th>Time In</th><th>Time Out</th>
                     <th>Overtime In</th><th>Overtime Out</th><th>Status</th><th>Action</th>
-                   </tr>`
-                : `<tr>
-                    <th>Employee ID</th><th>Employee Name</th><th>Period</th>
-                    <th>Worktime</th><th>Late (min)</th><th>Overtime</th><th>Absence</th>
-                    <th>Status</th><th>Action</th>
                    </tr>`;
 
             document.getElementById('previewBody').innerHTML = pageRows.map(r => {
                 const status = `<span class="status-pill ${r.statusClass}">${r.status}</span>`;
                 const action = `<span class="att-action-link">${r.actionLabel}</span>`;
-                if (daily) {
-                    return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
-                        <td>${r.displayId}</td><td>${r.employeeName || '—'}</td><td>${dash(r.workDate)}</td>
-                        <td>${dash(r.timeIn1)}</td><td>${dash(r.timeOut1)}</td>
-                        <td>${dash(r.timeIn2)}</td><td>${dash(r.timeOut2)}</td>
-                        <td>${dash(r.overtimeIn)}</td><td>${dash(r.overtimeOut)}</td>
-                        <td>${status}</td><td>${action}</td></tr>`;
-                }
                 return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
-                    <td>${r.displayId}</td><td>${r.employeeName || '—'}</td>
+                    <td>${r.displayId || '——'}</td>
+                    <td>${r.employeeName || '——'}</td>
                     <td>${dash(r.workDate)}</td>
-                    <td>${Number(r.workHoursNormal).toFixed(1)} / ${Number(r.workHoursActual).toFixed(1)}</td>
-                    <td>${r.lateMinutes}</td><td>${Number(r.overtimeHours).toFixed(1)}</td>
-                    <td>${Number(r.absenceDays).toFixed(1)}</td>
+                    <td>${timeCell(r.timeIn1)}</td><td>${timeCell(r.timeOut1)}</td>
+                    <td>${timeCell(r.timeIn2)}</td><td>${timeCell(r.timeOut2)}</td>
+                    <td>${timeCell(r.overtimeIn)}</td><td>${timeCell(r.overtimeOut)}</td>
                     <td>${status}</td><td>${action}</td></tr>`;
             }).join('');
 
