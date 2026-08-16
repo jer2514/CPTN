@@ -16,6 +16,8 @@ namespace RSDSystem.Models
         public DbSet<ProjectMonthlyBudget> ProjectMonthlyBudgets { get; set; }
         public DbSet<PayrollSchedule> PayrollSchedules { get; set; }
         public DbSet<Payroll> Payrolls { get; set; }
+        public DbSet<AttendanceImport> AttendanceImports { get; set; }
+        public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -102,6 +104,25 @@ namespace RSDSystem.Models
                 .WithMany()
                 .HasForeignKey(pr => pr.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceImport>()
+                .HasOne(i => i.Project)
+                .WithMany()
+                .HasForeignKey(i => i.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.Import)
+                .WithMany(i => i.Records)
+                .HasForeignKey(r => r.AttendanceImportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.Employee)
+                .WithMany()
+                .HasForeignKey(r => r.EmployeeId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .IsRequired(false);
         }
     }
 }

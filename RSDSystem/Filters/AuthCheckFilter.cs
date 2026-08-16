@@ -6,7 +6,7 @@ namespace RSDSystem.Filters
     public class AuthCheckFilter : IActionFilter
     {
         // Controllers reachable without being logged in
-        private static readonly string[] PublicControllers = { "Account" };
+        private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
 
         public void OnActionExecuting(ActionExecutingContext context)
         {
