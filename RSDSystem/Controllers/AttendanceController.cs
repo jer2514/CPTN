@@ -92,7 +92,9 @@ namespace RSDSystem.Controllers
                 return Json(new
                 {
                     success = true,
-                    message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message = result.ReplacedPrevious
+                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
                     result.ImportId,
                     result.ProjectId,
                     result.RowCount,
@@ -156,40 +158,21 @@ namespace RSDSystem.Controllers
             });
         }
 
-        public async Task<IActionResult> Edit(int id)
+        public IActionResult Edit(int id)
         {
-            var model = await _imports.GetMonthEditAsync(id, HttpContext.RequestAborted);
-            if (model == null)
-                return NotFound();
-
-            ViewBag.PageTitle = "Edit Attendance";
-            return View(model);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(AttendanceMonthEdit model)
-        {
-            if (model.Days.Count == 0)
-            {
-                TempData["Error"] = "No attendance days to save.";
-                return RedirectToAction(nameof(Records));
-            }
-
-            var error = await _imports.SaveMonthEditAsync(model, HttpContext.RequestAborted);
-            if (error != null)
-            {
-                TempData["Error"] = error;
-                return View(model);
-            }
-
-            TempData["Success"] = $"Saved {model.MonthLabel} attendance for {model.EmployeeName}.";
             return RedirectToAction(nameof(Records));
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateRecord(
+        public IActionResult Edit(AttendanceMonthEdit model)
+        {
+            return RedirectToAction(nameof(Records));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult UpdateRecord(
             int recordId,
             string? timeIn1,
             string? timeOut1,
@@ -199,12 +182,7 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
-            var error = await _imports.UpdateRecordAsync(
-                recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, status);
-            if (error != null)
-                return Json(new { success = false, message = error });
-
-            return Json(new { success = true, message = "Attendance row updated." });
+            return Json(new { success = false, message = "Attendance records are view only." });
         }
 
         private async Task<List<Project>> LoadProjectsAsync()

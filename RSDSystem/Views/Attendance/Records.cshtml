@@ -70,7 +70,6 @@
                         <th>Overtime In</th>
                         <th>Overtime Out</th>
                         <th>Status</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="recordsBody"></tbody>
@@ -195,7 +194,6 @@
                         <td>${timeCell(r.overtimeIn)}</td>
                         <td>${timeCell(r.overtimeOut)}</td>
                         <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
-                        <td><a class="att-action-link" href="/Attendance/Edit/${r.recordId}">${r.actionLabel}</a></td>
                     </tr>`).join('');
 
                 document.getElementById('recordsPager').innerHTML =

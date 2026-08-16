@@ -353,7 +353,7 @@
                 alert('Load a file before importing.');
                 return;
             }
-            if (!confirm('Import the previewed attendance rows into this project?')) return;
+            if (!confirm('Import these attendance rows? If this project already has attendance for the same dates, those rows will be replaced.')) return;
 
             const btn = this;
             btn.disabled = true;
