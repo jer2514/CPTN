@@ -2010,13 +2010,21 @@ button.badge-btn {
     text-decoration: none;
 }
 
- .btn-generate-pill:disabled {
-    opacity: .7;
+.btn-generate-pill:disabled,
+.btn-generate-disabled {
+    background: #c5c9d1;
+    color: #fff;
+    pointer-events: none;
     cursor: default;
- }
+}
 
 .btn-generate-done {
     background: #0d7a3e !important;
+}
+
+.emp-table tr.row-generated td {
+    background: #f0f2f5;
+    color: #8b93a7;
 }
 
 /* ── Payroll slip card ───────────────────────────────────── */

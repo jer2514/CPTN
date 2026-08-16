@@ -120,6 +120,12 @@ namespace RSDSystem.Controllers
                   .OrderBy(e => e.LastName)
                   .ToListAsync();
 
+            var generatedEmployeeIds = await _db.Set<Payroll>()
+                  .Where(p => p.ProjectId == projectId)
+                  .Select(p => p.EmployeeId)
+                  .Distinct()
+                  .ToListAsync();
+
             var result = employees.Select(e => new
             {
                 e.EmployeeId,
@@ -128,7 +134,8 @@ namespace RSDSystem.Controllers
                 e.JobClassification,
                 e.DailyRate,
                 e.RatePerHour,
-                e.IsActive
+                e.IsActive,
+                AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId)
             });
 
             return Json(new { success = true, projectName = project.ProjectName, employees = result });
@@ -154,6 +161,30 @@ namespace RSDSystem.Controllers
                     existing.Status == PayrollStatusOptions.Approved)
                 {
                     return RedirectToAction(nameof(ViewPayroll), new { id = existing.PayrollId });
+                }
+            }
+            else
+            {
+                existing = await _db.Set<Payroll>()
+                    .Where(p => p.EmployeeId == employeeId && p.ProjectId == projectId)
+                    .OrderByDescending(p => p.GeneratedDate)
+                    .FirstOrDefaultAsync();
+
+                if (existing != null)
+                {
+                    if (existing.Status == PayrollStatusOptions.Submitted ||
+                        existing.Status == PayrollStatusOptions.Approved)
+                    {
+                        return RedirectToAction(nameof(ViewPayroll), new { id = existing.PayrollId });
+                    }
+
+                    return RedirectToAction(nameof(PayrollSlip), new
+                    {
+                        employeeId,
+                        projectId,
+                        payrollId = existing.PayrollId,
+                        returnUrl
+                    });
                 }
             }
 
@@ -319,6 +350,17 @@ namespace RSDSystem.Controllers
             }
             else
             {
+                var alreadyGenerated = await _db.Set<Payroll>().AnyAsync(p =>
+                    p.EmployeeId == employeeId && p.ProjectId == projectId);
+                if (alreadyGenerated)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = "Payroll has already been generated for this employee."
+                    });
+                }
+
                 payroll = new Payroll
                 {
                     EmployeeId = employeeId,
