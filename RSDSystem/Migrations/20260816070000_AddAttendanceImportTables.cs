@@ -1,4 +1,3 @@
-using System;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using RSDSystem.Models;
@@ -14,99 +13,71 @@ namespace RSDSystem.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "AttendanceImports",
-                columns: table => new
-                {
-                    AttendanceImportId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ProjectId = table.Column<int>(type: "int", nullable: false),
-                    FileName = table.Column<string>(type: "nvarchar(260)", maxLength: 260, nullable: false),
-                    Source = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Format = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
-                    PeriodStart = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    PeriodEnd = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ImportedBy = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
-                    ImportedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    RowCount = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AttendanceImports", x => x.AttendanceImportId);
-                    table.ForeignKey(
-                        name: "FK_AttendanceImports_Projects_ProjectId",
-                        column: x => x.ProjectId,
-                        principalTable: "Projects",
-                        principalColumn: "ProjectId",
-                        onDelete: ReferentialAction.Cascade);
-                });
+            // Same tables may already exist from Program.cs startup SQL.
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.AttendanceImports', N'U') IS NULL
+BEGIN
+    CREATE TABLE [AttendanceImports] (
+        [AttendanceImportId] int NOT NULL IDENTITY,
+        [ProjectId] int NOT NULL,
+        [FileName] nvarchar(260) NOT NULL,
+        [Source] nvarchar(20) NOT NULL,
+        [Format] nvarchar(30) NOT NULL,
+        [PeriodStart] datetime2 NULL,
+        [PeriodEnd] datetime2 NULL,
+        [ImportedBy] nvarchar(150) NULL,
+        [ImportedAt] datetime2 NOT NULL,
+        [RowCount] int NOT NULL,
+        CONSTRAINT [PK_AttendanceImports] PRIMARY KEY ([AttendanceImportId]),
+        CONSTRAINT [FK_AttendanceImports_Projects_ProjectId] FOREIGN KEY ([ProjectId]) REFERENCES [Projects] ([ProjectId]) ON DELETE CASCADE
+    );
+    CREATE INDEX [IX_AttendanceImports_ProjectId] ON [AttendanceImports] ([ProjectId]);
+END
 
-            migrationBuilder.CreateTable(
-                name: "AttendanceRecords",
-                columns: table => new
-                {
-                    AttendanceRecordId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    AttendanceImportId = table.Column<int>(type: "int", nullable: false),
-                    EmployeeId = table.Column<int>(type: "int", nullable: true),
-                    ExternalUserId = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
-                    EmployeeName = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
-                    WorkDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    PeriodStart = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    PeriodEnd = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    TimeIn1 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    TimeOut1 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    TimeIn2 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    TimeOut2 = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    OvertimeIn = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    OvertimeOut = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    WorkHoursNormal = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    WorkHoursActual = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    LateMinutes = table.Column<int>(type: "int", nullable: false),
-                    EarlyMinutes = table.Column<int>(type: "int", nullable: false),
-                    OvertimeHours = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    AbsenceDays = table.Column<decimal>(type: "decimal(10,2)", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
-                    Matched = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AttendanceRecords", x => x.AttendanceRecordId);
-                    table.ForeignKey(
-                        name: "FK_AttendanceRecords_AttendanceImports_AttendanceImportId",
-                        column: x => x.AttendanceImportId,
-                        principalTable: "AttendanceImports",
-                        principalColumn: "AttendanceImportId",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AttendanceRecords_Employees_EmployeeId",
-                        column: x => x.EmployeeId,
-                        principalTable: "Employees",
-                        principalColumn: "EmployeeId",
-                        onDelete: ReferentialAction.SetNull);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AttendanceImports_ProjectId",
-                table: "AttendanceImports",
-                column: "ProjectId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AttendanceRecords_AttendanceImportId",
-                table: "AttendanceRecords",
-                column: "AttendanceImportId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AttendanceRecords_EmployeeId",
-                table: "AttendanceRecords",
-                column: "EmployeeId");
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NULL
+BEGIN
+    CREATE TABLE [AttendanceRecords] (
+        [AttendanceRecordId] int NOT NULL IDENTITY,
+        [AttendanceImportId] int NOT NULL,
+        [EmployeeId] int NULL,
+        [ExternalUserId] nvarchar(40) NOT NULL,
+        [EmployeeName] nvarchar(150) NOT NULL,
+        [WorkDate] datetime2 NULL,
+        [PeriodStart] datetime2 NULL,
+        [PeriodEnd] datetime2 NULL,
+        [TimeIn1] nvarchar(20) NULL,
+        [TimeOut1] nvarchar(20) NULL,
+        [TimeIn2] nvarchar(20) NULL,
+        [TimeOut2] nvarchar(20) NULL,
+        [OvertimeIn] nvarchar(20) NULL,
+        [OvertimeOut] nvarchar(20) NULL,
+        [WorkHoursNormal] decimal(10,2) NOT NULL,
+        [WorkHoursActual] decimal(10,2) NOT NULL,
+        [LateMinutes] int NOT NULL,
+        [EarlyMinutes] int NOT NULL,
+        [OvertimeHours] decimal(10,2) NOT NULL,
+        [AbsenceDays] decimal(10,2) NOT NULL,
+        [Status] nvarchar(20) NOT NULL,
+        [Matched] bit NOT NULL,
+        CONSTRAINT [PK_AttendanceRecords] PRIMARY KEY ([AttendanceRecordId]),
+        CONSTRAINT [FK_AttendanceRecords_AttendanceImports_AttendanceImportId] FOREIGN KEY ([AttendanceImportId]) REFERENCES [AttendanceImports] ([AttendanceImportId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_AttendanceRecords_Employees_EmployeeId] FOREIGN KEY ([EmployeeId]) REFERENCES [Employees] ([EmployeeId]) ON DELETE SET NULL
+    );
+    CREATE INDEX [IX_AttendanceRecords_AttendanceImportId] ON [AttendanceRecords] ([AttendanceImportId]);
+    CREATE INDEX [IX_AttendanceRecords_EmployeeId] ON [AttendanceRecords] ([EmployeeId]);
+END
+");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "AttendanceRecords");
-            migrationBuilder.DropTable(name: "AttendanceImports");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+    DROP TABLE [AttendanceRecords];
+IF OBJECT_ID(N'dbo.AttendanceImports', N'U') IS NOT NULL
+    DROP TABLE [AttendanceImports];
+");
         }
     }
 }
