@@ -28,10 +28,14 @@ namespace RSDSystem.Services
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Regex CardDate = new(
-            @"^(\d{1,2})\s+([A-Za-z]{2,9})\.?$",
+            @"^(\d{1,2})[\s\u00A0\u3000]+([A-Za-z]{2,9})\.?$",
             RegexOptions.Compiled);
 
         private static readonly Regex BareDay = new(@"^(\d{1,2})$", RegexOptions.Compiled);
+
+        private static readonly Regex WeekdayOnly = new(
+            @"^(sun|mon|tue|wed|thu|fri|sat|su|mo|tu|we|th|fr|sa)\.?$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private static readonly Regex InlineField = new(
             @"^(Name|User\s*ID|Employee\s*ID)\s*:?\s*(.+)$",
@@ -48,15 +52,14 @@ namespace RSDSystem.Services
             try
             {
                 using var reader = ExcelReaderFactory.CreateReader(file);
-                var data = reader.AsDataSet(new ExcelDataSetConfiguration
-                {
-                    ConfigureDataTable = _ => new ExcelDataTableConfiguration { UseHeaderRow = false }
-                });
-
-                if (data.Tables.Count == 0)
+                var tables = ReadExcelTables(reader);
+                if (tables.Count == 0)
                     return new AttendanceParseResult { Error = "The Excel file has no sheets." };
 
-                return ParseTable(data.Tables[0], fileName);
+                var table = tables
+                    .OrderByDescending(ScoreTimeCardSheet)
+                    .First();
+                return ParseTable(table, fileName);
             }
             catch (Exception ex)
             {
@@ -133,13 +136,17 @@ namespace RSDSystem.Services
 
         private static bool LooksLikeEmployeeTimeCard(DataTable table)
         {
-            var scan = Math.Min(table.Rows.Count, 25);
+            var scan = table.Rows.Count;
             for (var r = 0; r < scan; r++)
             {
                 var joined = string.Join(" ", RowValues(table, r)).ToLowerInvariant();
-                if (joined.Contains("employee attendance table") || joined.Contains("time card"))
+                if (joined.Contains("employee attendance table") || joined.Contains("time card")
+                    || joined.Contains("timecard"))
                     return true;
                 if (joined.Contains("before noon") && joined.Contains("after noon"))
+                    return true;
+                if (joined.Contains("beforenoon") || (joined.Contains("before") && joined.Contains("noon")
+                    && joined.Contains("after")))
                     return true;
             }
 
@@ -362,37 +369,25 @@ namespace RSDSystem.Services
         private static void ReadTimeCardBlock(DataTable table, EmployeeBlock block, AttendanceParseResult result)
         {
             var columns = MapTimeCardColumns(table, block.ColStart, block.ColEnd);
-            var startRow = columns?.DataStartRow ?? 0;
-            var emptyStreak = 0;
 
-            for (var r = startRow; r < table.Rows.Count; r++)
+            for (var r = 0; r < table.Rows.Count; r++)
             {
                 var values = RowValues(table, r);
-                var dateText = columns != null
-                    ? CellAt(values, columns.DateCol)
-                    : FirstNonEmpty(values, block.ColStart, block.ColEnd);
-
-                if (string.IsNullOrWhiteSpace(dateText))
+                var dateCol = columns?.DateCol;
+                var dateText = dateCol.HasValue ? CellAt(values, dateCol) : "";
+                if (string.IsNullOrWhiteSpace(dateText) || !LooksLikeCardDate(dateText))
                 {
-                    emptyStreak++;
-                    if (emptyStreak >= 3)
-                        break;
-                    continue;
+                    dateCol = FindDateColumn(values, block.ColStart, block.ColEnd);
+                    dateText = dateCol.HasValue ? CellAt(values, dateCol) : "";
                 }
 
-                if (IsSectionLabel(dateText) || IsPeriodText(dateText))
+                if (string.IsNullOrWhiteSpace(dateText) || IsSectionLabel(dateText) || IsPeriodText(dateText))
                     continue;
 
-                var workDate = ResolveCardDate(dateText, result.PeriodStart, result.PeriodEnd, columns != null);
+                var workDate = ResolveCardDate(dateText, result.PeriodStart, result.PeriodEnd, true);
                 if (!workDate.HasValue)
-                {
-                    emptyStreak++;
-                    if (emptyStreak >= 3)
-                        break;
                     continue;
-                }
 
-                emptyStreak = 0;
                 var row = new AttendanceRecord
                 {
                     ExternalUserId = block.UserId,
@@ -408,12 +403,38 @@ namespace RSDSystem.Services
                     OvertimeOut = NormalizeTime(CellAt(values, columns?.OtOut))
                 };
 
-                if (columns == null || TimesEmpty(row))
+                if (TimesEmpty(row))
+                    ApplyTimesFromDateColumn(values, dateCol ?? block.ColStart, block.ColEnd, dateText, row);
+
+                if (TimesEmpty(row))
                     ApplyFallbackTimes(values, block.ColStart, block.ColEnd, dateText, row);
 
                 row.Status = DeriveStatus(row);
                 result.Rows.Add(row);
             }
+        }
+
+        private static int? FindDateColumn(string[] values, int colStart, int colEnd)
+        {
+            for (var c = colStart; c <= colEnd && c < values.Length; c++)
+            {
+                if (LooksLikeCardDate(values[c]))
+                    return c;
+            }
+
+            return null;
+        }
+
+        private static bool LooksLikeCardDate(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || IsSectionLabel(value) || IsPeriodText(value))
+                return false;
+            var text = value.Trim();
+            if (CardDate.IsMatch(text))
+                return true;
+            if (text.Contains('-') || text.Contains('/') || text.Contains(','))
+                return ParseDate(text).HasValue;
+            return false;
         }
 
         private static TimeCardColumns? MapTimeCardColumns(DataTable table, int colStart, int colEnd)
@@ -527,11 +548,40 @@ namespace RSDSystem.Services
             {
                 if (string.Equals(values[c], dateText, StringComparison.OrdinalIgnoreCase))
                     continue;
+                if (WeekdayOnly.IsMatch(values[c] ?? ""))
+                    continue;
                 var time = NormalizeTime(values[c]);
                 if (time != null)
                     times.Add(time);
             }
 
+            AssignTimeList(row, times);
+        }
+
+        private static void ApplyTimesFromDateColumn(
+            string[] values, int dateCol, int colEnd, string dateText, AttendanceRecord row)
+        {
+            var slots = new string?[6];
+            var index = 0;
+            for (var c = dateCol + 1; c <= colEnd && c < values.Length && index < slots.Length; c++)
+            {
+                if (string.Equals(values[c], dateText, StringComparison.OrdinalIgnoreCase)
+                    || WeekdayOnly.IsMatch(values[c] ?? ""))
+                    continue;
+
+                slots[index++] = NormalizeTime(values[c]);
+            }
+
+            row.TimeIn1 = slots[0];
+            row.TimeOut1 = slots[1];
+            row.TimeIn2 = slots[2];
+            row.TimeOut2 = slots[3];
+            row.OvertimeIn = slots[4];
+            row.OvertimeOut = slots[5];
+        }
+
+        private static void AssignTimeList(AttendanceRecord row, List<string> times)
+        {
             if (times.Count > 0) row.TimeIn1 = times[0];
             if (times.Count > 1) row.TimeOut1 = times[1];
             if (times.Count > 2) row.TimeIn2 = times[2];
@@ -741,6 +791,109 @@ namespace RSDSystem.Services
             return new string(chars);
         }
 
+        private static List<DataTable> ReadExcelTables(IExcelDataReader reader)
+        {
+            var tables = new List<DataTable>();
+            do
+            {
+                var table = new DataTable(string.IsNullOrWhiteSpace(reader.Name) ? "Sheet" : reader.Name);
+                while (reader.Read())
+                {
+                    var fields = Math.Max(reader.FieldCount, 0);
+                    while (table.Columns.Count < fields)
+                        table.Columns.Add("C" + table.Columns.Count, typeof(object));
+
+                    var row = table.NewRow();
+                    for (var i = 0; i < fields; i++)
+                        row[i] = ReadExcelValue(reader, i);
+                    table.Rows.Add(row);
+                }
+
+                if (table.Rows.Count > 0)
+                    tables.Add(table);
+            } while (reader.NextResult());
+
+            return tables;
+        }
+
+        private static object ReadExcelValue(IExcelDataReader reader, int index)
+        {
+            if (index < 0 || index >= reader.FieldCount)
+                return DBNull.Value;
+
+            try
+            {
+                if (reader.IsDBNull(index))
+                    return DBNull.Value;
+            }
+            catch (Exception)
+            {
+            }
+
+            object? value = null;
+            try
+            {
+                value = reader.GetValue(index);
+            }
+            catch (Exception)
+            {
+            }
+
+            if (value != null && value != DBNull.Value)
+                return value;
+
+            try
+            {
+                return reader.GetDouble(index);
+            }
+            catch (Exception)
+            {
+            }
+
+            try
+            {
+                return reader.GetDateTime(index);
+            }
+            catch (Exception)
+            {
+            }
+
+            try
+            {
+                var text = reader.GetString(index);
+                return string.IsNullOrWhiteSpace(text) ? DBNull.Value : text;
+            }
+            catch (Exception)
+            {
+                return DBNull.Value;
+            }
+        }
+
+        private static int ScoreTimeCardSheet(DataTable table)
+        {
+            var score = table.Columns.Count;
+            for (var r = 0; r < table.Rows.Count; r++)
+            {
+                var values = RowValues(table, r);
+                var joined = string.Join(" ", values).ToLowerInvariant();
+                if (joined.Contains("time card") || joined.Contains("timecard"))
+                    score += 80;
+                if (joined.Contains("employee attendance"))
+                    score += 40;
+                if (joined.Contains("before noon") || joined.Contains("after noon"))
+                    score += 30;
+                foreach (var cell in values)
+                {
+                    if (CardDate.IsMatch((cell ?? "").Trim()))
+                        score += 10;
+                    if ((cell ?? "").Contains(':'))
+                        score += 2;
+                }
+            }
+
+            return score;
+        }
+
         private static DataTable ReadCsv(Stream file)
         {
             using var reader = new StreamReader(file, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
@@ -881,17 +1034,6 @@ namespace RSDSystem.Services
             if (!index.HasValue || index.Value < 0 || index.Value >= values.Length)
                 return "";
             return values[index.Value];
-        }
-
-        private static string FirstNonEmpty(string[] values, int start, int end)
-        {
-            for (var i = start; i <= end && i < values.Length; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(values[i]))
-                    return values[i];
-            }
-
-            return "";
         }
 
         private static string Cell(string[] values, Dictionary<string, int> map, params string[] keys)
