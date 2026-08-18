@@ -208,7 +208,7 @@ namespace RSDSystem.Controllers
             existing.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
             existing.DateOfBirth = user.DateOfBirth;
             existing.Gender = user.Gender;
-            existing.Username = user.Username;
+            existing.Username = user.Username ?? string.Empty;
             existing.Email = user.Email;
             existing.ContactNumber = user.ContactNumber;
             existing.Address = user.Address;

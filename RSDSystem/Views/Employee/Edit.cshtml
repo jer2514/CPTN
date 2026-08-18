@@ -115,8 +115,8 @@
                         <label class="form-lbl">Gender <span class="req-star">*</span></label>
                         <select name="Gender" class="@Ctrl("Gender")" data-validate="required" data-label="Gender">
                             <option value="">Select</option>
-                            <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
-                            <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
+                            <option value="Male" selected="@(Model.Gender == "Male")">Male</option>
+                            <option value="Female" selected="@(Model.Gender == "Female")">Female</option>
                         </select>
                         <span class="field-error" data-error-for="Gender">@Err("Gender")</span>
                     </div>
@@ -159,7 +159,7 @@
                             <option value="">Select project</option>
                             @foreach (var p in projects)
                             {
-                                <option value="@p.ProjectId" @(p.ProjectId == Model.ProjectId ? "selected" : null)>@p.ProjectName</option>
+                                <option value="@p.ProjectId" selected="@(p.ProjectId == Model.ProjectId)">@p.ProjectName</option>
                             }
                         </select>
                     </div>
@@ -174,7 +174,7 @@
                             <option value="">Select</option>
                             @foreach (var j in jobs)
                             {
-                                <option value="@j" @(j == Model.JobClassification ? "selected" : null)>@j</option>
+                                <option value="@j" selected="@(j == Model.JobClassification)">@j</option>
                             }
                         </select>
                         <span class="field-error" data-error-for="JobClassification">@Err("JobClassification")</span>

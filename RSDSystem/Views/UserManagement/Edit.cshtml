@@ -116,8 +116,8 @@
                         <label class="form-lbl">Gender</label>
                         <select name="Gender" class="form-ctrl">
                             <option value="">Select</option>
-                            <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
-                            <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
+                            <option value="Male" selected="@(Model.Gender == "Male")">Male</option>
+                            <option value="Female" selected="@(Model.Gender == "Female")">Female</option>
                         </select>
                     </div>
                 </div>
@@ -202,7 +202,7 @@
                             <option value="">Select role</option>
                             @foreach (var r in roles)
                             {
-                                <option value="@r" @(r == Model.Role ? "selected" : null)>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
+                                <option value="@r" selected="@(r == Model.Role)">@((r == "PayrollStaff") ? "Payroll Staff" : r)</option>
                             }
                         </select>
                         <span class="field-error" data-error-for="Role">@Err("Role")</span>
