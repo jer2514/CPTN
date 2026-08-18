@@ -72,7 +72,7 @@ body {
             transition: background .15s;
         }
 
-        .menu li.active a {
+        .menu > li.active > a {
             background: #C9DAFF;
             color: #163F8B;
             font-weight: 600;
@@ -216,7 +216,7 @@ body {
 }
 
 .dash-schedule-modal {
-    width: 460px;
+    width: 520px;
     text-align: left;
 }
 
@@ -241,9 +241,14 @@ body {
 /* ── Topbar (bell button row) ───────────────────────────── */
 .content-topbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 20px;
     margin-bottom:35px;
+}
+
+.content-topbar .bell-btn {
+    margin-left: auto;
 }
 
 .bell-btn {
@@ -561,9 +566,11 @@ body {
 
 /* ── Table checkbox ──────────────────────────────────────── */
 .tbl-check {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
+    accent-color: #266DF1;
     cursor: pointer;
+    vertical-align: middle;
 }
 
 /* ── Employee avatar in table ────────────────────────────── */
@@ -615,6 +622,36 @@ body {
     color: #c0392b;
     border-radius: 20px;
     padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-ongoing {
+    background: #d4f7e0;
+    color: #0d7a3e;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-finished {
+    background: #d6e4ff;
+    color: #163F8B;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge-hold {
+    background: #ffdca0;
+    color: #a15c00;
+    border-radius: 20px;
+    padding: 4px 16px;
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
@@ -712,7 +749,7 @@ body {
     background: #fff;
     border-radius: 14px;
     padding: 28px 32px;
-    max-width: 700px;
+    max-width: 680px;
     margin: 0 auto;
 }
 
@@ -1444,6 +1481,56 @@ select.form-ctrl {
     margin-bottom: 14px;
 }
 
+.proj-view-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.proj-view-toolbar .proj-view-actions {
+    margin-bottom: 0;
+}
+
+.proj-status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.proj-status-line .form-lbl {
+    display: inline;
+    margin-bottom: 0;
+}
+
+.proj-status-line .badge-ongoing {
+    background: #22c55e;
+    color: #111;
+    padding: 6px 18px;
+    font-size: 12.5px;
+}
+
+.proj-status-line .badge-hold {
+    background: #f59e0b;
+    color: #111;
+    padding: 6px 18px;
+    font-size: 12.5px;
+}
+
+.proj-status-line .badge-finished {
+    background: #266DF1;
+    color: #fff;
+    padding: 6px 18px;
+    font-size: 12.5px;
+}
+
+.proj-view-field-muted {
+    color: #9ab0d8;
+    font-size: 12.5px;
+}
+
 .proj-emp-count {
     font-size: 12px;
     color: #6b87c0;
@@ -1664,9 +1751,22 @@ button.badge-btn {
     }
 
         .submenu li a:hover {
-            background: #f5f8ff;
-            color: #163F8B;
+            background: none;
+            color: #266DF1;
         }
+
+    .submenu li.active a {
+        background: none;
+        box-shadow: none;
+        color: #266DF1;
+        font-weight: 600;
+    }
+
+    .menu li a.menu-dropdown-toggle.active {
+        background: #C9DAFF;
+        color: #163F8B;
+        font-weight: 600;
+    }
 
 .menu-logout {
     padding: 0 10px 10px;
@@ -1692,26 +1792,39 @@ button.badge-btn {
 
 
 /* ── To-do task card ─────────────────────────────────────── */
+.task-page-card {
+    height: fit-content;
+    padding: 22px 24px 18px;
+}
+
 .task-card-title {
     font-size: 18px;
     font-weight: 700;
     color: #266DF1;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .task-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 13.5px;
 }
 
     .task-table thead tr {
         background: #DCE5FF;
     }
 
+    .task-table th,
+    .task-table td {
+        padding: 12px 14px;
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .task-table th {
-        padding: 12px 16px;
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 600;
         color: #163F8B;
         text-align: left;
@@ -1719,9 +1832,32 @@ button.badge-btn {
     }
 
     .task-table td {
-        padding: 14px 16px;
         border-bottom: 1px solid #f0f4ff;
-        color: #000;
+        color: #111;
+    }
+
+    .task-table th:nth-child(1),
+    .task-table td:nth-child(1) {
+        width: 24%;
+    }
+
+    .task-table th:nth-child(2),
+    .task-table td:nth-child(2) {
+        width: 26%;
+    }
+
+    .task-table th:nth-child(3),
+    .task-table td:nth-child(3),
+    .task-table th:nth-child(4),
+    .task-table td:nth-child(4) {
+        width: 18%;
+        text-align: center;
+    }
+
+    .task-table th:nth-child(5),
+    .task-table td:nth-child(5) {
+        width: 120px;
+        text-align: center;
     }
 
     .task-table tbody tr:last-child td {
@@ -1732,26 +1868,23 @@ button.badge-btn {
         background: #f8fbff;
     }
 
-.task-check-btn {
-    border: 1.5px solid #163F8B;
-    background: #fff;
-    color: #163F8B;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    display: inline-flex;
+    .task-table .task-empty {
+        text-align: center;
+        color: #6b87c0;
+        padding: 28px 14px;
+    }
+
+.task-check-form {
+    display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    cursor: pointer;
-    padding: 0;
+    margin: 0;
 }
 
-    .task-check-btn.checked {
-        background: #163F8B;
-        color: #fff;
-        border-color: #163F8B;
-    }
+.task-check-form .tbl-check {
+    width: 18px;
+    height: 18px;
+}
 
 
 /*payroll staff*/
@@ -1813,6 +1946,23 @@ button.badge-btn {
     background: none;
 }
 
+.genpay-suggest-list .suggest-name {
+    display: block;
+}
+
+.genpay-suggest-list .suggest-meta {
+    display: block;
+    font-size: 11px;
+    color: #7a93c4;
+    margin-top: 2px;
+}
+
+.genpay-suggest-list .suggest-match {
+    color: #266DF1;
+    font-weight: 700;
+    background: #e8f0ff;
+}
+
 .genpay-fallback-note {
     background: #FFF8E1;
     color: #8a6d00;
@@ -1860,13 +2010,21 @@ button.badge-btn {
     text-decoration: none;
 }
 
- .btn-generate-pill:disabled {
-    opacity: .7;
+.btn-generate-pill:disabled,
+.btn-generate-disabled {
+    background: #c5c9d1;
+    color: #fff;
+    pointer-events: none;
     cursor: default;
- }
+}
 
 .btn-generate-done {
     background: #0d7a3e !important;
+}
+
+.emp-table tr.row-generated td {
+    background: #f0f2f5;
+    color: #8b93a7;
 }
 
 /* ── Payroll slip card ───────────────────────────────────── */
@@ -1897,6 +2055,17 @@ button.badge-btn {
     font-size: 13.5px;
     font-weight: 600;
     color: #266DF1;
+}
+
+.slip-schedule-hint {
+    background: #eef4ff;
+    border: 1px solid #c5d8ff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #163F8B;
+    line-height: 1.4;
 }
 
 /* ── Pending Payroll — status rows & pills ──────────────── */
@@ -2072,10 +2241,10 @@ button.badge-btn {
 }
 
 .btn-approve {
-    background: #0d7a3e;
+    background: #22c55e;
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 10px 32px;
     font-size: 13px;
     font-weight: 600;
@@ -2083,14 +2252,14 @@ button.badge-btn {
 }
 
     .btn-approve:hover {
-        background: #0a5c2f;
+        background: #16a34a;
     }
 
 .btn-return {
-    background: #E1962B;
+    background: #f59e0b;
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 10px 22px;
     font-size: 13px;
     font-weight: 600;
@@ -2098,8 +2267,54 @@ button.badge-btn {
 }
 
     .btn-return:hover {
-        background: #c07d1c;
+        background: #d97706;
     }
+
+.review-slip-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    align-items: start;
+    max-width: 1180px;
+    margin: 0 auto;
+}
+
+.review-slip-col .payslip-card {
+    max-width: none;
+    margin: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+
+.review-slip-col .payslip-approve-row {
+    margin-top: 14px;
+}
+
+.hidden-token-form {
+    display: none;
+}
+
+.del-icon-success {
+    background: #d4f7e0;
+}
+
+.del-icon-success-i {
+    color: #0d7a3e;
+    font-size: 28px;
+}
+
+.btn-return-confirm {
+    background: #E1962B;
+}
+
+.btn-result-ok {
+    background: #266DF1;
+}
+
+@media (max-width: 980px) {
+    .review-slip-grid {
+        grid-template-columns: 1fr;
+    }
+}
 
 .correction-modal {
     text-align: left;
@@ -2222,5 +2437,762 @@ button.badge-btn {
     font-size: 13px;
     color: #6b4d00;
     line-height: 1.5;
+}
+
+/* ── Admin View Payroll / Prediction ─────────────────────── */
+.vp-filters {
+    display: grid;
+    grid-template-columns: 1fr 220px auto;
+    gap: 14px;
+    align-items: end;
+    margin-bottom: 22px;
+    overflow: visible;
+}
+
+.vp-filter-submit {
+    padding-bottom: 1px;
+}
+
+.vp-period-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.vp-period-card {
+    border: 1.5px solid #d7e3ff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.vp-period-head,
+.vp-period-body {
+    display: grid;
+    grid-template-columns: 1.2fr 1.2fr 1.2fr 140px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+}
+
+.vp-period-head {
+    background: #dce8ff;
+    font-size: 12px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.vp-period-body {
+    background: #eef4ff;
+    font-size: 13px;
+}
+
+.vp-detail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.vp-inline-back {
+    margin-bottom: 12px;
+    position: static;
+}
+
+.vp-detail-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin: 4px 0 20px;
+}
+
+.vp-detail-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #266DF1;
+    line-height: 1.2;
+}
+
+.vp-detail-dates {
+    font-size: 13px;
+    color: #4a4a4a;
+    margin-top: 6px;
+}
+
+.vp-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    align-items: center;
+}
+
+.vp-btn-pdf,
+.vp-btn-send {
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    white-space: nowrap;
+}
+
+.vp-btn-pdf {
+    background: #fff;
+    color: #111;
+    border: 1.5px solid #111;
+}
+
+.vp-btn-pdf:hover {
+    background: #f5f5f5;
+    color: #111;
+}
+
+.vp-btn-send {
+    background: #22a35a;
+    color: #fff;
+    border: none;
+}
+
+.vp-btn-send:hover {
+    background: #1b8448;
+    color: #fff;
+}
+
+.vp-employee-table thead tr {
+    background: #dce8ff;
+}
+
+.vp-employee-table th {
+    color: #163F8B;
+}
+
+.vp-employee-table tbody tr:nth-child(even) td {
+    background: #f4f8ff;
+}
+
+.vp-slip-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+    margin-top: 28px;
+}
+
+.gen-modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px 32px 24px;
+    width: min(460px, calc(100vw - 32px));
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .2);
+}
+
+.gen-modal-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-bottom: 16px;
+}
+
+.gen-modal-text {
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.gen-modal-text strong {
+    color: #266DF1;
+}
+
+.gen-modal-period-lbl {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.gen-modal-period {
+    color: #266DF1;
+    font-weight: 600;
+    margin-bottom: 22px;
+}
+
+.gen-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.gen-modal-btn {
+    width: auto;
+    margin: 0;
+}
+
+.gen-modal-cancel {
+    background: #8a8a8a;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 28px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.gen-modal-cancel:hover {
+    background: #6f6f6f;
+}
+
+.send-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 8px 0 22px;
+    font-weight: 600;
+}
+
+.send-file-row i {
+    font-size: 28px;
+    color: #266DF1;
+}
+
+.pred-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.pred-back {
+    margin-bottom: 0;
+    position: static;
+}
+
+.pred-heading-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.pred-project {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.pred-dates {
+    color: #d5e2ff;
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.pred-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.pred-btn-pdf,
+.pred-btn-send {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+}
+
+.pred-btn-pdf {
+    background: #fff;
+    color: #111;
+}
+
+.pred-btn-pdf:hover {
+    background: #f3f3f3;
+    color: #111;
+}
+
+.pred-btn-send {
+    background: #22a35a;
+    color: #fff;
+}
+
+.pred-btn-send:hover {
+    background: #1b8448;
+    color: #fff;
+}
+
+.pred-card {
+    min-height: 420px;
+}
+
+.pred-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.pred-slip {
+    border: 1.5px solid #266DF1;
+    border-radius: 4px;
+    padding: 12px 14px 10px;
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+    display: block;
+}
+
+.pred-slip:hover {
+    box-shadow: 0 6px 16px rgba(22, 63, 139, .12);
+}
+
+.mini-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: #266DF1;
+}
+
+.mini-sub {
+    text-align: center;
+    font-size: 11px;
+    color: #000;
+    margin-bottom: 8px;
+}
+
+.mini-section {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0d7a3e;
+    border-bottom: 1px solid #111;
+    padding-bottom: 3px;
+    margin: 8px 0 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.mini-period {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: #266DF1;
+}
+
+.mini-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    font-size: 10.5px;
+}
+
+.mini-fields {
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    row-gap: 3px;
+    column-gap: 8px;
+    font-size: 10.5px;
+}
+
+.mini-fields-gap {
+    margin-top: 6px;
+}
+
+.mini-net {
+    display: grid;
+    grid-template-columns: 118px 1fr;
+    gap: 8px;
+    font-size: 10.5px;
+    border-top: 1px solid #111;
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+.mini-lbl { color: #111; }
+.mini-val { color: #266DF1; font-weight: 600; }
+
+.mini-footer {
+    margin-top: 8px;
+    font-size: 10px;
+    color: #266DF1;
+    font-weight: 600;
+}
+
+.pred-pager {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    margin-top: 16px;
+    font-weight: 600;
+}
+
+.pred-pager-arrows {
+    display: flex;
+    gap: 28px;
+}
+
+.pred-pager a,
+.pred-pager span.disabled {
+    color: #fff;
+    text-decoration: none;
+    font-size: 18px;
+}
+
+.pred-pager span.disabled {
+    opacity: .4;
+}
+
+@media (max-width: 900px) {
+    .vp-filters,
+    .vp-period-head,
+    .vp-period-body,
+    .pred-grid,
+    .pred-heading-row,
+    .vp-detail-heading {
+        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .vp-detail-actions {
+        justify-content: flex-start;
+    }
+}
+
+/* ── Import Attendance ───────────────────────────────────── */
+.att-page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #266DF1;
+    margin-bottom: 18px;
+}
+
+.att-import-row {
+    margin-bottom: 14px;
+}
+
+.att-field {
+    max-width: 720px;
+}
+
+.att-field-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.att-grow {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-choose-file {
+    background: #e8eaee;
+    color: #333;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    height: 38px;
+}
+
+.btn-choose-file:hover {
+    background: #d8dbe1;
+}
+
+.att-preview-meta {
+    font-size: 12.5px;
+    color: #5b6f94;
+}
+
+.att-table-wrap {
+    overflow-x: auto;
+}
+
+.att-table th,
+.att-table td {
+    white-space: nowrap;
+}
+
+.att-table .att-empty {
+    color: #9aa3b5;
+    letter-spacing: 1px;
+}
+
+.att-row-unmatched td {
+    background: #fff4f4;
+}
+
+.att-status-complete {
+    background: #b6f0c9;
+    color: #0d7a3e;
+}
+
+.att-status-incomplete {
+    background: #ffd4a8;
+    color: #a15c00;
+}
+
+.att-status-late {
+    background: #ffe58a;
+    color: #8a6d00;
+}
+
+.att-status-absent {
+    background: #ffc9c9;
+    color: #b42318;
+}
+
+.att-action-link {
+    background: none;
+    border: none;
+    color: #266DF1;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: none;
+}
+
+.att-action-link:hover {
+    text-decoration: underline;
+}
+
+.att-preview-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
+.att-pager {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #163F8B;
+}
+
+.att-page-btn {
+    border: 1px solid #C9DAFF;
+    background: #fff;
+    color: #266DF1;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+}
+
+.att-page-btn:disabled {
+    opacity: .4;
+    cursor: default;
+}
+
+.btn-import-attendance {
+    background: #22a35a;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-import-attendance:hover {
+    background: #1b8448;
+}
+
+.btn-import-attendance:disabled {
+    background: #9ecfb0;
+    cursor: default;
+}
+
+.att-edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.att-edit-grid label,
+.att-edit-status {
+    font-size: 12px;
+    font-weight: 600;
+    color: #163F8B;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.att-edit-status {
+    grid-column: 1 / -1;
+}
+
+.att-edit-sub {
+    font-size: 13px;
+    color: #5b6f94;
+    margin: -8px 0 18px;
+}
+
+.att-edit-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.att-card-table thead th {
+    text-align: center;
+}
+
+.att-time-input {
+    min-width: 118px;
+    padding: 6px 8px;
+    height: 36px;
+}
+
+.att-day-cell {
+    min-width: 140px;
+}
+
+.att-day-label {
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.att-day-full {
+    font-size: 11px;
+    color: #7a93c4;
+    margin-top: 2px;
+}
+
+.att-weekend .att-day-label {
+    color: #c0392b;
+}
+
+.att-day-focus td {
+    background: #eef4ff;
+}
+
+.att-edit-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(22, 63, 139, 0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 24px;
+}
+
+.att-edit-overlay[hidden] {
+    display: none;
+}
+
+.att-edit-panel {
+    width: min(720px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    box-shadow: 0 16px 40px rgba(22, 63, 139, 0.18);
+}
+
+.att-edit-live {
+    margin-top: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #163F8B;
+}
+
+.att-summary {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.att-summary-chip {
+    background: #f3f7ff;
+    border: 1px solid #d7e4ff;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.att-summary-chip span {
+    display: block;
+    font-size: 11px;
+    color: #5b6f94;
+    font-weight: 600;
+}
+
+.att-summary-chip strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 18px;
+    color: #163F8B;
+}
+
+.att-quick-btn {
+    background: #eef4ff;
+    color: #266DF1;
+    border: 1px solid #c9daff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.att-quick-btn:hover {
+    background: #dce8ff;
+}
+
+.att-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.att-hours-cell {
+    text-align: center;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.att-ot-hours {
+    font-size: 11px;
+    font-weight: 600;
+    color: #7a93c4;
+}
+
+.att-quick-cell {
+    white-space: nowrap;
+}
+
+.att-row-edited td {
+    background: #f3f8ff;
+}
+
+@media (max-width: 900px) {
+    .att-edit-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .att-summary {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 

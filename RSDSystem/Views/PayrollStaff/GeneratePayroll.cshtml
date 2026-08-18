@@ -177,19 +177,23 @@
             const tbody = document.getElementById('employeeTableBody');
             const fmt = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            tbody.innerHTML = list.map(e => `
-                <tr>
+            tbody.innerHTML = list.map(e => {
+                const generated = e.alreadyGenerated === true;
+                const action = generated
+                    ? `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`
+                    : `<a class="btn-generate-pill"
+                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}">
+                            Generate
+                       </a>`;
+                return `
+                <tr class="${generated ? 'row-generated' : ''}">
                     <td>${e.displayId}</td>
                     <td>${e.name}</td>
                     <td>${e.jobClassification}</td>
                     <td>${fmt(e.dailyRate)}</td>
-                    <td>
-                        <a class="btn-generate-pill"
-                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}">
-                            Generate
-                        </a>
-                    </td>
-                </tr>`).join('');
+                    <td>${action}</td>
+                </tr>`;
+            }).join('');
         }
 
         function filterEmployees() {

@@ -6,7 +6,7 @@ namespace RSDSystem.Filters
     public class AuthCheckFilter : IActionFilter
     {
         // Controllers reachable without being logged in
-        private static readonly string[] PublicControllers = { "Account" };
+        private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
 
         public void OnActionExecuting(ActionExecutingContext context)
         {
@@ -20,6 +20,17 @@ namespace RSDSystem.Filters
 
             if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(role))
             {
+                if (WantsJson(context))
+                {
+                    context.Result = new JsonResult(new
+                    {
+                        success = false,
+                        message = "Your session expired. Refresh the page and sign in again."
+                    })
+                    { StatusCode = 401 };
+                    return;
+                }
+
                 context.Result = new RedirectToActionResult("Login", "Account", null);
                 return;
             }
@@ -33,5 +44,21 @@ namespace RSDSystem.Filters
         }
 
         public void OnActionExecuted(ActionExecutedContext context) { }
+
+        private static bool WantsJson(ActionExecutingContext context)
+        {
+            var request = context.HttpContext.Request;
+            var accept = request.Headers["Accept"].ToString();
+            if (accept.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            var controller = context.RouteData.Values["controller"]?.ToString();
+            var action = context.RouteData.Values["action"]?.ToString();
+            return string.Equals(controller, "Attendance", StringComparison.OrdinalIgnoreCase)
+                && (string.Equals(action, "Preview", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "ImportFile", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "UpdateRecord", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase));
+        }
     }
 }

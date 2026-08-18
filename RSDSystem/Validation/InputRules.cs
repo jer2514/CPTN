@@ -1,5 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+<<<<<<< HEAD
+using Microsoft.AspNetCore.Http;
+=======
+>>>>>>> master
 
 namespace RSDSystem.Validation
 {
@@ -20,6 +24,12 @@ namespace RSDSystem.Validation
         public const string AddressPattern = @"^[A-Za-z0-9Ññ\s,.\-/#'()&]{5,250}$";
         public const string AddressMessage = "Enter a complete address (Barangay, Municipality/City, Province).";
 
+<<<<<<< HEAD
+        public const string ProjectNamePattern = @"^[A-Za-z0-9Ññ][A-Za-z0-9Ññ\s.'\-/&#()]{1,149}$";
+        public const string ProjectNameMessage = "Enter a valid project name.";
+
+=======
+>>>>>>> master
         public const int MinWorkingAge = 18;
         public const int MaxWorkingAge = 80;
         public const long MaxPhotoBytes = 2 * 1024 * 1024;
@@ -81,6 +91,65 @@ namespace RSDSystem.Validation
             }
         }
 
+<<<<<<< HEAD
+        public const int MinCalendarYear = DateRules.MinCalendarYear;
+        public const int MaxCalendarYear = DateRules.MaxCalendarYear;
+        public const string CalendarYearMessage = DateRules.CalendarYearMessage;
+
+        public static bool IsMissingDate(DateTime? value) => DateRules.IsMissingDate(value);
+        public static bool IsUsableDate(DateTime? value) => DateRules.IsUsableDate(value);
+        public static int InclusiveDays(DateTime start, DateTime end) => DateRules.InclusiveDays(start, end);
+        public static int CountWeekdays(DateTime start, DateTime end) => DateRules.CountWeekdays(start, end);
+
+        public static IEnumerable<ValidationResult> ValidateDateRange(
+            DateTime? start,
+            DateTime? end,
+            string startField,
+            string endField,
+            string startLabel = "Starting date",
+            string endLabel = "End date") =>
+            DateRules.ValidateDateRange(start, end, startField, endField, startLabel, endLabel);
+
+        public static bool TryParseNonNegativeInt(string? raw, out int value, out string? error, string label)
+        {
+            value = 0;
+            error = null;
+            if (string.IsNullOrWhiteSpace(raw) || !int.TryParse(raw.Trim(), out value))
+            {
+                error = $"{label} must be a whole number.";
+                return false;
+            }
+
+            if (value < 0)
+            {
+                error = $"{label} cannot be negative.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public static bool TryParseNonNegativeDecimal(string? raw, out decimal value, out string? error, string label)
+        {
+            value = 0;
+            error = null;
+            if (string.IsNullOrWhiteSpace(raw) || !decimal.TryParse(raw.Trim(), out value))
+            {
+                error = $"{label} must be a valid amount.";
+                return false;
+            }
+
+            if (value < 0)
+            {
+                error = $"{label} cannot be negative.";
+                return false;
+            }
+
+            return true;
+        }
+
+=======
+>>>>>>> master
         public static bool TryValidatePhoto(IFormFile? photo, out string? error)
         {
             error = null;

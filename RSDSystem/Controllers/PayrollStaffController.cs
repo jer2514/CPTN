@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Helpers;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -20,11 +21,25 @@ namespace RSDSystem.Controllers
         // GET /PayrollStaff  → "To do task" dashboard
         public async Task<IActionResult> Index()
         {
-            var tasks = await _db.Projects
-                 .Where(p => p.AssignedPayrollStaff == CurrentStaffName
-                 && p.Status == "Active")
-                 .OrderBy(p => p.StartingDate)
-                 .ToListAsync();
+            var staffName = StaffName();
+            if (string.IsNullOrWhiteSpace(staffName))
+            {
+                ViewBag.PageTitle = "To do task";
+                return View(new List<PayrollSchedule>());
+            }
+
+            var tasks = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .Where(s => s.Project != null
+                    && s.Project.AssignedPayrollStaff != null
+                    && s.Project.AssignedPayrollStaff.Trim() == staffName)
+                .Where(s => s.Project!.Status == ProjectStatusOptions.OnGoing
+                    || s.Project.Status == "Active"
+                    || s.Project.Status == null
+                    || s.Project.Status == "")
+                .OrderBy(s => s.StartingDate)
+                .ThenBy(s => s.Project!.ProjectName)
+                .ToListAsync();
 
             ViewBag.PageTitle = "To do task";
             return View(tasks);
@@ -35,14 +50,24 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleTask(int id)
         {
-            var project = await _db.Projects.FindAsync(id);
-            if (project != null)
+            var staffName = StaffName();
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id);
+
+            if (schedule?.Project != null
+                && (string.IsNullOrWhiteSpace(staffName)
+                    || string.Equals(schedule.Project.AssignedPayrollStaff?.Trim(), staffName, StringComparison.Ordinal)))
             {
-                project.TaskCompleted = !project.TaskCompleted;
+                schedule.TaskCompleted = !schedule.TaskCompleted;
                 await _db.SaveChangesAsync();
             }
+
             return RedirectToAction(nameof(Index));
         }
+
+        private string StaffName() =>
+            (HttpContext.Session.GetString("FullName") ?? CurrentStaffName).Trim();
 
 
 
@@ -51,7 +76,7 @@ namespace RSDSystem.Controllers
         {
             var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
 
-            var projectsQuery = _db.Projects.Where(p => p.Status == "Active");
+            var projectsQuery = _db.Projects.Ongoing();
 
             List<Project> projects;
 
@@ -95,32 +120,119 @@ namespace RSDSystem.Controllers
                   .OrderBy(e => e.LastName)
                   .ToListAsync();
 
+            var generatedEmployeeIds = await _db.Set<Payroll>()
+                  .Where(p => p.ProjectId == projectId)
+                  .Select(p => p.EmployeeId)
+                  .Distinct()
+                  .ToListAsync();
+
             var result = employees.Select(e => new
             {
                 e.EmployeeId,
-                DisplayId = IdFormatter.Format(e.EmployeeCode),
+                DisplayId = EmployeeIds.Format(e.EmployeeCode),
                 Name = e.FullName,
                 e.JobClassification,
                 e.DailyRate,
                 e.RatePerHour,
-                e.IsActive
+                e.IsActive,
+                AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId)
             });
 
             return Json(new { success = true, projectName = project.ProjectName, employees = result });
         }
 
-        // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5
-        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId)
+        // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
+        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null, string? returnUrl = null,
+            int? daysWorked = null, int? absentDays = null, decimal? overtimeHours = null)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             var project = await _db.Projects.FindAsync(projectId);
             if (emp == null || project == null) return NotFound();
 
-            ViewBag.PageTitle = "Generate Payroll Slip";
-            ViewBag.DisplayId = IdFormatter.Format(emp.EmployeeCode);
+            Payroll? existing = null;
+            if (payrollId.HasValue && payrollId.Value > 0)
+            {
+                existing = await _db.Set<Payroll>().FirstOrDefaultAsync(p =>
+                    p.PayrollId == payrollId.Value &&
+                    p.EmployeeId == employeeId &&
+                    p.ProjectId == projectId);
+
+                if (existing == null) return NotFound();
+                if (existing.Status == PayrollStatusOptions.Submitted ||
+                    existing.Status == PayrollStatusOptions.Approved)
+                {
+                    return RedirectToAction(nameof(ViewPayroll), new { id = existing.PayrollId });
+                }
+            }
+            else
+            {
+                existing = await _db.Set<Payroll>()
+                    .Where(p => p.EmployeeId == employeeId && p.ProjectId == projectId)
+                    .OrderByDescending(p => p.GeneratedDate)
+                    .FirstOrDefaultAsync();
+
+                if (existing != null)
+                {
+                    if (existing.Status == PayrollStatusOptions.Submitted ||
+                        existing.Status == PayrollStatusOptions.Approved)
+                    {
+                        return RedirectToAction(nameof(ViewPayroll), new { id = existing.PayrollId });
+                    }
+
+                    return RedirectToAction(nameof(PayrollSlip), new
+                    {
+                        employeeId,
+                        projectId,
+                        payrollId = existing.PayrollId,
+                        returnUrl,
+                        daysWorked,
+                        absentDays,
+                        overtimeHours
+                    });
+                }
+            }
+
+            var schedules = await _db.Set<PayrollSchedule>()
+                .Where(s => s.ProjectId == projectId)
+                .OrderBy(s => s.StartingDate)
+                .ToListAsync();
+
+            var projectStart = DateRules.IsUsableDate(project.StartingDate)
+                ? project.StartingDate!.Value.Date : (DateTime?)null;
+            var projectEnd = DateRules.IsUsableDate(project.EstimateEndDate)
+                ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
+
+            var defaultStart = existing?.PayPeriodStart.Date
+                ?? projectStart
+                ?? DateTime.Today.AddDays(-6);
+            var defaultEnd = existing?.PayPeriodEnd.Date
+                ?? projectEnd
+                ?? DateTime.Today;
+            if (defaultEnd < defaultStart)
+                defaultEnd = defaultStart;
+
+            ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
+            ViewBag.IsEdit = existing != null;
+            ViewBag.PayrollId = existing?.PayrollId ?? 0;
+            ViewBag.ReturnUrl = SafeReturnUrl(returnUrl)
+                ?? (existing != null
+                    ? Url.Action(nameof(ViewPayroll), new { id = existing.PayrollId })
+                    : Url.Action(nameof(GeneratePayroll), new { projectId }));
+            ViewBag.DisplayId = EmployeeIds.Format(emp.EmployeeCode);
             ViewBag.Project = project;
-            ViewBag.DefaultStart = DateTime.Today.AddDays(-6).ToString("yyyy-MM-dd");
-            ViewBag.DefaultEnd = DateTime.Today.ToString("yyyy-MM-dd");
+            ViewBag.Schedules = schedules;
+            ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
+            ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
+            ViewBag.DefaultDaysWorked = daysWorked
+                ?? existing?.RegularDaysWorked
+                ?? Math.Max(1, DateRules.CountWeekdays(defaultStart, defaultEnd));
+            ViewBag.AbsentDays = absentDays ?? existing?.AbsentDays ?? 0;
+            ViewBag.OvertimeHours = overtimeHours ?? existing?.OvertimeHours ?? 0;
+            ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
+            ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
 
             return View(emp);
         }
@@ -129,46 +241,166 @@ namespace RSDSystem.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GeneratePayrollSlip(int employeeId, int projectId,
-            DateTime payPeriodStart, DateTime payPeriodEnd, int regularDaysWorked, decimal overtimeHours, int absentDays, decimal cashAdvance)
+            DateTime payPeriodStart, DateTime payPeriodEnd, int regularDaysWorked, decimal overtimeHours, int absentDays, decimal cashAdvance,
+            int payrollId = 0)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
 
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+
+            var errors = new Dictionary<string, string>();
+
+            foreach (var result in DateRules.ValidateDateRange(
+                payPeriodStart, payPeriodEnd,
+                "payPeriodStart", "payPeriodEnd",
+                "Pay period starting date", "Pay period ending date"))
+            {
+                var key = result.MemberNames.FirstOrDefault() ?? "";
+                if (!errors.ContainsKey(key) && !string.IsNullOrEmpty(result.ErrorMessage))
+                    errors[key] = result.ErrorMessage;
+            }
+
+            if (regularDaysWorked < 1)
+                errors["regularDaysWorked"] = "Regular days worked must be at least 1.";
+
+            if (absentDays < 0)
+                errors["absentDays"] = "Absent days cannot be negative.";
+
+            if (overtimeHours < 0)
+                errors["overtimeHours"] = "Overtime hours cannot be negative.";
+
+            if (cashAdvance < 0)
+                errors["cashAdvance"] = "Cash advance cannot be negative.";
+
+            if (DateRules.IsUsableDate(payPeriodStart) && DateRules.IsUsableDate(payPeriodEnd)
+                && payPeriodEnd.Date >= payPeriodStart.Date)
+            {
+                var periodDays = DateRules.InclusiveDays(payPeriodStart, payPeriodEnd);
+
+                if (regularDaysWorked + absentDays > periodDays)
+                    errors["regularDaysWorked"] = "Days worked plus absences cannot exceed the pay period.";
+
+                if (overtimeHours > regularDaysWorked * 24)
+                    errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
+
+                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
+                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
+
+                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
+                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
+
+                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
+                    errors["payPeriodEnd"] = "Pay period cannot end before the project starting date.";
+
+                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
+                    errors["payPeriodStart"] = "Pay period cannot start after the project estimate end date.";
+            }
 
             decimal regularPay = emp.DailyRate * regularDaysWorked;
             decimal overtimePay = overtimeHours * emp.RatePerHour;
             decimal gross = regularPay + overtimePay;
+
+            if (cashAdvance > gross)
+                errors["cashAdvance"] = "Cash advance cannot be greater than gross pay.";
+
+            if (errors.Count > 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = errors.Values.First(),
+                    errors
+                });
+            }
+
             decimal net = gross - cashAdvance;
             if (net < 0) net = 0;
 
-            var payroll = new Payroll
+            Payroll? payroll = null;
+            if (payrollId > 0)
             {
-                EmployeeId = employeeId,
-                ProjectId = projectId,
-                PayPeriodStart = payPeriodStart,
-                PayPeriodEnd = payPeriodEnd,
-                RegularDaysWorked = regularDaysWorked,
-                OvertimeHours = overtimeHours,
-                AbsentDays = absentDays,
-                RegularPay = regularPay,
-                OvertimePay = overtimePay,
-                GrossPay = gross,
-                CashAdvance = cashAdvance,
-                NetPay = net,
-                Status = PayrollStatusOptions.Draft,
-                GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
-                GeneratedDate = DateTime.Now
-            };
+                payroll = await _db.Set<Payroll>().FirstOrDefaultAsync(p =>
+                    p.PayrollId == payrollId &&
+                    p.EmployeeId == employeeId &&
+                    p.ProjectId == projectId);
 
-            _db.Payrolls.Add(payroll);
+                if (payroll == null)
+                    return Json(new { success = false, message = "Payroll record not found." });
+
+                if (payroll.Status == PayrollStatusOptions.Submitted ||
+                    payroll.Status == PayrollStatusOptions.Approved)
+                {
+                    return Json(new { success = false, message = "Submitted or approved payroll cannot be edited." });
+                }
+            }
+
+            if (payroll != null)
+            {
+                payroll.PayPeriodStart = payPeriodStart.Date;
+                payroll.PayPeriodEnd = payPeriodEnd.Date;
+                payroll.RegularDaysWorked = regularDaysWorked;
+                payroll.OvertimeHours = overtimeHours;
+                payroll.AbsentDays = absentDays;
+                payroll.RegularPay = regularPay;
+                payroll.OvertimePay = overtimePay;
+                payroll.GrossPay = gross;
+                payroll.CashAdvance = cashAdvance;
+                payroll.NetPay = net;
+                payroll.GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
+                payroll.GeneratedDate = DateTime.Now;
+            }
+            else
+            {
+                var alreadyGenerated = await _db.Set<Payroll>().AnyAsync(p =>
+                    p.EmployeeId == employeeId && p.ProjectId == projectId);
+                if (alreadyGenerated)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = "Payroll has already been generated for this employee."
+                    });
+                }
+
+                payroll = new Payroll
+                {
+                    EmployeeId = employeeId,
+                    ProjectId = projectId,
+                    PayPeriodStart = payPeriodStart.Date,
+                    PayPeriodEnd = payPeriodEnd.Date,
+                    RegularDaysWorked = regularDaysWorked,
+                    OvertimeHours = overtimeHours,
+                    AbsentDays = absentDays,
+                    RegularPay = regularPay,
+                    OvertimePay = overtimePay,
+                    GrossPay = gross,
+                    CashAdvance = cashAdvance,
+                    NetPay = net,
+                    Status = PayrollStatusOptions.Draft,
+                    GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
+                    GeneratedDate = DateTime.Now
+                };
+                _db.Set<Payroll>().Add(payroll);
+            }
+
             await _db.SaveChangesAsync();
 
             return Json(new
             {
                 success = true,
-                message = $"Payroll for {emp.FullName} has been saved.",
-                projectId
+                message = payrollId > 0
+                    ? $"Payroll for {emp.FullName} has been updated."
+                    : $"Payroll for {emp.FullName} has been saved.",
+                projectId,
+                payrollId = payroll.PayrollId,
+                isEdit = payrollId > 0,
+                returnUrl = payrollId > 0
+                    ? Url.Action(nameof(ViewPayroll), new { id = payroll.PayrollId })
+                    : Url.Action(nameof(GeneratePayroll), new { projectId })
             });
         }
 
@@ -192,7 +424,7 @@ namespace RSDSystem.Controllers
         {
             var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
 
-            var projectsQuery = _db.Projects.Where(p => p.Status == "Active");
+            var projectsQuery = _db.Projects.Ongoing();
             List<Project> projects;
 
             if (!string.IsNullOrWhiteSpace(staffName))
@@ -228,7 +460,7 @@ namespace RSDSystem.Controllers
             if (project == null)
                 return Json(new { success = false, message = "Project not found." });
 
-            var payrolls = await _db.Payrolls
+            var payrolls = await _db.Set<Payroll>()
                                     .Include(p => p.Employee)
                                     .Where(p => p.ProjectId == projectId)
                                     .ToListAsync();
@@ -239,7 +471,7 @@ namespace RSDSystem.Controllers
                 .Select(p => new
                 {
                     p.PayrollId,
-                    DisplayId = IdFormatter.Format(p.Employee?.EmployeeCode),
+                    DisplayId = EmployeeIds.Format(p.Employee?.EmployeeCode),
                     EmployeeName = p.Employee?.FullName,
                     Job = p.Employee?.JobClassification,
                     p.Status,
@@ -252,7 +484,7 @@ namespace RSDSystem.Controllers
         // GET /PayrollStaff/ViewPayroll/{id}
         public async Task<IActionResult> ViewPayroll(int id)
         {
-            var payroll = await _db.Payrolls
+            var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
                                    .FirstOrDefaultAsync(p => p.PayrollId == id);
@@ -260,7 +492,7 @@ namespace RSDSystem.Controllers
             if (payroll == null) return NotFound();
 
             ViewBag.PageTitle = "View Payroll";
-            ViewBag.DisplayId = IdFormatter.Format(payroll.Employee?.EmployeeCode);
+            ViewBag.DisplayId = EmployeeIds.Format(payroll.Employee?.EmployeeCode);
             return View(payroll);
         }
 
@@ -269,7 +501,7 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitPayroll(int id)
         {
-             var payroll = await _db.Payrolls.FindAsync(id);
+             var payroll = await _db.Set<Payroll>().FindAsync(id);
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
@@ -284,23 +516,29 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePayroll(int id)
         {
-            var payroll = await _db.Payrolls.FindAsync(id);
+            var payroll = await _db.Set<Payroll>().FindAsync(id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
-            if (payroll.Status != PayrollStatusOptions.Draft)
-                return Json(new { success = false, message = "Only draft payroll records can be deleted." });
-
-            _db.Payrolls.Remove(payroll);
+            _db.Set<Payroll>().Remove(payroll);
             await _db.SaveChangesAsync();
 
-            return Json(new { success = true, message = "Draft payroll deleted." });
+            return Json(new { success = true, message = "Payroll record deleted." });
         }
 
         public IActionResult Logout()
         {
              // TODO: clear auth/session once login is implemented
              return RedirectToAction(nameof(Index));
+        }
+
+        private string? SafeReturnUrl(string? returnUrl)
+        {
+            if (string.IsNullOrWhiteSpace(returnUrl))
+                return null;
+            if (!Url.IsLocalUrl(returnUrl))
+                return null;
+            return returnUrl;
         }
     }
 }

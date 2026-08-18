@@ -31,6 +31,7 @@ namespace RSDSystem.Models
         [Display(Name = "M.I.")]
         public string? MiddleInitial { get; set; }
 
+        [NotMapped]
         public string FullName => string.IsNullOrWhiteSpace(MiddleInitial)
             ? $"{FirstName} {LastName}"
             : $"{FirstName} {MiddleInitial}. {LastName}";
@@ -40,8 +41,16 @@ namespace RSDSystem.Models
         [DataType(DataType.Date)]
         public DateTime? DateOfBirth { get; set; }
 
+<<<<<<< HEAD
+
+        [NotMapped]
+
         public int? Age => InputRules.CalculateAge(DateOfBirth);
 
+=======
+        public int? Age => InputRules.CalculateAge(DateOfBirth);
+
+>>>>>>> master
         [Required(ErrorMessage = "Gender is required.")]
         [MaxLength(10)]
         public string? Gender { get; set; }
@@ -52,7 +61,13 @@ namespace RSDSystem.Models
         [Display(Name = "Address")]
         public string? Address { get; set; }
 
+<<<<<<< HEAD
+
         [Required(ErrorMessage = "Email is required.")]
+
+=======
+        [Required(ErrorMessage = "Email is required.")]
+>>>>>>> master
         [MaxLength(100)]
         [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string? Email { get; set; }

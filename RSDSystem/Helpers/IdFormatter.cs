@@ -2,7 +2,7 @@
 {
     public static class IdFormatter
     {
-        // "260001" → "26-0001"
+        // User codes stay year-prefixed: "260001" → "26-0001"
         public static string Format(string? code)
         {
             if (string.IsNullOrWhiteSpace(code) || code.Length < 3)
@@ -12,5 +12,9 @@
             var seq = code.Substring(2);
             return $"{year}-{seq}";
         }
+
+        public static string FormatEmployee(string? code) => EmployeeIds.Format(code);
+
+        public static int? EmployeeSequence(string? code) => EmployeeIds.Sequence(code);
     }
 }

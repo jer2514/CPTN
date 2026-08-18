@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
+using RSDSystem.Helpers;
 using RSDSystem.Models;
 using RSDSystem.Validation;
 
@@ -25,8 +26,10 @@ namespace RSDSystem.Controllers
         };
 
         // GET /Employee
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
+            const int pageSize = 10;
+
             var query = _db.Employees
                            .Include(e => e.Project)
                            .AsQueryable();
@@ -37,25 +40,34 @@ namespace RSDSystem.Controllers
                 query = query.Where(e =>
                     e.FirstName.Contains(s) ||
                     e.LastName.Contains(s) ||
-                    e.JobClassification.Contains(s));
+                    e.JobClassification.Contains(s) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(s)) ||
+                    (e.EmployeeCode != null && e.EmployeeCode.Contains(s.Replace("-", ""))) ||
+                    (e.Email != null && e.Email.Contains(s)) ||
+                    (e.Project != null && e.Project.ProjectName.Contains(s)));
             }
 
             query = sortBy switch
             {
                 "lastname" => query.OrderBy(e => e.LastName),
                 "job" => query.OrderBy(e => e.JobClassification),
-                _ => query.OrderBy(e => e.EmployeeId)
-            }; query = sortBy switch
-            {
-                "lastname" => query.OrderBy(e => e.LastName),
-                "job" => query.OrderBy(e => e.JobClassification),
+                "assigned" => query.OrderBy(e => e.Project!.ProjectName),
+                "status" => query.OrderByDescending(e => e.IsActive),
                 _ => query.OrderByDescending(e => e.DateAdded).ThenByDescending(e => e.EmployeeId)
             };
 
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /Employee/Create
@@ -63,7 +75,7 @@ namespace RSDSystem.Controllers
         {
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
+                                  .Ongoing()
                                   .OrderBy(p => p.ProjectName)
                                   .ToList();
             return View(new Employee());
@@ -80,6 +92,13 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+<<<<<<< HEAD
+
+            if (string.IsNullOrWhiteSpace(emp.Email))
+                ModelState.Remove("Email");
+
+=======
+>>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -93,7 +112,7 @@ namespace RSDSystem.Controllers
             {
                 ViewBag.JobClassifications = JobClassifications;
                 ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
+                                      .Ongoing()
                                       .OrderBy(p => p.ProjectName)
                                       .ToList();
                 return View(emp);
@@ -125,7 +144,7 @@ namespace RSDSystem.Controllers
 
             ViewBag.JobClassifications = JobClassifications;
             ViewBag.Projects = _db.Projects
-                                  .Where(p => p.Status == "Active")
+                                  .Ongoing()
                                   .OrderBy(p => p.ProjectName)
                                   .ToList();
             return View(emp);
@@ -142,6 +161,13 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+<<<<<<< HEAD
+
+            if (string.IsNullOrWhiteSpace(emp.Email))
+                ModelState.Remove("Email");
+
+=======
+>>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -155,7 +181,7 @@ namespace RSDSystem.Controllers
             {
                 ViewBag.JobClassifications = JobClassifications;
                 ViewBag.Projects = _db.Projects
-                                      .Where(p => p.Status == "Active")
+                                      .Ongoing()
                                       .OrderBy(p => p.ProjectName)
                                       .ToList();
                 return View(emp);
@@ -194,17 +220,43 @@ namespace RSDSystem.Controllers
             emp.MiddleInitial = string.IsNullOrWhiteSpace(emp.MiddleInitial)
                 ? null
                 : emp.MiddleInitial.Trim().ToUpperInvariant();
+<<<<<<< HEAD
+
+            emp.Email = string.IsNullOrWhiteSpace(emp.Email) ? null : emp.Email.Trim();
+            emp.ContactNumber = emp.ContactNumber?.Trim();
+            emp.Address = emp.Address?.Trim();
+            emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
+            emp.JobClassification = string.IsNullOrWhiteSpace(emp.JobClassification)
+                ? string.Empty
+                : emp.JobClassification.Trim();
+
+=======
+>>>>>>> master
             emp.Email = emp.Email?.Trim();
             emp.ContactNumber = emp.ContactNumber?.Trim();
             emp.Address = emp.Address?.Trim();
             emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
             emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
+<<<<<<< HEAD
+
+=======
+>>>>>>> master
         }
 
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
+<<<<<<< HEAD
+
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLowerInvariant());
+
             if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
             return ti.ToTitleCase(value.Trim().ToLower());
+
+=======
+            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLower());
+>>>>>>> master
         }
 
         private void ValidatePhoto(IFormFile? photo)
@@ -291,30 +343,31 @@ namespace RSDSystem.Controllers
             return $"/uploads/employees/{fileName}";
         }
 
-        // Generate a unique EmployeeCode in the same format used by the
-        // migration: YY + 4-digit zero-padded sequence (e.g. 26 0001 => "260001").
+        // Unique 5-digit biometric ID: 00001, 00002, ...
         private async Task<string> GenerateEmployeeCodeAsync()
         {
-            var year = DateTime.Now.Year % 100;
-            var prefix = year.ToString("D2");
-
             var codes = await _db.Employees
-                                 .Where(e => e.EmployeeCode != null && e.EmployeeCode.StartsWith(prefix))
+                                 .Where(e => e.EmployeeCode != null && e.EmployeeCode != "")
                                  .Select(e => e.EmployeeCode!)
                                  .ToListAsync();
 
             int maxSeq = 0;
             foreach (var code in codes)
             {
-                if (code.Length >= 6)
-                {
-                    var tail = code.Substring(code.Length - 4);
-                    if (int.TryParse(tail, out var n) && n > maxSeq) maxSeq = n;
-                }
+                var seq = EmployeeIds.Sequence(code);
+                if (seq.HasValue && seq.Value > maxSeq)
+                    maxSeq = seq.Value;
             }
 
             var next = maxSeq + 1;
-            return prefix + next.ToString("D4");
+            var candidate = next.ToString("D5");
+            while (codes.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+            {
+                next++;
+                candidate = next.ToString("D5");
+            }
+
+            return candidate;
         }
 
         //delete multiple employees

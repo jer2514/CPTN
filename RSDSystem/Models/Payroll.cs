@@ -19,7 +19,10 @@ namespace RSDSystem.Models
         public DateTime PayPeriodEnd { get; set; }
 
         public int RegularDaysWorked { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal OvertimeHours { get; set; }
+
         public int AbsentDays { get; set; }
 
         [Column(TypeName = "decimal(12,2)")]

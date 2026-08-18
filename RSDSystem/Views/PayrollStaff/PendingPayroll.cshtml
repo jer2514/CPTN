@@ -157,29 +157,17 @@
             return '';
         }
 
-        // ── Build the action buttons per row based on status ─────────
-        // Draft       -> Submit, View, Delete
-        // Correction  -> Submit, View
-        // Submitted   -> View only
-        // Approved    -> View only
+        // Draft / Correction -> Submit, View, Delete
+        // Submitted / Approved / other -> View, Delete
         function actionButtons(p) {
             let btns = '';
 
-            if (p.status === 'Draft') {
-                // Submit first
+            if (p.status === 'Draft' || p.status === 'Correction') {
                 btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
-                // View next
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-                // Delete last
-                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
-            } else if (p.status === 'Correction') {
-                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-            } else {
-                // Submitted / Approved / other statuses -> View only
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
             }
 
+            btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
             return btns;
         }
 
@@ -249,11 +237,16 @@
             pendingSubmitId = null;
         });
 
-        // ── Delete confirmation (Draft only) ─────────────────────────
         let pendingDeleteId = null;
 
         function confirmDelete(payrollId) {
             pendingDeleteId = payrollId;
+            const row = currentPayrolls.find(p => p.payrollId === payrollId);
+            const name = row?.employeeName || 'this employee';
+            const status = (row?.status || 'payroll').toLowerCase();
+            document.getElementById('deleteTitle').textContent = 'Delete Payroll?';
+            document.getElementById('deleteMsg').textContent =
+                `This will permanently remove ${name}'s ${status} payroll record. This action cannot be undone.`;
             document.getElementById('deleteOverlay').classList.add('open');
         }
 
@@ -328,9 +321,9 @@
         <div class="del-icon-wrap">
             <i class="bi bi-exclamation-triangle-fill del-icon"></i>
         </div>
-        <div class="del-title">Delete Draft Payroll?</div>
-        <div class="del-msg">
-            This draft payroll record will be permanently deleted. This action cannot be undone.
+        <div class="del-title" id="deleteTitle">Delete Payroll?</div>
+        <div class="del-msg" id="deleteMsg">
+            This payroll record will be permanently deleted. This action cannot be undone.
         </div>
         <div class="del-actions">
             <button class="del-btn-cancel" id="deleteCancelBtn">Cancel</button>

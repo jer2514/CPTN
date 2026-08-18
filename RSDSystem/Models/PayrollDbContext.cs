@@ -16,6 +16,8 @@ namespace RSDSystem.Models
         public DbSet<ProjectMonthlyBudget> ProjectMonthlyBudgets { get; set; }
         public DbSet<PayrollSchedule> PayrollSchedules { get; set; }
         public DbSet<Payroll> Payrolls { get; set; }
+        public DbSet<AttendanceImport> AttendanceImports { get; set; }
+        public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -31,8 +33,17 @@ namespace RSDSystem.Models
                 .IsUnique();
 
             modelBuilder.Entity<Employee>()
+                .Property(e => e.Email)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Employee>()
                 .HasIndex(e => e.Email)
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
+
+            modelBuilder.Entity<Employee>()
+                .Ignore(e => e.FullName)
+                .Ignore(e => e.Age);
 
             modelBuilder.Entity<User>()
                 .Ignore(u => u.FullName)
@@ -52,6 +63,30 @@ namespace RSDSystem.Models
                 .HasForeignKey(m => m.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Project>()
+                .Property(p => p.ProjectName)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.Status)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.Location)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.TypeOfService)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.PayrollDistribution)
+                .IsRequired(false);
+
+            modelBuilder.Entity<Project>()
+                .Property(p => p.AssignedPayrollStaff)
+                .IsRequired(false);
+
             modelBuilder.Entity<PayrollSchedule>()
                 .HasOne(s => s.Project)
                 .WithMany()
@@ -69,6 +104,25 @@ namespace RSDSystem.Models
                 .WithMany()
                 .HasForeignKey(pr => pr.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AttendanceImport>()
+                .HasOne(i => i.Project)
+                .WithMany()
+                .HasForeignKey(i => i.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.Import)
+                .WithMany(i => i.Records)
+                .HasForeignKey(r => r.AttendanceImportId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceRecord>()
+                .HasOne(r => r.Employee)
+                .WithMany()
+                .HasForeignKey(r => r.EmployeeId)
+                .OnDelete(DeleteBehavior.NoAction)
+                .IsRequired(false);
         }
     }
 }

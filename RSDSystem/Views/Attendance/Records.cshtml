@@ -1,0 +1,224 @@
+@model List<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "Attendance Records";
+    Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="att-page-title">Attendance Records</div>
+
+    @if (ViewBag.ShowingAllProjects == true)
+    {
+        <div class="genpay-fallback-note">
+            Showing all active projects — none are currently assigned to your account specifically.
+        </div>
+    }
+
+    <div class="att-import-row">
+        <div class="att-field">
+            <label class="form-lbl">Project Name</label>
+            <div class="att-field-controls">
+                <div class="genpay-autocomplete att-grow">
+                    <input type="text" id="projectInput" class="form-ctrl"
+                           placeholder="Type to search project..." autocomplete="off" />
+                    <input type="hidden" id="projectIdInput" />
+                    <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+                </div>
+                <button type="button" id="loadBtn" class="btn-primary-blue-solid">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="recordsSection" style="display:none">
+        <div class="emp-card-head" style="margin-top:6px">
+            <div id="recordsMeta" class="att-preview-meta"></div>
+            <div class="emp-controls">
+                <div class="dropdown">
+                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Complete">Complete</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Incomplete</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Absent">Absent</a></li>
+                    </ul>
+                </div>
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="rowSearch" placeholder="Search User" />
+                </div>
+            </div>
+        </div>
+
+        <div class="att-table-wrap">
+            <table class="emp-table att-table">
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Employee Name</th>
+                        <th>Date</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th>Overtime In</th>
+                        <th>Overtime Out</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recordsBody"></tbody>
+            </table>
+        </div>
+
+        <div class="att-preview-footer">
+            <div id="recordsPager" class="att-pager"></div>
+        </div>
+    </div>
+
+    <div id="recordsEmpty" class="text-center text-muted py-5">
+        Select a project and click Load to view imported attendance.
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const allProjects = [
+            @foreach (var p in Model)
+            {
+                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
+            }
+        ];
+
+        const projectInput = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList = document.getElementById('projectSuggestions');
+        let statusFilter = 'all';
+        let currentPage = 1;
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = '';
+            const q = projectInput.value.trim().toLowerCase();
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+        });
+        projectInput.addEventListener('focus', function () {
+            const q = projectInput.value.trim().toLowerCase();
+            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+        });
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
+        });
+
+        document.querySelectorAll('.filter-menu [data-status]').forEach(el => {
+            el.addEventListener('click', function (e) {
+                e.preventDefault();
+                statusFilter = this.dataset.status;
+                currentPage = 1;
+                loadRecords();
+            });
+        });
+        document.getElementById('rowSearch').addEventListener('input', function () {
+            currentPage = 1;
+            loadRecords();
+        });
+
+        function dash(v) {
+            return v == null || v === '' || v === '—' ? '——' : v;
+        }
+
+        function timeCell(v) {
+            const text = dash(v);
+            return text === '——' ? `<span class="att-empty">${text}</span>` : text;
+        }
+
+        async function loadRecords() {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+
+            const empty = document.getElementById('recordsEmpty');
+            const section = document.getElementById('recordsSection');
+            const q = encodeURIComponent(document.getElementById('rowSearch').value.trim());
+            const url = `/Attendance/GetRecords?projectId=${projectIdInput.value}&search=${q}&status=${encodeURIComponent(statusFilter)}&page=${currentPage}`;
+
+            empty.style.display = 'block';
+            section.style.display = 'none';
+            empty.textContent = 'Loading attendance records...';
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!data.success) { empty.textContent = data.message; return; }
+                if (!data.rows.length) {
+                    empty.textContent = 'No imported attendance for this project yet.';
+                    return;
+                }
+
+                document.getElementById('recordsMeta').textContent =
+                    `${data.projectName} · ${data.total} row(s)`;
+                document.getElementById('recordsBody').innerHTML = data.rows.map(r => `
+                    <tr class="${r.matched ? '' : 'att-row-unmatched'}">
+                        <td>${r.displayId || '——'}</td>
+                        <td>${r.employeeName || '——'}</td>
+                        <td>${dash(r.workDate)}</td>
+                        <td>${timeCell(r.timeIn1)}</td>
+                        <td>${timeCell(r.timeOut1)}</td>
+                        <td>${timeCell(r.timeIn2)}</td>
+                        <td>${timeCell(r.timeOut2)}</td>
+                        <td>${timeCell(r.overtimeIn)}</td>
+                        <td>${timeCell(r.overtimeOut)}</td>
+                        <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
+                    </tr>`).join('');
+
+                document.getElementById('recordsPager').innerHTML =
+                    `<span>Page ${data.page} of ${data.totalPages}</span>
+                     <button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
+                     <button type="button" class="att-page-btn" ${data.page >= data.totalPages ? 'disabled' : ''} data-dir="1">&rsaquo;</button>`;
+
+                empty.style.display = 'none';
+                section.style.display = 'block';
+            } catch {
+                empty.textContent = 'Could not load attendance records.';
+            }
+        }
+
+        document.getElementById('loadBtn').addEventListener('click', function () {
+            currentPage = 1;
+            loadRecords();
+        });
+
+        document.getElementById('recordsPager').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-dir]');
+            if (!btn || btn.disabled) return;
+            currentPage += Number(btn.dataset.dir);
+            loadRecords();
+        });
+
+    </script>
+}

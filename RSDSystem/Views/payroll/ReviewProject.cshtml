@@ -1,0 +1,142 @@
+@model List<RSDSystem.Models.Payroll>
+@{
+    ViewData["Title"] = "Review Payroll";
+    var projectId = ViewBag.ProjectId is int pid ? pid : 0;
+    int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
+    int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
+}
+
+<div class="content-topbar">
+    <a asp-controller="Home" asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="review-slip-grid">
+    @foreach (var slip in Model)
+    {
+        <div class="review-slip-col">
+            <partial name="_PayslipCard" model="slip" />
+            <div class="payslip-approve-row">
+                <button type="button" class="btn-approve" onclick="approvePayroll(@slip.PayrollId)">Approve</button>
+                <button type="button" class="btn-return" onclick="openCorrectionModal(@slip.PayrollId)">Return for Correction</button>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="pred-pager">
+    <div>Page @currentPage of @totalPages</div>
+    <div class="pred-pager-arrows">
+        @if (currentPage > 1)
+        {
+            <a asp-action="ReviewProject"
+               asp-route-projectId="@projectId"
+               asp-route-page="@(currentPage - 1)">&lt;</a>
+        }
+        else
+        {
+            <span class="disabled">&lt;</span>
+        }
+        @if (totalPages > currentPage)
+        {
+            <a asp-action="ReviewProject"
+               asp-route-projectId="@projectId"
+               asp-route-page="@(currentPage + 1)">&gt;</a>
+        }
+        else
+        {
+            <span class="disabled">&gt;</span>
+        }
+    </div>
+</div>
+
+<div class="del-overlay" id="correctionOverlay">
+    <div class="del-modal correction-modal">
+        <div class="del-title">Reason for Correction</div>
+        <textarea id="correctionReasonInput" class="form-ctrl correction-textarea"
+                  placeholder="Enter the reason for correction..."></textarea>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeCorrectionModal()">Cancel</button>
+            <button class="del-btn-delete btn-return-confirm" onclick="submitCorrection()">Return Payroll</button>
+        </div>
+    </div>
+</div>
+
+<div class="del-overlay" id="actionResultOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap del-icon-success">
+            <i class="bi bi-check-circle-fill del-icon-success-i"></i>
+        </div>
+        <div class="del-title">Done</div>
+        <div class="del-msg" id="actionResultMsg"></div>
+        <div class="del-actions">
+            <button class="del-btn-delete btn-result-ok" onclick="finishReviewAction()">OK</button>
+        </div>
+    </div>
+</div>
+
+<form id="__afToken" class="hidden-token-form">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        const projectId = @projectId;
+        const currentPage = @currentPage;
+        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]').value;
+        let pendingPayrollId = 0;
+        let lastRemaining = 0;
+
+        async function approvePayroll(id) {
+            const form = new FormData();
+            form.append('id', id);
+            form.append('__RequestVerificationToken', token);
+
+            const res = await fetch('/Payroll/Approve/' + id, { method: 'POST', body: form });
+            const data = await res.json();
+            showResult(data);
+        }
+
+        function openCorrectionModal(id) {
+            pendingPayrollId = id;
+            document.getElementById('correctionReasonInput').value = '';
+            document.getElementById('correctionOverlay').classList.add('open');
+        }
+        function closeCorrectionModal() {
+            document.getElementById('correctionOverlay').classList.remove('open');
+            pendingPayrollId = 0;
+        }
+
+        async function submitCorrection() {
+            const reason = document.getElementById('correctionReasonInput').value.trim();
+            if (!reason) { alert('Please enter a reason for correction.'); return; }
+
+            const form = new FormData();
+            form.append('id', pendingPayrollId);
+            form.append('reason', reason);
+            form.append('__RequestVerificationToken', token);
+
+            const res = await fetch('/Payroll/ReturnForCorrection/' + pendingPayrollId, { method: 'POST', body: form });
+            const data = await res.json();
+            closeCorrectionModal();
+            showResult(data);
+        }
+
+        function showResult(data) {
+            if (!data.success) { alert(data.message || 'Something went wrong.'); return; }
+            lastRemaining = Number(data.remaining || 0);
+            document.getElementById('actionResultMsg').textContent = data.message;
+            document.getElementById('actionResultOverlay').classList.add('open');
+        }
+
+        function finishReviewAction() {
+            if (lastRemaining <= 0) {
+                window.location.href = '@Url.Action("Index", "Home")';
+                return;
+            }
+            window.location.href = '/Payroll/ReviewProject?projectId=' + projectId + '&page=' + currentPage;
+        }
+    </script>
+}
