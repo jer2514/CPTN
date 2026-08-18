@@ -31,6 +31,15 @@ namespace RSDSystem.Services
             }
 
             var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
+            if (employees.Count == 0)
+            {
+                return new AttendancePreviewResult
+                {
+                    Error = "This project has no assigned employees. Assign employees before importing attendance.",
+                    Project = project
+                };
+            }
+
             var parsed = AttendanceFileParser.Parse(file, fileName);
             if (parsed.Error != null)
             {
@@ -38,7 +47,9 @@ namespace RSDSystem.Services
             }
 
             await ApplyAdminTaskWindowAsync(project.ProjectId, parsed, cancellationToken);
-            var rows = MapRows(parsed, employees);
+            var mapped = MapRows(parsed, employees);
+            var kept = mapped.Where(r => r.Matched).ToList();
+            var filtered = DistinctPeople(mapped.Where(r => !r.Matched));
             return new AttendancePreviewResult
             {
                 Project = project,
@@ -46,9 +57,35 @@ namespace RSDSystem.Services
                 Format = parsed.Format,
                 PeriodStart = parsed.PeriodStart,
                 PeriodEnd = parsed.PeriodEnd,
-                Rows = rows,
-                MatchedCount = rows.Count(r => r.Matched),
-                UnmatchedCount = rows.Count(r => !r.Matched)
+                Rows = kept,
+                ExtractedCount = mapped.Count,
+                MatchedCount = kept.Count,
+                UnmatchedCount = mapped.Count - kept.Count,
+                FilteredOutCount = filtered.Count,
+                FilteredPeople = filtered,
+                ProjectEmployees = employees
+                    .OrderBy(e => e.LastName)
+                    .ThenBy(e => e.FirstName)
+                    .Select(e => e.FullName)
+                    .ToList()
+            };
+        }
+
+        public async Task<AttendanceProjectRoster?> GetRosterAsync(
+            int? projectId,
+            string? projectName,
+            string? assignedStaff,
+            CancellationToken cancellationToken = default)
+        {
+            var project = await ResolveProjectAsync(projectId, projectName, assignedStaff, cancellationToken);
+            if (project == null)
+                return null;
+
+            var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
+            return new AttendanceProjectRoster
+            {
+                Project = project,
+                Employees = employees
             };
         }
 
@@ -74,9 +111,19 @@ namespace RSDSystem.Services
                 return new AttendanceImportResult { Error = preview.Error ?? "Import failed." };
             }
 
-            if (preview.Rows.Count == 0)
+            if (preview.ExtractedCount == 0)
             {
                 return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
+            }
+
+            if (preview.Rows.Count == 0)
+            {
+                return new AttendanceImportResult
+                {
+                    Error = "None of the people in this file are assigned to "
+                        + preview.Project.ProjectName
+                        + ". Assign them to the project or import under the correct project."
+                };
             }
 
             try
@@ -159,6 +206,7 @@ namespace RSDSystem.Services
                 RowCount = preview.Rows.Count,
                 MatchedCount = preview.MatchedCount,
                 UnmatchedCount = preview.UnmatchedCount,
+                FilteredOutCount = preview.FilteredOutCount,
                 ReplacedPrevious = replaced
             };
         }
@@ -528,14 +576,29 @@ namespace RSDSystem.Services
 
         private async Task<List<Employee>> LoadMatchPoolAsync(int projectId, CancellationToken cancellationToken)
         {
-            var projectEmployees = await _db.Employees
+            return await _db.Employees
                 .AsNoTracking()
                 .Where(e => e.ProjectId == projectId)
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
                 .ToListAsync(cancellationToken);
+        }
 
-            return projectEmployees.Count > 0
-                ? projectEmployees
-                : await _db.Employees.AsNoTracking().ToListAsync(cancellationToken);
+        private static List<AttendanceFilteredPerson> DistinctPeople(IEnumerable<AttendancePreviewRow> rows)
+        {
+            return rows
+                .GroupBy(r => (
+                    User: (r.ExternalUserId ?? "").Trim().ToLowerInvariant(),
+                    Name: (r.EmployeeName ?? "").Trim().ToLowerInvariant()
+                ))
+                .Select(g => new AttendanceFilteredPerson
+                {
+                    ExternalUserId = g.First().ExternalUserId,
+                    EmployeeName = g.First().EmployeeName
+                })
+                .OrderBy(p => p.EmployeeName)
+                .ThenBy(p => p.ExternalUserId)
+                .ToList();
         }
 
         private static List<AttendancePreviewRow> MapRows(AttendanceParseResult parsed, IReadOnlyList<Employee> employees)
@@ -703,8 +766,24 @@ namespace RSDSystem.Services
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
         public List<AttendancePreviewRow> Rows { get; set; } = new();
+        public int ExtractedCount { get; set; }
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
+        public int FilteredOutCount { get; set; }
+        public List<AttendanceFilteredPerson> FilteredPeople { get; set; } = new();
+        public List<string> ProjectEmployees { get; set; } = new();
+    }
+
+    public class AttendanceFilteredPerson
+    {
+        public string ExternalUserId { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+    }
+
+    public class AttendanceProjectRoster
+    {
+        public Project Project { get; set; } = null!;
+        public List<Employee> Employees { get; set; } = new();
     }
 
     public class AttendancePreviewRow
@@ -757,6 +836,7 @@ namespace RSDSystem.Services
         public int RowCount { get; set; }
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
+        public int FilteredOutCount { get; set; }
         public bool ReplacedPrevious { get; set; }
     }
 }

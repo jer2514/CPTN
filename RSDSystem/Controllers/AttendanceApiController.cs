@@ -70,9 +70,7 @@ namespace RSDSystem.Controllers
                 return Ok(new
                 {
                     success = true,
-                    message = result.ReplacedPrevious
-                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message = ImportMessage(result),
                     importId = result.ImportId,
                     projectId = result.ProjectId,
                     projectName = result.ProjectName,
@@ -82,7 +80,8 @@ namespace RSDSystem.Controllers
                     periodEnd = result.PeriodEnd,
                     rowCount = result.RowCount,
                     matchedCount = result.MatchedCount,
-                    unmatchedCount = result.UnmatchedCount
+                    unmatchedCount = result.UnmatchedCount,
+                    filteredOutCount = result.FilteredOutCount
                 });
             }
             catch (Exception ex)
@@ -93,6 +92,20 @@ namespace RSDSystem.Controllers
                     message = "Could not import the attendance file. " + ex.GetBaseException().Message
                 });
             }
+        }
+
+        private static string ImportMessage(AttendanceImportResult result)
+        {
+            var message = result.ReplacedPrevious
+                ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
+
+            if (result.FilteredOutCount > 0)
+            {
+                message += $" {result.FilteredOutCount} people from the file were not on this project and were skipped.";
+            }
+
+            return message;
         }
 
         private bool HasValidApiKey()

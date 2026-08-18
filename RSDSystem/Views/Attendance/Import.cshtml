@@ -33,6 +33,8 @@
         </div>
     </div>
 
+    <div id="projectBanner" class="att-project-banner" style="display:none"></div>
+
     <div class="att-import-row">
         <div class="att-field">
             <label class="form-lbl">Attendance File</label>
@@ -45,6 +47,8 @@
             </div>
         </div>
     </div>
+
+    <div id="extractBar" class="att-extract-bar" style="display:none"></div>
 
     <div id="previewSection" class="att-preview" style="display:none">
         <div class="emp-card-head" style="margin-top:6px">
@@ -83,7 +87,7 @@
     </div>
 
     <div id="previewEmpty" class="text-center text-muted py-5">
-        Select a project, choose the Employee Attendance Table Excel file, then click Load File to preview daily time cards.
+        Load a project, choose the attendance file, then click Load File. Only employees assigned to that project stay in the preview.
     </div>
 </div>
 
@@ -190,13 +194,49 @@
             if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
         });
 
-        document.getElementById('loadProjectBtn').addEventListener('click', function () {
-            if (!projectIdInput.value) {
+        document.getElementById('loadProjectBtn').addEventListener('click', async function () {
+            if (!projectIdInput.value && !projectInput.value.trim()) {
                 alert('Please select a project from the suggestion list.');
                 return;
             }
-            document.getElementById('previewEmpty').textContent =
-                'Project loaded. Choose the attendance file and click Load File.';
+
+            const banner = document.getElementById('projectBanner');
+            const extractBar = document.getElementById('extractBar');
+            const empty = document.getElementById('previewEmpty');
+            const section = document.getElementById('previewSection');
+            extractBar.style.display = 'none';
+            section.style.display = 'none';
+            empty.style.display = 'block';
+            banner.style.display = 'none';
+            empty.textContent = 'Loading project...';
+
+            try {
+                const params = new URLSearchParams({
+                    projectId: projectIdInput.value || '0',
+                    projectName: projectInput.value.trim()
+                });
+                const res = await fetch('/Attendance/ProjectRoster?' + params.toString(), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    empty.textContent = data.message || 'Project not found.';
+                    return;
+                }
+
+                projectIdInput.value = data.projectId;
+                projectInput.value = data.projectName;
+                const names = (data.employees || []).map(e => e.name);
+                banner.style.display = 'block';
+                banner.innerHTML = names.length
+                    ? '<strong>' + data.projectName + '</strong> loaded. Matching will use ' + names.join(', ') + '.'
+                    : '<strong>' + data.projectName + '</strong> has no assigned employees. Assign people to this project before importing.';
+                empty.textContent = names.length
+                    ? 'Project loaded. Choose the attendance file and click Load File to extract, then keep only this project\'s employees.'
+                    : 'Assign employees to this project first.';
+            } catch {
+                empty.textContent = 'Could not load the project roster.';
+            }
         });
 
         document.getElementById('chooseFileBtn').addEventListener('click', () => fileInput.click());
@@ -320,8 +360,10 @@
         document.getElementById('loadFileBtn').addEventListener('click', async function () {
             const empty = document.getElementById('previewEmpty');
             const section = document.getElementById('previewSection');
+            const extractBar = document.getElementById('extractBar');
             empty.style.display = 'block';
             section.style.display = 'none';
+            extractBar.style.display = 'none';
             empty.textContent = 'Reading attendance file...';
 
             try {
@@ -337,8 +379,32 @@
                 const period = data.periodStart && data.periodEnd
                     ? `${data.periodStart} – ${data.periodEnd}`
                     : 'Period not found in file';
+                const filtered = (data.filteredPeople || []).map(p => {
+                    const name = p.employeeName || p.externalUserId || 'Unknown';
+                    return p.externalUserId && p.employeeName
+                        ? `${p.employeeName} (${p.externalUserId})`
+                        : name;
+                });
                 document.getElementById('previewMeta').textContent =
-                    `${data.fileName} · ${period} · ${data.matchedCount} matched, ${data.unmatchedCount} unmatched`;
+                    `${data.fileName} · ${period} · ${data.matchedCount || 0} kept for this project`;
+                extractBar.style.display = 'block';
+                extractBar.innerHTML =
+                    `<div><strong>Raw file extracted</strong> from ${data.fileName || 'the attendance file'} · ${data.extractedCount || 0} person-day rows</div>
+                     <div class="att-extract-stats">
+                        <span class="att-stat">${data.extractedCount || 0} extracted</span>
+                        <span class="att-stat att-stat-ok">${data.matchedCount || 0} matched ${data.projectName || 'this project'}</span>
+                        <span class="att-stat att-stat-warn">${data.filteredOutCount || 0} filtered out</span>
+                     </div>
+                     ${filtered.length
+                        ? `<div class="att-extract-dropped">Filtered out because they are not assigned to this project: ${filtered.join(', ')}.</div>`
+                        : '<div class="att-extract-dropped att-extract-kept">Everyone in the file belongs to this project.</div>'}`;
+
+                if (!previewRows.length) {
+                    empty.style.display = 'block';
+                    section.style.display = 'none';
+                    empty.textContent = 'No employees in this file match the loaded project. Nothing will be imported.';
+                    return;
+                }
 
                 empty.style.display = 'none';
                 section.style.display = 'block';
