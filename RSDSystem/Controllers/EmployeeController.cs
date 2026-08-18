@@ -92,8 +92,10 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
+
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -156,8 +158,10 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
+
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -210,6 +214,7 @@ namespace RSDSystem.Controllers
             emp.MiddleInitial = string.IsNullOrWhiteSpace(emp.MiddleInitial)
                 ? null
                 : emp.MiddleInitial.Trim().ToUpperInvariant();
+
             emp.Email = string.IsNullOrWhiteSpace(emp.Email) ? null : emp.Email.Trim();
             emp.ContactNumber = emp.ContactNumber?.Trim();
             emp.Address = emp.Address?.Trim();
@@ -217,12 +222,24 @@ namespace RSDSystem.Controllers
             emp.JobClassification = string.IsNullOrWhiteSpace(emp.JobClassification)
                 ? string.Empty
                 : emp.JobClassification.Trim();
+
+            emp.Email = emp.Email?.Trim();
+            emp.ContactNumber = emp.ContactNumber?.Trim();
+            emp.Address = emp.Address?.Trim();
+            emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
+            emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
+
         }
 
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
+
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             return ti.ToTitleCase(value.Trim().ToLowerInvariant());
+
+            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLower());
+
         }
 
         private void ValidatePhoto(IFormFile? photo)

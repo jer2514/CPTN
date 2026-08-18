@@ -90,6 +90,8 @@
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     }
+                    <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
+                    <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
                 </select>
                 <span class="field-error" data-error-for="Gender">@Err("Gender")</span>
             </div>
@@ -112,6 +114,9 @@
                 <label class="form-lbl">Email</label>
                 <input type="email" name="Email" value="@Model.Email" maxlength="100"
                        class="@Ctrl("Email")" data-validate="email" data-label="Email" />
+                <label class="form-lbl">Email <span class="req-star">*</span></label>
+                <input type="email" name="Email" value="@Model.Email" maxlength="100"
+                       class="@Ctrl("Email")" data-validate="required|email" data-label="Email" />
                 <span class="field-error" data-error-for="Email">@Err("Email")</span>
             </div>
             <div>
@@ -140,6 +145,7 @@
                         {
                             <option value="@p.ProjectId">@p.ProjectName</option>
                         }
+                        <option value="@p.ProjectId" @(Model.ProjectId == p.ProjectId ? "selected" : null)>@p.ProjectName</option>
                     }
                 </select>
             </div>
@@ -162,6 +168,7 @@
                         {
                             <option value="@j">@j</option>
                         }
+                        <option value="@j" @(Model.JobClassification == j ? "selected" : null)>@j</option>
                     }
                 </select>
                 <span class="field-error" data-error-for="JobClassification">@Err("JobClassification")</span>

@@ -41,7 +41,9 @@ namespace RSDSystem.Models
         [DataType(DataType.Date)]
         public DateTime? DateOfBirth { get; set; }
 
+
         [NotMapped]
+
         public int? Age => InputRules.CalculateAge(DateOfBirth);
 
         [Required(ErrorMessage = "Gender is required.")]
@@ -53,6 +55,9 @@ namespace RSDSystem.Models
         [RegularExpression(InputRules.AddressPattern, ErrorMessage = InputRules.AddressMessage)]
         [Display(Name = "Address")]
         public string? Address { get; set; }
+
+
+        [Required(ErrorMessage = "Email is required.")]
 
         [MaxLength(100)]
         [EmailAddress(ErrorMessage = "Enter a valid email address.")]

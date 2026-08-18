@@ -41,6 +41,7 @@ namespace RSDSystem.Models
         public DateTime? DateOfBirth { get; set; }
 
         [NotMapped]
+
         public int? Age => InputRules.CalculateAge(DateOfBirth);
 
         [MaxLength(10)]

@@ -88,6 +88,8 @@
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     }
+                    <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
+                    <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
                 </select>
             </div>
         </div>
@@ -180,6 +182,7 @@
                         {
                             <option value="@r">@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
                         }
+                        <option value="@r" @(Model.Role == r ? "selected" : null)>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
                     }
                 </select>
                 <span class="field-error" data-error-for="Role">@Err("Role")</span>
