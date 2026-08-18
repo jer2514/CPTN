@@ -32,6 +32,29 @@ namespace RSDSystem.Controllers
             return View(await LoadProjectsAsync());
         }
 
+        [HttpGet]
+        public async Task<IActionResult> ProjectRoster(int? projectId, string? projectName)
+        {
+            var roster = await _imports.GetRosterAsync(
+                projectId, projectName, StaffScope(), HttpContext.RequestAborted);
+            if (roster?.Project == null)
+                return Json(new { success = false, message = "Project not found. Type a project name and click Load." });
+
+            return Json(new
+            {
+                success = true,
+                projectId = roster.Project.ProjectId,
+                projectName = roster.Project.ProjectName,
+                employeeCount = roster.Employees.Count,
+                employees = roster.Employees.Select(e => new
+                {
+                    id = e.EmployeeId,
+                    code = AttendanceDisplay.EmployeeId(e.EmployeeCode),
+                    name = e.FullName
+                })
+            });
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
@@ -57,8 +80,16 @@ namespace RSDSystem.Controllers
                 format = preview.Format,
                 periodStart = AttendanceDisplay.LongDate(preview.PeriodStart),
                 periodEnd = AttendanceDisplay.LongDate(preview.PeriodEnd),
+                extractedCount = preview.ExtractedCount,
                 matchedCount = preview.MatchedCount,
                 unmatchedCount = preview.UnmatchedCount,
+                filteredOutCount = preview.FilteredOutCount,
+                filteredPeople = preview.FilteredPeople.Select(p => new
+                {
+                    externalUserId = p.ExternalUserId,
+                    employeeName = p.EmployeeName
+                }),
+                projectEmployees = preview.ProjectEmployees,
                 rows = preview.Rows.Select(r => ToRowJson(r))
             });
         }
@@ -92,14 +123,13 @@ namespace RSDSystem.Controllers
                 return Json(new
                 {
                     success = true,
-                    message = result.ReplacedPrevious
-                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message = ImportMessage(result),
                     result.ImportId,
                     result.ProjectId,
                     result.RowCount,
                     result.MatchedCount,
-                    result.UnmatchedCount
+                    result.UnmatchedCount,
+                    result.FilteredOutCount
                 });
             }
             catch (Exception ex)
@@ -219,6 +249,20 @@ namespace RSDSystem.Controllers
 
         private string ImportedBy() =>
             HttpContext.Session.GetString("FullName") ?? "Staff";
+
+        private static string ImportMessage(AttendanceImportResult result)
+        {
+            var message = result.ReplacedPrevious
+                ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
+
+            if (result.FilteredOutCount > 0)
+            {
+                message += $" {result.FilteredOutCount} people from the file were not on this project and were skipped.";
+            }
+
+            return message;
+        }
 
         private static string? ValidateUpload(IFormFile? file)
         {

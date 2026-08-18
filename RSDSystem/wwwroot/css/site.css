@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    RSD Payroll System — site.css
    Color palette:
      Main background  : #163F8B
@@ -3184,6 +3184,65 @@ button.badge-btn {
 
 .att-row-edited td {
     background: #f3f8ff;
+}
+
+.att-project-banner {
+    background: #e8f8ee;
+    border: 1px solid #b6f0c9;
+    color: #0d7a3e;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+    margin: 0 0 14px;
+    max-width: 720px;
+}
+
+.att-extract-bar {
+    background: #f3f7ff;
+    border: 1px solid #dce8ff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 4px 0 14px;
+    font-size: 12.5px;
+    color: #163F8B;
+}
+
+.att-extract-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.att-stat {
+    background: #fff;
+    border: 1px solid #dce8ff;
+    color: #163F8B;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.att-stat-ok {
+    background: #e8f8ee;
+    border-color: #b6f0c9;
+    color: #0d7a3e;
+}
+
+.att-stat-warn {
+    background: #fff4f4;
+    border-color: #ffd0d0;
+    color: #b42318;
+}
+
+.att-extract-dropped {
+    margin-top: 8px;
+    color: #7a3a36;
+}
+
+.att-extract-kept {
+    color: #0d7a3e;
 }
 
 @media (max-width: 900px) {
