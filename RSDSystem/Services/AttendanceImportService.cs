@@ -104,6 +104,12 @@ namespace RSDSystem.Services
                 RowCount = preview.Rows.Count
             };
 
+            var replaced = await ReplaceOverlappingImportsAsync(
+                preview.Project.ProjectId,
+                preview.PeriodStart,
+                preview.PeriodEnd,
+                cancellationToken);
+
             foreach (var row in preview.Rows)
             {
                 batch.Records.Add(new AttendanceRecord
@@ -152,7 +158,8 @@ namespace RSDSystem.Services
                 PeriodEnd = preview.PeriodEnd,
                 RowCount = preview.Rows.Count,
                 MatchedCount = preview.MatchedCount,
-                UnmatchedCount = preview.UnmatchedCount
+                UnmatchedCount = preview.UnmatchedCount,
+                ReplacedPrevious = replaced
             };
         }
 
@@ -187,16 +194,67 @@ namespace RSDSystem.Services
 
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 5, 100);
-            var total = await query.CountAsync(cancellationToken);
-            var rows = await query
+            var all = await query
+                .OrderByDescending(r => r.Import!.ImportedAt)
+                .ThenByDescending(r => r.AttendanceRecordId)
+                .ThenBy(r => r.EmployeeName)
+                .ThenBy(r => r.WorkDate)
+                .ToListAsync(cancellationToken);
+
+            var rows = all
+                .GroupBy(r => (
+                    r.EmployeeId,
+                    User: (r.ExternalUserId ?? "").Trim().ToLowerInvariant(),
+                    Date: r.WorkDate?.Date
+                ))
+                .Select(g => g.First())
                 .OrderByDescending(r => r.Import!.ImportedAt)
                 .ThenBy(r => r.EmployeeName)
                 .ThenBy(r => r.WorkDate)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
+                .ToList();
+
+            var total = rows.Count;
+            return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(), total);
+        }
+
+        private async Task<bool> ReplaceOverlappingImportsAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken)
+        {
+            var start = (periodStart ?? periodEnd)?.Date;
+            var end = (periodEnd ?? periodStart)?.Date;
+
+            var existing = await _db.AttendanceImports
+                .Include(i => i.Records)
+                .Where(i => i.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            return (rows, total);
+            List<AttendanceImport> toRemove;
+            if (!start.HasValue || !end.HasValue)
+            {
+                toRemove = existing;
+            }
+            else
+            {
+                toRemove = existing.Where(i => PeriodsOverlap(i, start.Value, end.Value)).ToList();
+            }
+
+            if (toRemove.Count == 0)
+                return false;
+
+            _db.AttendanceImports.RemoveRange(toRemove);
+            return true;
+        }
+
+        private static bool PeriodsOverlap(AttendanceImport import, DateTime start, DateTime end)
+        {
+            var importStart = (import.PeriodStart ?? import.PeriodEnd)?.Date
+                ?? import.Records.Where(r => r.WorkDate.HasValue).Select(r => r.WorkDate!.Value.Date).DefaultIfEmpty(start).Min();
+            var importEnd = (import.PeriodEnd ?? import.PeriodStart)?.Date
+                ?? import.Records.Where(r => r.WorkDate.HasValue).Select(r => r.WorkDate!.Value.Date).DefaultIfEmpty(end).Max();
+            return importStart <= end && importEnd >= start;
         }
 
         public async Task<string?> UpdateRecordAsync(
@@ -699,5 +757,6 @@ namespace RSDSystem.Services
         public int RowCount { get; set; }
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
+        public bool ReplacedPrevious { get; set; }
     }
 }

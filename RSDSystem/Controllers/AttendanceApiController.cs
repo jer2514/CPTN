@@ -70,7 +70,9 @@ namespace RSDSystem.Controllers
                 return Ok(new
                 {
                     success = true,
-                    message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message = result.ReplacedPrevious
+                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
                     importId = result.ImportId,
                     projectId = result.ProjectId,
                     projectName = result.ProjectName,
