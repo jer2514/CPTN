@@ -50,36 +50,47 @@ namespace RSDSystem.Controllers
             if (!projectId.HasValue && string.IsNullOrWhiteSpace(projectName))
                 return BadRequest(new { success = false, message = "Provide projectId or projectName." });
 
-            await using var stream = file.OpenReadStream();
-            var result = await _imports.ImportAsync(
-                projectId,
-                projectName,
-                stream,
-                file.FileName,
-                "n8n",
-                AttendanceImportSources.N8n,
-                assignedStaff: null,
-                overridesJson: null,
-                cancellationToken: HttpContext.RequestAborted);
-
-            if (result.Error != null)
-                return BadRequest(new { success = false, message = result.Error });
-
-            return Ok(new
+            try
             {
-                success = true,
-                message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
-                importId = result.ImportId,
-                projectId = result.ProjectId,
-                projectName = result.ProjectName,
-                fileName = result.FileName,
-                format = result.Format,
-                periodStart = result.PeriodStart,
-                periodEnd = result.PeriodEnd,
-                rowCount = result.RowCount,
-                matchedCount = result.MatchedCount,
-                unmatchedCount = result.UnmatchedCount
-            });
+                await using var stream = file.OpenReadStream();
+                var result = await _imports.ImportAsync(
+                    projectId,
+                    projectName,
+                    stream,
+                    file.FileName,
+                    "n8n",
+                    AttendanceImportSources.N8n,
+                    assignedStaff: null,
+                    overridesJson: null,
+                    cancellationToken: HttpContext.RequestAborted);
+
+                if (result.Error != null)
+                    return BadRequest(new { success = false, message = result.Error });
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    importId = result.ImportId,
+                    projectId = result.ProjectId,
+                    projectName = result.ProjectName,
+                    fileName = result.FileName,
+                    format = result.Format,
+                    periodStart = result.PeriodStart,
+                    periodEnd = result.PeriodEnd,
+                    rowCount = result.RowCount,
+                    matchedCount = result.MatchedCount,
+                    unmatchedCount = result.UnmatchedCount
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Could not import the attendance file. " + ex.GetBaseException().Message
+                });
+            }
         }
 
         private bool HasValidApiKey()
