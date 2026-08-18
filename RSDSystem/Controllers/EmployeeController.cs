@@ -92,10 +92,13 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+<<<<<<< HEAD
 
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
 
+=======
+>>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -158,10 +161,13 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
+<<<<<<< HEAD
 
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
 
+=======
+>>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -214,6 +220,7 @@ namespace RSDSystem.Controllers
             emp.MiddleInitial = string.IsNullOrWhiteSpace(emp.MiddleInitial)
                 ? null
                 : emp.MiddleInitial.Trim().ToUpperInvariant();
+<<<<<<< HEAD
 
             emp.Email = string.IsNullOrWhiteSpace(emp.Email) ? null : emp.Email.Trim();
             emp.ContactNumber = emp.ContactNumber?.Trim();
@@ -223,16 +230,22 @@ namespace RSDSystem.Controllers
                 ? string.Empty
                 : emp.JobClassification.Trim();
 
+=======
+>>>>>>> master
             emp.Email = emp.Email?.Trim();
             emp.ContactNumber = emp.ContactNumber?.Trim();
             emp.Address = emp.Address?.Trim();
             emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
             emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
         }
 
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
+<<<<<<< HEAD
 
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             return ti.ToTitleCase(value.Trim().ToLowerInvariant());
@@ -240,6 +253,10 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
             return ti.ToTitleCase(value.Trim().ToLower());
 
+=======
+            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
+            return ti.ToTitleCase(value.Trim().ToLower());
+>>>>>>> master
         }
 
         private void ValidatePhoto(IFormFile? photo)

@@ -73,6 +73,7 @@
                 <label class="form-lbl">Gender</label>
                 <select name="Gender" class="form-ctrl">
                     <option value="">Select</option>
+<<<<<<< HEAD
                     @if (Model.Gender == "Male")
                     {
                         <option value="Male" selected>Male</option>
@@ -88,6 +89,8 @@
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     }
+=======
+>>>>>>> master
                     <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
                     <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
                 </select>
@@ -174,6 +177,7 @@
                     <option value="">Select role</option>
                     @foreach (var r in roles)
                     {
+<<<<<<< HEAD
                         if (r == Model.Role)
                         {
                             <option value="@r" selected>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
@@ -182,6 +186,8 @@
                         {
                             <option value="@r">@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
                         }
+=======
+>>>>>>> master
                         <option value="@r" @(Model.Role == r ? "selected" : null)>@(r == "PayrollStaff" ? "Payroll Staff" : r)</option>
                     }
                 </select>
