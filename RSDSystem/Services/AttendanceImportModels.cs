@@ -77,4 +77,43 @@ namespace RSDSystem.Services
         public int UnmatchedCount { get; set; }
         public bool ReplacedPrevious { get; set; }
     }
+
+    public class AttendancePeriodOption
+    {
+        public string Key { get; set; } = "";
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+        public string Label { get; set; } = "";
+        public string? ImportedBy { get; set; }
+    }
+
+    public class AttendanceEmployeeSummary
+    {
+        public int? EmployeeId { get; set; }
+        public string DisplayId { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+        public bool Matched { get; set; }
+        public int DaysWorked { get; set; }
+        public int DaysAbsent { get; set; }
+        public int DaysLate { get; set; }
+        public int DaysIncomplete { get; set; }
+        public decimal RegularHours { get; set; }
+        public decimal OvertimeHours { get; set; }
+    }
+
+    public class AttendanceSummaryResult
+    {
+        public List<AttendanceEmployeeSummary> Rows { get; set; } = new();
+        public int Total { get; set; }
+        public int DaysWorked { get; set; }
+        public int DaysAbsent { get; set; }
+        public int DaysLate { get; set; }
+        public int DaysIncomplete { get; set; }
+        public decimal RegularHours { get; set; }
+        public decimal OvertimeHours { get; set; }
+        public int UnmatchedCount { get; set; }
+        public string? ImportedBy { get; set; }
+        public DateTime? PeriodStart { get; set; }
+        public DateTime? PeriodEnd { get; set; }
+    }
 }

@@ -58,7 +58,10 @@ namespace RSDSystem.Filters
                 && (string.Equals(action, "Preview", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "ImportFile", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "UpdateRecord", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase));
+                    || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetPeriods", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetSummary", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "DeletePeriod", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

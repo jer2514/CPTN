@@ -188,25 +188,226 @@ namespace RSDSystem.Services
             string? status,
             int page,
             int pageSize,
+            DateTime? periodStart = null,
+            DateTime? periodEnd = null,
             CancellationToken cancellationToken = default)
         {
-            var query = _db.AttendanceRecords
+            var query = RecordsForProject(projectId);
+            query = ApplyRecordFilters(query, search, status, periodStart, periodEnd);
+
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 5, 100);
+            var all = await query
+                .OrderByDescending(r => r.Import!.ImportedAt)
+                .ThenByDescending(r => r.AttendanceRecordId)
+                .ThenBy(r => r.EmployeeName)
+                .ThenBy(r => r.WorkDate)
+                .ToListAsync(cancellationToken);
+
+            var rows = DeduplicateStoredRows(all);
+
+            var total = rows.Count;
+            return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(), total);
+        }
+
+        public async Task<List<AttendancePeriodOption>> ListPeriodsAsync(
+            int projectId,
+            CancellationToken cancellationToken = default)
+        {
+            var imports = await _db.AttendanceImports
+                .AsNoTracking()
+                .Where(i => i.ProjectId == projectId)
+                .Select(i => new
+                {
+                    i.AttendanceImportId,
+                    i.PeriodStart,
+                    i.PeriodEnd,
+                    i.ImportedBy,
+                    i.ImportedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            var bounds = await _db.AttendanceRecords
+                .AsNoTracking()
+                .Where(r => r.Import != null && r.Import.ProjectId == projectId)
+                .GroupBy(r => r.AttendanceImportId)
+                .Select(g => new
+                {
+                    ImportId = g.Key,
+                    MinDate = g.Min(r => r.WorkDate),
+                    MaxDate = g.Max(r => r.WorkDate)
+                })
+                .ToListAsync(cancellationToken);
+
+            var boundMap = bounds.ToDictionary(b => b.ImportId);
+            var periods = new Dictionary<string, AttendancePeriodOption>();
+
+            foreach (var import in imports.OrderByDescending(i => i.ImportedAt))
+            {
+                boundMap.TryGetValue(import.AttendanceImportId, out var bound);
+                var start = AttendanceDisplay.UsableDate(import.PeriodStart)
+                    ?? AttendanceDisplay.UsableDate(bound?.MinDate);
+                var end = AttendanceDisplay.UsableDate(import.PeriodEnd)
+                    ?? AttendanceDisplay.UsableDate(bound?.MaxDate)
+                    ?? start;
+                if (!start.HasValue || !end.HasValue)
+                    continue;
+                if (end.Value < start.Value)
+                    end = start;
+
+                var key = PeriodKey(start.Value, end.Value);
+                if (periods.ContainsKey(key))
+                    continue;
+
+                periods[key] = new AttendancePeriodOption
+                {
+                    Key = key,
+                    Start = start.Value,
+                    End = end.Value,
+                    Label = PeriodLabel(start.Value, end.Value),
+                    ImportedBy = import.ImportedBy
+                };
+            }
+
+            return periods.Values
+                .OrderByDescending(p => p.Start)
+                .ThenByDescending(p => p.End)
+                .ToList();
+        }
+
+        public async Task<AttendanceSummaryResult> QuerySummaryAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            string? search,
+            string? status,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            var query = ApplyRecordFilters(
+                RecordsForProject(projectId), search, null, periodStart, periodEnd);
+            var all = DeduplicateStoredRows(await query.ToListAsync(cancellationToken));
+
+            var groups = all
+                .GroupBy(r => r.EmployeeId.HasValue
+                    ? "e:" + r.EmployeeId.Value
+                    : "u:" + (r.ExternalUserId ?? "").Trim().ToLowerInvariant()
+                        + ":" + (r.EmployeeName ?? "").Trim().ToLowerInvariant())
+                .Select(g => ToEmployeeSummary(g.ToList()))
+                .OrderBy(r => r.EmployeeName)
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                !string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                groups = status.Trim() switch
+                {
+                    "Unmatched" => groups.Where(r => !r.Matched).ToList(),
+                    "Absent" => groups.Where(r => r.DaysAbsent > 0).ToList(),
+                    "Late" => groups.Where(r => r.DaysLate > 0).ToList(),
+                    "Incomplete" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
+                    _ => groups
+                };
+            }
+
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 5, 100);
+            var start = AttendanceDisplay.UsableDate(periodStart);
+            var end = AttendanceDisplay.UsableDate(periodEnd);
+
+            return new AttendanceSummaryResult
+            {
+                Total = groups.Count,
+                DaysWorked = groups.Sum(r => r.DaysWorked),
+                DaysAbsent = groups.Sum(r => r.DaysAbsent),
+                DaysLate = groups.Sum(r => r.DaysLate),
+                DaysIncomplete = groups.Sum(r => r.DaysIncomplete),
+                RegularHours = groups.Sum(r => r.RegularHours),
+                OvertimeHours = groups.Sum(r => r.OvertimeHours),
+                UnmatchedCount = groups.Count(r => !r.Matched),
+                ImportedBy = all.Select(r => r.Import?.ImportedBy)
+                    .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)),
+                PeriodStart = start,
+                PeriodEnd = end,
+                Rows = groups.Skip((page - 1) * pageSize).Take(pageSize).ToList()
+            };
+        }
+
+        public async Task<(int Deleted, string? Error)> DeletePeriodAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var start = AttendanceDisplay.UsableDate(periodStart);
+            var end = AttendanceDisplay.UsableDate(periodEnd);
+            if (!start.HasValue || !end.HasValue)
+                return (0, "Select a valid period first.");
+
+            var from = start.Value.Date;
+            var toExclusive = end.Value.Date.AddDays(1);
+            var records = await _db.AttendanceRecords
+                .Include(r => r.Import)
+                .Where(r => r.Import != null && r.Import.ProjectId == projectId)
+                .Where(r => r.WorkDate != null && r.WorkDate >= from && r.WorkDate < toExclusive)
+                .ToListAsync(cancellationToken);
+
+            if (records.Count == 0)
+                return (0, "No attendance rows in this period.");
+
+            var importIds = records.Select(r => r.AttendanceImportId).Distinct().ToList();
+            _db.AttendanceRecords.RemoveRange(records);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            var emptyImports = await _db.AttendanceImports
+                .Where(i => importIds.Contains(i.AttendanceImportId)
+                    && !_db.AttendanceRecords.Any(r => r.AttendanceImportId == i.AttendanceImportId))
+                .ToListAsync(cancellationToken);
+            if (emptyImports.Count > 0)
+            {
+                _db.AttendanceImports.RemoveRange(emptyImports);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            return (records.Count, null);
+        }
+
+        private IQueryable<AttendanceRecord> RecordsForProject(int projectId) =>
+            _db.AttendanceRecords
                 .AsNoTracking()
                 .Include(r => r.Import)
                 .Include(r => r.Employee)
                 .Where(r => r.Import != null && r.Import.ProjectId == projectId);
 
+        private static IQueryable<AttendanceRecord> ApplyRecordFilters(
+            IQueryable<AttendanceRecord> query,
+            string? search,
+            string? status,
+            DateTime? periodStart,
+            DateTime? periodEnd)
+        {
+            var start = AttendanceDisplay.UsableDate(periodStart);
+            var end = AttendanceDisplay.UsableDate(periodEnd);
+            if (start.HasValue && end.HasValue)
+            {
+                var from = start.Value.Date;
+                var toExclusive = end.Value.Date.AddDays(1);
+                query = query.Where(r =>
+                    (r.WorkDate != null && r.WorkDate >= from && r.WorkDate < toExclusive)
+                    || (r.WorkDate == null && r.Import != null
+                        && r.Import.PeriodStart != null && r.Import.PeriodEnd != null
+                        && r.Import.PeriodStart < toExclusive
+                        && r.Import.PeriodEnd >= from));
+            }
+
             if (!string.IsNullOrWhiteSpace(status) &&
                 !string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
             {
                 if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
-                {
                     query = query.Where(r => !r.Matched);
-                }
                 else
-                {
                     query = query.Where(r => r.Status == status);
-                }
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -218,30 +419,59 @@ namespace RSDSystem.Services
                     (r.Employee != null && r.Employee.EmployeeCode.Contains(term)));
             }
 
-            page = Math.Max(1, page);
-            pageSize = Math.Clamp(pageSize, 5, 100);
-            var all = await query
-                .OrderByDescending(r => r.Import!.ImportedAt)
-                .ThenByDescending(r => r.AttendanceRecordId)
-                .ThenBy(r => r.EmployeeName)
-                .ThenBy(r => r.WorkDate)
-                .ToListAsync(cancellationToken);
+            return query;
+        }
 
-            var rows = all
+        private static List<AttendanceRecord> DeduplicateStoredRows(List<AttendanceRecord> rows) =>
+            rows
                 .GroupBy(r => (
                     r.EmployeeId,
                     User: (r.ExternalUserId ?? "").Trim().ToLowerInvariant(),
-                    Date: r.WorkDate?.Date
+                    Date: AttendanceDisplay.UsableDate(r.WorkDate)
                 ))
                 .Select(g => g.First())
-                .OrderByDescending(r => r.Import!.ImportedAt)
-                .ThenBy(r => r.EmployeeName)
+                .OrderBy(r => r.EmployeeName)
                 .ThenBy(r => r.WorkDate)
                 .ToList();
 
-            var total = rows.Count;
-            return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(), total);
+        private static AttendanceEmployeeSummary ToEmployeeSummary(List<AttendanceRecord> rows)
+        {
+            var first = rows[0];
+            return new AttendanceEmployeeSummary
+            {
+                EmployeeId = first.EmployeeId,
+                DisplayId = AttendanceDisplay.EmployeeId(first.Employee?.EmployeeCode ?? first.ExternalUserId),
+                EmployeeName = first.Employee?.FullName ?? first.EmployeeName,
+                Matched = rows.Any(r => r.Matched),
+                DaysWorked = rows.Count(r =>
+                    r.Status is AttendanceStatuses.Complete or AttendanceStatuses.Late),
+                DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
+                DaysLate = rows.Count(r => r.Status == AttendanceStatuses.Late),
+                DaysIncomplete = rows.Count(r => r.Status == AttendanceStatuses.Incomplete),
+                RegularHours = rows.Sum(DayRegularHours),
+                OvertimeHours = rows.Sum(DayOvertimeHours)
+            };
         }
+
+        private static decimal DayRegularHours(AttendanceRecord row)
+        {
+            if (row.WorkHoursActual > 0)
+                return row.WorkHoursActual;
+            return AttendanceDisplay.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
+        }
+
+        private static decimal DayOvertimeHours(AttendanceRecord row)
+        {
+            if (row.OvertimeHours > 0)
+                return row.OvertimeHours;
+            return AttendanceDisplay.OvertimeHours(row.OvertimeIn, row.OvertimeOut);
+        }
+
+        private static string PeriodKey(DateTime start, DateTime end) =>
+            start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
+
+        private static string PeriodLabel(DateTime start, DateTime end) =>
+            AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end);
 
         private async Task<bool> ReplaceOverlappingImportsAsync(
             int projectId,
