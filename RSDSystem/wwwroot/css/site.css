@@ -2486,6 +2486,88 @@ button.badge-btn {
     font-size: 13px;
 }
 
+.pred-forecast-head,
+.pred-forecast-body {
+    display: grid;
+    grid-template-columns: 1.2fr 1.2fr 1.2fr 1.2fr 120px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+}
+
+.pred-forecast-head {
+    background: #dce8ff;
+    font-size: 12px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.pred-forecast-body {
+    background: #eef4ff;
+    font-size: 13px;
+    color: #163F8B;
+}
+
+.pred-result-panel {
+    width: min(460px, 100%);
+}
+
+.pred-result-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #5b6b8c;
+    border-bottom: 1px solid #eef2f8;
+}
+
+.pred-result-row strong {
+    color: #163F8B;
+    font-weight: 700;
+    text-align: right;
+}
+
+.pred-risk {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #fff6e8;
+    color: #8a5a00;
+}
+
+.pred-risk i {
+    font-size: 20px;
+    color: #e67e22;
+}
+
+.pred-risk-warn {
+    background: #fff1e6;
+}
+
+.pred-risk-title {
+    font-weight: 700;
+    color: #8a4b00;
+}
+
+.pred-risk-detail {
+    font-size: 13px;
+    margin-top: 2px;
+}
+
+.pred-result-footer {
+    margin-top: 18px;
+    font-size: 13px;
+    color: #5b6b8c;
+}
+
+.pred-result-footer span {
+    color: #266DF1;
+    font-weight: 700;
+}
+
 .vp-detail-top {
     display: flex;
     justify-content: space-between;
@@ -2855,6 +2937,8 @@ button.badge-btn {
     .vp-filters,
     .vp-period-head,
     .vp-period-body,
+    .pred-forecast-head,
+    .pred-forecast-body,
     .pred-grid,
     .pred-heading-row,
     .vp-detail-heading {

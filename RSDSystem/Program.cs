@@ -32,6 +32,11 @@ builder.Services.AddDbContext<PayrollDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<AttendanceImportService>();
+builder.Services.AddHttpClient("PayrollPrediction", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddScoped<PayrollPredictionService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>

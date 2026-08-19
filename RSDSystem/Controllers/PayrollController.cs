@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
 using RSDSystem.Models;
+using RSDSystem.Services;
 using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
@@ -11,11 +12,13 @@ namespace RSDSystem.Controllers
     public class PayrollController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly PayrollPredictionService _predictions;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
-        public PayrollController(PayrollDbContext db)
+        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions)
         {
             _db = db;
+            _predictions = predictions;
         }
 
         private IActionResult? RequireAdmin()
@@ -131,13 +134,60 @@ namespace RSDSystem.Controllers
             });
         }
 
-        public IActionResult Prediction()
+        public async Task<IActionResult> Prediction()
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
             ViewBag.PageTitle = "Payroll Prediction";
-            return View();
+            var projects = await _db.Projects
+                .AsNoTracking()
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+            return View(projects);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetPrediction(int projectId)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var page = await _predictions.LoadAsync(projectId, HttpContext.RequestAborted);
+            if (page.Error != null && page.Rows.Count == 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    projectName = page.ProjectName,
+                    message = page.Error
+                });
+            }
+
+            return Json(new
+            {
+                success = true,
+                projectId = page.ProjectId,
+                projectName = page.ProjectName,
+                generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
+                rows = page.Rows.Select(r => new
+                {
+                    previousMonth1 = r.PreviousMonth1.ToString("MMMM yyyy", DateCulture),
+                    previousAmount1 = r.PreviousAmount1,
+                    previousMonth2 = r.PreviousMonth2.ToString("MMMM yyyy", DateCulture),
+                    previousAmount2 = r.PreviousAmount2,
+                    predictionMonth = r.PredictionMonth.ToString("MMMM yyyy", DateCulture),
+                    predictedPayroll = r.PredictedPayroll,
+                    allocatedBudget = r.AllocatedBudget,
+                    budgetDifference = r.BudgetDifference,
+                    exceedsBudget = r.ExceedsBudget,
+                    unusualChange = r.UnusualChange,
+                    changePercent = r.ChangePercent,
+                    riskTitle = r.RiskTitle,
+                    riskDetail = r.RiskDetail
+                })
+            });
         }
 
         public async Task<IActionResult> GeneratedPayslips(int projectId, DateTime start, DateTime end, int page = 1)

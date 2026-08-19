@@ -63,7 +63,12 @@ namespace RSDSystem.Filters
                     || string.Equals(action, "GetSummary", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "DeletePeriod", StringComparison.OrdinalIgnoreCase))
                 || (string.Equals(controller, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(action, "GetAttendanceTotals", StringComparison.OrdinalIgnoreCase));
+                    && string.Equals(action, "GetAttendanceTotals", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "Payroll", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(action, "GetPrediction", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "PayrollPredictionApi", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(action, "Predict", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "Health", StringComparison.OrdinalIgnoreCase)));
         }
     }
 }
