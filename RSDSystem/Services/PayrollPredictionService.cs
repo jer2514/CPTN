@@ -44,19 +44,7 @@ namespace RSDSystem.Services
                 .Where(p => p.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            var approved = payrolls
-                .Where(p => string.Equals(p.Status?.Trim(), PayrollStatusOptions.Approved, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            var months = approved
-                .GroupBy(p => new DateTime(p.PayPeriodEnd.Year, p.PayPeriodEnd.Month, 1))
-                .Select(g => new MonthlyPayrollTotal
-                {
-                    Month = g.Key,
-                    Amount = g.Sum(p => p.NetPay)
-                })
-                .OrderBy(m => m.Month)
-                .ToList();
+            var months = BuildHistory(payrolls);
 
             if (months.Count < 2)
             {
@@ -65,7 +53,7 @@ namespace RSDSystem.Services
                     ProjectId = project.ProjectId,
                     ProjectName = project.ProjectName ?? "—",
                     GeneratedAt = DateTime.Now,
-                    Error = "Need at least two months of approved payroll before a prediction can be made."
+                    Error = HistoryError(payrolls, months)
                 };
             }
 
@@ -82,10 +70,13 @@ namespace RSDSystem.Services
                 rows.Add(new PayrollPredictionRow
                 {
                     PreviousMonth1 = first.Month,
+                    PreviousLabel1 = first.Label,
                     PreviousAmount1 = first.Amount,
                     PreviousMonth2 = second.Month,
+                    PreviousLabel2 = second.Label,
                     PreviousAmount2 = second.Amount,
                     PredictionMonth = predictMonth,
+                    PredictionLabel = predictMonth.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("en-US")),
                     PredictedPayroll = forecast.PredictedPayroll,
                     AllocatedBudget = forecast.AllocatedBudget,
                     BudgetDifference = forecast.BudgetDifference,
@@ -182,6 +173,111 @@ namespace RSDSystem.Services
                 Console.WriteLine("Prediction API fallback: " + ex.Message);
                 return null;
             }
+        }
+
+        private static List<MonthlyPayrollTotal> BuildHistory(List<Payroll> payrolls)
+        {
+            var calendar = SplitAcrossCalendarMonths(payrolls);
+            if (calendar.Count >= 2)
+                return calendar;
+
+            return payrolls
+                .GroupBy(p => (Start: p.PayPeriodStart.Date, End: p.PayPeriodEnd.Date))
+                .Select(g =>
+                {
+                    var used = PreferOfficial(g);
+                    return new MonthlyPayrollTotal
+                    {
+                        Month = new DateTime(g.Key.Start.Year, g.Key.Start.Month, 1),
+                        SortDate = g.Key.Start,
+                        Amount = used.Sum(p => p.NetPay),
+                        Label = PeriodLabel(g.Key.Start, g.Key.End)
+                    };
+                })
+                .OrderBy(m => m.SortDate)
+                .ThenBy(m => m.Label)
+                .ToList();
+        }
+
+        private static List<MonthlyPayrollTotal> SplitAcrossCalendarMonths(List<Payroll> payrolls)
+        {
+            var culture = CultureInfo.GetCultureInfo("en-US");
+            var amounts = new Dictionary<DateTime, decimal>();
+
+            foreach (var period in payrolls.GroupBy(p => (Start: p.PayPeriodStart.Date, End: p.PayPeriodEnd.Date)))
+            {
+                var total = PreferOfficial(period).Sum(p => p.NetPay);
+                var start = period.Key.Start;
+                var end = period.Key.End < start ? start : period.Key.End;
+                var spanDays = (end - start).TotalDays + 1;
+                if (spanDays <= 0)
+                    continue;
+
+                for (var month = new DateTime(start.Year, start.Month, 1);
+                     month <= end;
+                     month = month.AddMonths(1))
+                {
+                    var monthEnd = month.AddMonths(1).AddDays(-1);
+                    var overlapStart = start > month ? start : month;
+                    var overlapEnd = end < monthEnd ? end : monthEnd;
+                    if (overlapEnd < overlapStart)
+                        continue;
+
+                    var share = (decimal)((overlapEnd - overlapStart).TotalDays + 1) / (decimal)spanDays;
+                    amounts.TryGetValue(month, out var current);
+                    amounts[month] = current + Math.Round(total * share, 2);
+                }
+            }
+
+            return amounts
+                .OrderBy(kv => kv.Key)
+                .Select(kv => new MonthlyPayrollTotal
+                {
+                    Month = kv.Key,
+                    SortDate = kv.Key,
+                    Amount = kv.Value,
+                    Label = kv.Key.ToString("MMMM yyyy", culture)
+                })
+                .ToList();
+        }
+
+        private static List<Payroll> PreferOfficial(IEnumerable<Payroll> rows)
+        {
+            var list = rows.ToList();
+            var approved = list.Where(IsStatus(PayrollStatusOptions.Approved)).ToList();
+            if (approved.Count > 0)
+                return approved;
+
+            var submitted = list.Where(IsStatus(PayrollStatusOptions.Submitted)).ToList();
+            if (submitted.Count > 0)
+                return submitted;
+
+            return list;
+        }
+
+        private static Func<Payroll, bool> IsStatus(string status) =>
+            p => string.Equals(p.Status?.Trim(), status, StringComparison.OrdinalIgnoreCase);
+
+        private static string PeriodLabel(DateTime start, DateTime end)
+        {
+            var culture = CultureInfo.GetCultureInfo("en-US");
+            if (start.Year == end.Year && start.Month == end.Month)
+                return start.ToString("MMMM d", culture) + "–" + end.ToString("d, yyyy", culture);
+            return start.ToString("MMM d", culture) + " – " + end.ToString("MMM d, yyyy", culture);
+        }
+
+        private static string HistoryError(List<Payroll> payrolls, List<MonthlyPayrollTotal> months)
+        {
+            if (payrolls.Count == 0)
+                return "This project has no generated payroll yet. Generate payroll for two periods first.";
+
+            if (months.Count <= 1)
+            {
+                var label = months.Count == 1 ? months[0].Label : "one period";
+                return $"This project currently has payroll in {label} only. Generate payroll for a second month or pay period, then load prediction again.";
+            }
+
+            return "Need at least two months of payroll before a prediction can be made.";
         }
 
         private decimal AnomalyPercent()
@@ -289,7 +385,9 @@ namespace RSDSystem.Services
     public class MonthlyPayrollTotal
     {
         public DateTime Month { get; set; }
+        public DateTime SortDate { get; set; }
         public decimal Amount { get; set; }
+        public string Label { get; set; } = "";
     }
 
     public class PayrollPredictionPage
@@ -304,10 +402,13 @@ namespace RSDSystem.Services
     public class PayrollPredictionRow
     {
         public DateTime PreviousMonth1 { get; set; }
+        public string PreviousLabel1 { get; set; } = "";
         public decimal PreviousAmount1 { get; set; }
         public DateTime PreviousMonth2 { get; set; }
+        public string PreviousLabel2 { get; set; } = "";
         public decimal PreviousAmount2 { get; set; }
         public DateTime PredictionMonth { get; set; }
+        public string PredictionLabel { get; set; } = "";
         public decimal PredictedPayroll { get; set; }
         public decimal AllocatedBudget { get; set; }
         public decimal BudgetDifference { get; set; }
