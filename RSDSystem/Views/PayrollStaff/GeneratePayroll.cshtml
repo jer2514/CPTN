@@ -161,11 +161,11 @@
                 const data = await res.json();
 
                 if (!data.success) {
-                    emptyBox.textContent = data.message;
+                    emptyBox.textContent = data.message || 'Could not load employees for this project.';
                     return;
                 }
 
-                currentEmployees = data.employees;
+                currentEmployees = data.employees || [];
                 currentScheduleId = data.scheduleId || null;
 
                 if (!data.hasSchedule) {
@@ -184,7 +184,7 @@
                 section.style.display = 'block';
                 renderEmployees(currentEmployees);
             } catch (err) {
-                emptyBox.textContent = 'Something went wrong while loading employees.';
+                emptyBox.textContent = 'Could not load employees. Refresh the page after the latest update, then try Load again.';
             }
         });
 
