@@ -211,7 +211,8 @@ BEGIN
         UPDATE r SET r.[ProjectId] = i.[ProjectId]
         FROM [dbo].[AttendanceRecords] r
         INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId];
-        ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [ProjectId] int NOT NULL;
+        IF NOT EXISTS (SELECT 1 FROM [dbo].[AttendanceRecords] WHERE [ProjectId] IS NULL)
+            ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [ProjectId] int NOT NULL;
     END
     ELSE
     BEGIN
