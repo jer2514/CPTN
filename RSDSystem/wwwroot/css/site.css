@@ -2563,6 +2563,12 @@ button.badge-btn {
     color: #5b6b8c;
 }
 
+.pred-result-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #7a93c4;
+}
+
 .pred-result-footer span {
     color: #266DF1;
     font-weight: 700;
