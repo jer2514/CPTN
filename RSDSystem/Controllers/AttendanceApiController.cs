@@ -80,8 +80,7 @@ namespace RSDSystem.Controllers
                     periodEnd = result.PeriodEnd,
                     rowCount = result.RowCount,
                     matchedCount = result.MatchedCount,
-                    unmatchedCount = result.UnmatchedCount,
-                    filteredOutCount = result.FilteredOutCount
+                    unmatchedCount = result.UnmatchedCount
                 });
             }
             catch (Exception ex)
@@ -100,9 +99,9 @@ namespace RSDSystem.Controllers
                 ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
                 : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
 
-            if (result.FilteredOutCount > 0)
+            if (result.UnmatchedCount > 0)
             {
-                message += $" {result.FilteredOutCount} people from the file were not on this project and were skipped.";
+                message += $" {result.UnmatchedCount} row(s) did not match an employee.";
             }
 
             return message;

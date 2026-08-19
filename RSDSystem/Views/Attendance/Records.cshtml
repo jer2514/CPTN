@@ -87,13 +87,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -203,7 +200,7 @@
 
                 empty.style.display = 'none';
                 section.style.display = 'block';
-            } catch {
+            } catch (err) {
                 empty.textContent = 'Could not load attendance records.';
             }
         }
