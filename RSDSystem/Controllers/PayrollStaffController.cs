@@ -200,10 +200,7 @@ namespace RSDSystem.Controllers
                 .OrderBy(s => s.StartingDate)
                 .ToListAsync();
 
-            var projectStart = DateRules.IsUsableDate(project.StartingDate)
-                ? project.StartingDate!.Value.Date : (DateTime?)null;
-            var projectEnd = DateRules.IsUsableDate(project.EstimateEndDate)
-                ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
+            var activeSchedule = ResolveActiveSchedule(schedules, existing?.PayPeriodStart);
 
             DateTime defaultStart;
             DateTime defaultEnd;
@@ -212,10 +209,15 @@ namespace RSDSystem.Controllers
                 defaultStart = existing.PayPeriodStart.Date;
                 defaultEnd = existing.PayPeriodEnd.Date;
             }
+            else if (activeSchedule != null)
+            {
+                defaultStart = activeSchedule.StartingDate.Date;
+                defaultEnd = activeSchedule.EndDate.Date;
+            }
             else
             {
-                (defaultStart, defaultEnd) = await ResolvePayPeriodAsync(
-                    projectId, schedules, projectStart, projectEnd, HttpContext.RequestAborted);
+                defaultStart = DateTime.Today;
+                defaultEnd = DateTime.Today;
             }
 
             if (defaultEnd < defaultStart)
@@ -234,8 +236,7 @@ namespace RSDSystem.Controllers
             ViewBag.DisplayId = EmployeeIds.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
-            ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
-            ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.HasPayrollSchedule = activeSchedule != null;
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
             ViewBag.DefaultDaysWorked = daysWorked
@@ -251,8 +252,12 @@ namespace RSDSystem.Controllers
                 ?? attendance?.OvertimeHours
                 ?? 0;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
-            ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
-            ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.MinDate = activeSchedule != null
+                ? activeSchedule.StartingDate.ToString("yyyy-MM-dd")
+                : "";
+            ViewBag.MaxDate = activeSchedule != null
+                ? activeSchedule.EndDate.ToString("yyyy-MM-dd")
+                : "";
             ViewBag.AttendanceFound = attendance != null;
 
             return View(emp);
@@ -350,17 +355,27 @@ namespace RSDSystem.Controllers
                 if (overtimeHours > otCapDays * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
-                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
-                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
+                var schedules = await _db.Set<PayrollSchedule>()
+                    .Where(s => s.ProjectId == projectId)
+                    .OrderBy(s => s.StartingDate)
+                    .ToListAsync();
 
-                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
-                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
-
-                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
-                    errors["payPeriodEnd"] = "Pay period cannot end before the project starting date.";
-
-                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
-                    errors["payPeriodStart"] = "Pay period cannot start after the project estimate end date.";
+                if (schedules.Count == 0)
+                {
+                    errors["payPeriodStart"] = "A payroll schedule must be added by the admin before generating payroll.";
+                }
+                else
+                {
+                    var covering = FindCoveringSchedule(schedules, payPeriodStart, payPeriodEnd);
+                    if (covering == null)
+                    {
+                        var active = ResolveActiveSchedule(schedules, payPeriodStart);
+                        var rangeLabel = active != null
+                            ? $"{active.StartingDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)} – {active.EndDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)}"
+                            : "the payroll schedule set by the admin";
+                        errors["payPeriodStart"] = $"Pay period must fall within the payroll schedule: {rangeLabel}.";
+                    }
+                }
             }
 
             decimal regularPay = emp.DailyRate * regularDaysWorked;
@@ -606,35 +621,37 @@ namespace RSDSystem.Controllers
              return RedirectToAction(nameof(Index));
         }
 
-        private async Task<(DateTime Start, DateTime End)> ResolvePayPeriodAsync(
-            int projectId,
-            List<PayrollSchedule> schedules,
-            DateTime? projectStart,
-            DateTime? projectEnd,
-            CancellationToken cancellationToken)
+        private static PayrollSchedule? ResolveActiveSchedule(
+            List<PayrollSchedule> schedules, DateTime? periodStart = null)
         {
-            var open = schedules
+            if (schedules.Count == 0)
+                return null;
+
+            if (periodStart.HasValue && DateRules.IsUsableDate(periodStart))
+            {
+                var covering = schedules.FirstOrDefault(s =>
+                    s.StartingDate.Date <= periodStart.Value.Date &&
+                    periodStart.Value.Date <= s.EndDate.Date);
+                if (covering != null)
+                    return covering;
+            }
+
+            return schedules
                 .Where(s => !s.TaskCompleted)
                 .OrderBy(s => s.StartingDate)
-                .FirstOrDefault();
-            if (open != null)
-                return (open.StartingDate.Date, open.EndDate.Date);
+                .FirstOrDefault()
+                ?? schedules
+                    .OrderByDescending(s => s.StartingDate)
+                    .FirstOrDefault();
+        }
 
-            var latestSchedule = schedules
-                .OrderByDescending(s => s.StartingDate)
-                .FirstOrDefault();
-            if (latestSchedule != null)
-                return (latestSchedule.StartingDate.Date, latestSchedule.EndDate.Date);
-
-            var periods = await _attendance.ListPeriodsAsync(projectId, cancellationToken);
-            if (periods.Count > 0)
-                return (periods[0].Start, periods[0].End);
-
-            var start = projectStart ?? DateTime.Today.AddDays(-6);
-            var end = projectEnd ?? DateTime.Today;
-            if (end < start)
-                end = start;
-            return (start, end);
+        private static PayrollSchedule? FindCoveringSchedule(
+            IEnumerable<PayrollSchedule> schedules, DateTime start, DateTime end)
+        {
+            start = start.Date;
+            end = end.Date;
+            return schedules.FirstOrDefault(s =>
+                s.StartingDate.Date <= start && end <= s.EndDate.Date);
         }
 
         private string? SafeReturnUrl(string? returnUrl)
