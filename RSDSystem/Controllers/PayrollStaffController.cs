@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Helpers;
+using RSDSystem.Services;
 using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
@@ -9,13 +10,15 @@ namespace RSDSystem.Controllers
     public class PayrollStaffController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly AttendanceImportService _attendance;
 
         // TODO: replace with the signed-in user's FullName once auth/session is wired up
         private const string CurrentStaffName = "Patrick Bateman";
 
-        public PayrollStaffController(PayrollDbContext db)
+        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance)
         {
             _db = db;
+            _attendance = attendance;
         }
 
         // GET /PayrollStaff  → "To do task" dashboard
@@ -202,14 +205,24 @@ namespace RSDSystem.Controllers
             var projectEnd = DateRules.IsUsableDate(project.EstimateEndDate)
                 ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
 
-            var defaultStart = existing?.PayPeriodStart.Date
-                ?? projectStart
-                ?? DateTime.Today.AddDays(-6);
-            var defaultEnd = existing?.PayPeriodEnd.Date
-                ?? projectEnd
-                ?? DateTime.Today;
+            DateTime defaultStart;
+            DateTime defaultEnd;
+            if (existing != null)
+            {
+                defaultStart = existing.PayPeriodStart.Date;
+                defaultEnd = existing.PayPeriodEnd.Date;
+            }
+            else
+            {
+                (defaultStart, defaultEnd) = await ResolvePayPeriodAsync(
+                    projectId, schedules, projectStart, projectEnd, HttpContext.RequestAborted);
+            }
+
             if (defaultEnd < defaultStart)
                 defaultEnd = defaultStart;
+
+            var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
+                projectId, employeeId, defaultStart, defaultEnd, HttpContext.RequestAborted);
 
             ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
             ViewBag.IsEdit = existing != null;
@@ -227,14 +240,63 @@ namespace RSDSystem.Controllers
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
             ViewBag.DefaultDaysWorked = daysWorked
                 ?? existing?.RegularDaysWorked
+                ?? attendance?.DaysWorked
                 ?? Math.Max(1, DateRules.CountWeekdays(defaultStart, defaultEnd));
-            ViewBag.AbsentDays = absentDays ?? existing?.AbsentDays ?? 0;
-            ViewBag.OvertimeHours = overtimeHours ?? existing?.OvertimeHours ?? 0;
+            ViewBag.AbsentDays = absentDays
+                ?? existing?.AbsentDays
+                ?? attendance?.DaysAbsent
+                ?? 0;
+            ViewBag.OvertimeHours = overtimeHours
+                ?? existing?.OvertimeHours
+                ?? attendance?.OvertimeHours
+                ?? 0;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
             ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
             ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.AttendanceFound = attendance != null;
 
             return View(emp);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAttendanceTotals(
+            int employeeId, int projectId, string? periodStart, string? periodEnd)
+        {
+            if (!DateTime.TryParseExact(periodStart, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var start)
+                || !DateTime.TryParseExact(periodEnd, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var end))
+                return Json(new { success = false, found = false, message = "Select a pay period first." });
+
+            start = AttendanceDisplay.UsableDate(start) ?? start.Date;
+            end = AttendanceDisplay.UsableDate(end) ?? end.Date;
+            if (end < start)
+                end = start;
+
+            var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
+                projectId, employeeId, start, end, HttpContext.RequestAborted);
+            if (attendance == null)
+            {
+                return Json(new
+                {
+                    success = true,
+                    found = false,
+                    daysWorked = DateRules.CountWeekdays(start, end),
+                    daysAbsent = 0,
+                    overtimeHours = 0m
+                });
+            }
+
+            return Json(new
+            {
+                success = true,
+                found = true,
+                daysWorked = attendance.DaysWorked,
+                daysAbsent = attendance.DaysAbsent,
+                overtimeHours = attendance.OvertimeHours
+            });
         }
 
         // POST /PayrollStaff/GeneratePayrollSlip
@@ -264,8 +326,8 @@ namespace RSDSystem.Controllers
                     errors[key] = result.ErrorMessage;
             }
 
-            if (regularDaysWorked < 1)
-                errors["regularDaysWorked"] = "Regular days worked must be at least 1.";
+            if (regularDaysWorked < 0)
+                errors["regularDaysWorked"] = "Regular days worked cannot be negative.";
 
             if (absentDays < 0)
                 errors["absentDays"] = "Absent days cannot be negative.";
@@ -284,7 +346,8 @@ namespace RSDSystem.Controllers
                 if (regularDaysWorked + absentDays > periodDays)
                     errors["regularDaysWorked"] = "Days worked plus absences cannot exceed the pay period.";
 
-                if (overtimeHours > regularDaysWorked * 24)
+                var otCapDays = Math.Max(regularDaysWorked, 1);
+                if (overtimeHours > otCapDays * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
                 if (DateRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
@@ -529,6 +592,37 @@ namespace RSDSystem.Controllers
         {
              // TODO: clear auth/session once login is implemented
              return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<(DateTime Start, DateTime End)> ResolvePayPeriodAsync(
+            int projectId,
+            List<PayrollSchedule> schedules,
+            DateTime? projectStart,
+            DateTime? projectEnd,
+            CancellationToken cancellationToken)
+        {
+            var open = schedules
+                .Where(s => !s.TaskCompleted)
+                .OrderBy(s => s.StartingDate)
+                .FirstOrDefault();
+            if (open != null)
+                return (open.StartingDate.Date, open.EndDate.Date);
+
+            var latestSchedule = schedules
+                .OrderByDescending(s => s.StartingDate)
+                .FirstOrDefault();
+            if (latestSchedule != null)
+                return (latestSchedule.StartingDate.Date, latestSchedule.EndDate.Date);
+
+            var periods = await _attendance.ListPeriodsAsync(projectId, cancellationToken);
+            if (periods.Count > 0)
+                return (periods[0].Start, periods[0].End);
+
+            var start = projectStart ?? DateTime.Today.AddDays(-6);
+            var end = projectEnd ?? DateTime.Today;
+            if (end < start)
+                end = start;
+            return (start, end);
         }
 
         private string? SafeReturnUrl(string? returnUrl)

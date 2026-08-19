@@ -334,6 +334,24 @@ namespace RSDSystem.Services
             };
         }
 
+        public async Task<AttendanceEmployeeSummary?> GetEmployeePeriodTotalsAsync(
+            int projectId,
+            int employeeId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var query = ApplyRecordFilters(
+                RecordsForProject(projectId), null, null, periodStart, periodEnd)
+                .Where(r => r.EmployeeId == employeeId);
+
+            var rows = DeduplicateStoredRows(await query.ToListAsync(cancellationToken));
+            if (rows.Count == 0)
+                return null;
+
+            return ToEmployeeSummary(rows);
+        }
+
         public async Task<(int Deleted, string? Error)> DeletePeriodAsync(
             int projectId,
             DateTime? periodStart,

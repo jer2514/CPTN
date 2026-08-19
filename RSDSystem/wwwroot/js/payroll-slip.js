@@ -8,6 +8,8 @@
     const successOkBtn = document.getElementById('successOkBtn');
     const configEl = document.getElementById('slip-config');
     const config = configEl ? JSON.parse(configEl.textContent || '{}') : {};
+    const employeeId = Number(config.employeeId || 0);
+    const projectId = Number(config.projectId || 0);
     const dailyRate = Number(config.dailyRate || 0);
     const hourlyRate = Number(config.hourlyRate || 0);
     const schedules = Array.isArray(config.schedules) ? config.schedules : [];
@@ -116,7 +118,7 @@
 
     function weekdayCount(startIso, endIso) {
         const total = inclusiveDays(startIso, endIso);
-        if (total === null) return 1;
+        if (total === null) return 0;
         const start = new Date(startIso + 'T00:00:00');
         let days = 0;
         for (let i = 0; i < total; i++) {
@@ -125,18 +127,41 @@
             const weekday = day.getDay();
             if (weekday !== 0 && weekday !== 6) days++;
         }
-        return days > 0 ? days : 1;
+        return days;
     }
 
-    function fillDaysFromPeriod() {
+    function setNumberValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = value;
+        el.classList.remove('is-invalid');
+        const dest = slipForm.querySelector('[data-error-for="' + id + '"]');
+        if (dest) dest.textContent = '';
+    }
+
+    async function fillAttendanceFromPeriod() {
         const start = document.getElementById('payPeriodStart').value;
         const end = document.getElementById('payPeriodEnd').value;
-        const daysEl = document.getElementById('regularDaysWorked');
-        if (!daysEl || !start || !end) return;
-        daysEl.value = String(weekdayCount(start, end));
-        daysEl.classList.remove('is-invalid');
-        const dest = slipForm.querySelector('[data-error-for="regularDaysWorked"]');
-        if (dest) dest.textContent = '';
+        if (!employeeId || !projectId || !start || !end) return;
+
+        try {
+            const url = '/PayrollStaff/GetAttendanceTotals?employeeId=' + encodeURIComponent(employeeId)
+                + '&projectId=' + encodeURIComponent(projectId)
+                + '&periodStart=' + encodeURIComponent(start)
+                + '&periodEnd=' + encodeURIComponent(end);
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.success) return;
+
+            setNumberValue('regularDaysWorked', String(data.daysWorked ?? 0));
+            setNumberValue('absentDays', String(data.daysAbsent ?? 0));
+            const ot = Number(data.overtimeHours || 0);
+            setNumberValue('overtimeHours', ot.toFixed(ot % 1 === 0 ? 0 : 2));
+        } catch (err) {
+            setNumberValue('regularDaysWorked', String(weekdayCount(start, end)));
+            setNumberValue('absentDays', '0');
+            setNumberValue('overtimeHours', '0');
+        }
     }
 
     function validateSlipExtras() {
@@ -155,6 +180,9 @@
         }
 
         if (daysWorked > 0 && ot > daysWorked * 24) {
+            showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
+            ok = false;
+        } else if (daysWorked === 0 && ot > 24) {
             showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
             ok = false;
         }
@@ -179,16 +207,13 @@
 
     document.getElementById('payPeriodStart').addEventListener('change', function () {
         syncPeriodBounds();
-        if (!isEdit) fillDaysFromPeriod();
+        fillAttendanceFromPeriod();
     });
     document.getElementById('payPeriodEnd').addEventListener('change', function () {
         syncPeriodBounds();
-        if (!isEdit) fillDaysFromPeriod();
+        fillAttendanceFromPeriod();
     });
     syncPeriodBounds();
-    if (!isEdit && !parseInt(document.getElementById('regularDaysWorked').value, 10)) {
-        fillDaysFromPeriod();
-    }
 
     slipForm.addEventListener('submit', async function (e) {
         e.preventDefault();
