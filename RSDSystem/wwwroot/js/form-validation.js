@@ -3,23 +3,16 @@
     const MI_RE = /^[A-Za-zÑñ]{1,2}$/;
     const PHONE_RE = /^09\d{9}$/;
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-<<<<<<< HEAD
     const ADDRESS_RE = new RegExp("^[A-Za-z0-9Ññ\\s,.\\-/#')(&]{5,250}$");
     const PROJECT_NAME_RE = new RegExp("^[A-Za-z0-9Ññ][A-Za-z0-9Ññ\\s.'\\-/&#()]{1,149}$");
-=======
-    const ADDRESS_RE = /^[A-Za-z0-9Ññ\s,.\-/#'()&]{5,250}$/;
->>>>>>> master
     const ALLOWED_PHOTO = ['image/jpeg', 'image/png', 'image/webp'];
     const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
     const MIN_AGE = 18;
     const MAX_AGE = 80;
-<<<<<<< HEAD
     const MIN_YEAR = 2000;
     const MAX_YEAR = 2099;
     const DATE_MIN = '2000-01-01';
     const DATE_MAX = '2099-12-31';
-=======
->>>>>>> master
 
     function ageFrom(isoDate) {
         if (!isoDate) return null;
@@ -32,7 +25,6 @@
         return age;
     }
 
-<<<<<<< HEAD
     function formatIsoDate(iso) {
         if (!iso) return '';
         const parts = iso.split('-');
@@ -40,8 +32,6 @@
         return parts[1] + '/' + parts[2] + '/' + parts[0];
     }
 
-=======
->>>>>>> master
     function valueOf(el) {
         if (!el) return '';
         if (el.type === 'file') return el.files && el.files.length ? el.files[0].name : '';
@@ -63,7 +53,6 @@
                 if (n <= 0) return label + ' must be greater than 0.';
                 continue;
             }
-<<<<<<< HEAD
             if (rule === 'nonNeg') {
                 const n = parseFloat(el.value);
                 if (el.value === '' || Number.isNaN(n)) return label + ' is required.';
@@ -80,8 +69,6 @@
                 if (parseInt(el.value, 10) < 1) return label + ' must be at least 1.';
                 continue;
             }
-=======
->>>>>>> master
             if (rule === 'match') {
                 const otherId = el.getAttribute('data-match');
                 const other = otherId ? document.getElementById(otherId) : null;
@@ -125,7 +112,6 @@
             if (rule === 'minlen8' && value.length < 8) {
                 return 'Password must be at least 8 characters.';
             }
-<<<<<<< HEAD
             if (rule === 'projectName' && !PROJECT_NAME_RE.test(value)) {
                 return 'Enter a valid project name.';
             }
@@ -153,8 +139,6 @@
                     return label + ' must be on or before ' + formatIsoDate(max) + '.';
                 }
             }
-=======
->>>>>>> master
         }
         return '';
     }
@@ -162,7 +146,9 @@
     function errorEl(field) {
         const name = field.getAttribute('name') || field.id;
         if (!name) return null;
-        return field.closest('form').querySelector('[data-error-for="' + name + '"]');
+        const form = field.closest('form');
+        if (!form) return null;
+        return form.querySelector('[data-error-for="' + name + '"]');
     }
 
     function show(field, message) {
@@ -206,7 +192,6 @@
         sync();
     }
 
-<<<<<<< HEAD
     function hasRule(el, rule) {
         return (el.getAttribute('data-validate') || '').split('|').indexOf(rule) !== -1;
     }
@@ -214,17 +199,12 @@
     function bindPhone(form) {
         form.querySelectorAll('[data-validate]').forEach(function (el) {
             if (!hasRule(el, 'phone')) return;
-=======
-    function bindPhone(form) {
-        form.querySelectorAll('[data-validate*="phone"]').forEach(function (el) {
->>>>>>> master
             el.addEventListener('input', function () {
                 el.value = el.value.replace(/\D/g, '').slice(0, 11);
             });
         });
     }
 
-<<<<<<< HEAD
     function applyDefaultDateBounds(el) {
         if (!el || el.type !== 'date' || hasRule(el, 'dob')) return;
         if (!el.min) el.min = DATE_MIN;
@@ -269,10 +249,6 @@
     function bindMi(form) {
         form.querySelectorAll('[data-validate]').forEach(function (el) {
             if (!hasRule(el, 'mi')) return;
-=======
-    function bindMi(form) {
-        form.querySelectorAll('[data-validate*="mi"]').forEach(function (el) {
->>>>>>> master
             el.addEventListener('input', function () {
                 el.value = el.value.replace(/[^A-Za-zÑñ]/g, '').slice(0, 2).toUpperCase();
             });
@@ -287,10 +263,7 @@
         bindAge(form);
         bindPhone(form);
         bindMi(form);
-<<<<<<< HEAD
         bindDateInputs(form);
-=======
->>>>>>> master
 
         form.addEventListener('submit', function (e) {
             if (!validateForm(form)) e.preventDefault();
@@ -305,26 +278,17 @@
                 if (field.classList.contains('is-invalid')) validateField(field);
             });
         });
-<<<<<<< HEAD
 
         form.querySelectorAll('[data-after]').forEach(function (field) {
             const other = document.getElementById(field.getAttribute('data-after') || '');
             if (other) other.addEventListener('change', function () { validateField(field); });
         });
-=======
->>>>>>> master
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('form.js-validate').forEach(initForm);
-<<<<<<< HEAD
         bindDateInputs(document);
     });
 
     window.RsdFormValidation = { init: initForm, validate: validateForm, sanitizeDate: sanitizeDateValue };
-=======
-    });
-
-    window.RsdFormValidation = { init: initForm, validate: validateForm };
->>>>>>> master
 })();

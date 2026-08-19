@@ -58,7 +58,6 @@ namespace RSDSystem.Models
         public string? Address { get; set; }
 
 
-        [Required(ErrorMessage = "Email is required.")]
         [MaxLength(100)]
         [EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string? Email { get; set; }
