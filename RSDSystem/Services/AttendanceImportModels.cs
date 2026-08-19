@@ -11,24 +11,9 @@ namespace RSDSystem.Services
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
         public List<AttendancePreviewRow> Rows { get; set; } = new();
-        public int ExtractedCount { get; set; }
+        public List<Employee> CandidateEmployees { get; set; } = new();
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
-        public int FilteredOutCount { get; set; }
-        public List<AttendanceFilteredPerson> FilteredPeople { get; set; } = new();
-        public List<string> ProjectEmployees { get; set; } = new();
-    }
-
-    public class AttendanceFilteredPerson
-    {
-        public string ExternalUserId { get; set; } = "";
-        public string EmployeeName { get; set; } = "";
-    }
-
-    public class AttendanceProjectRoster
-    {
-        public Project Project { get; set; } = null!;
-        public List<Employee> Employees { get; set; } = new();
     }
 
     public class AttendancePreviewRow
@@ -37,6 +22,7 @@ namespace RSDSystem.Services
         public string DisplayId { get; set; } = "";
         public string ExternalUserId { get; set; } = "";
         public string EmployeeName { get; set; } = "";
+        public string? MatchedEmployeeName { get; set; }
         public DateTime? WorkDate { get; set; }
         public string? TimeIn1 { get; set; }
         public string? TimeOut1 { get; set; }
@@ -68,6 +54,14 @@ namespace RSDSystem.Services
         public string? OvertimeOut { get; set; }
     }
 
+    public class AttendanceManualMatch
+    {
+        public string? ExternalUserId { get; set; }
+        public string? EmployeeName { get; set; }
+        public DateTime WorkDate { get; set; }
+        public int EmployeeId { get; set; }
+    }
+
     public class AttendanceImportResult
     {
         public string? Error { get; set; }
@@ -81,7 +75,6 @@ namespace RSDSystem.Services
         public int RowCount { get; set; }
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
-        public int FilteredOutCount { get; set; }
         public bool ReplacedPrevious { get; set; }
     }
 }

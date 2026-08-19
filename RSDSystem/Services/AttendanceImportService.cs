@@ -31,15 +31,6 @@ namespace RSDSystem.Services
             }
 
             var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
-            if (employees.Count == 0)
-            {
-                return new AttendancePreviewResult
-                {
-                    Error = "This project has no assigned employees. Assign employees before importing attendance.",
-                    Project = project
-                };
-            }
-
             var parsed = AttendanceFileParser.Parse(file, fileName);
             if (parsed.Error != null)
             {
@@ -47,9 +38,10 @@ namespace RSDSystem.Services
             }
 
             await ApplyAdminTaskWindowAsync(project.ProjectId, parsed, cancellationToken);
-            var mapped = MapRows(parsed, employees);
-            var kept = mapped.Where(r => r.Matched).ToList();
-            var filtered = DistinctPeople(mapped.Where(r => !r.Matched));
+
+            // Extract the raw rows first, unmatched — matching is applied on top of that raw data.
+            var rows = MapRows(parsed, employees);
+
             return new AttendancePreviewResult
             {
                 Project = project,
@@ -57,35 +49,10 @@ namespace RSDSystem.Services
                 Format = parsed.Format,
                 PeriodStart = parsed.PeriodStart,
                 PeriodEnd = parsed.PeriodEnd,
-                Rows = kept,
-                ExtractedCount = mapped.Count,
-                MatchedCount = kept.Count,
-                UnmatchedCount = mapped.Count - kept.Count,
-                FilteredOutCount = filtered.Count,
-                FilteredPeople = filtered,
-                ProjectEmployees = employees
-                    .OrderBy(e => e.LastName)
-                    .ThenBy(e => e.FirstName)
-                    .Select(e => e.FullName)
-                    .ToList()
-            };
-        }
-
-        public async Task<AttendanceProjectRoster?> GetRosterAsync(
-            int? projectId,
-            string? projectName,
-            string? assignedStaff,
-            CancellationToken cancellationToken = default)
-        {
-            var project = await ResolveProjectAsync(projectId, projectName, assignedStaff, cancellationToken);
-            if (project == null)
-                return null;
-
-            var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
-            return new AttendanceProjectRoster
-            {
-                Project = project,
-                Employees = employees
+                Rows = rows,
+                CandidateEmployees = employees,
+                MatchedCount = rows.Count(r => r.Matched),
+                UnmatchedCount = rows.Count(r => !r.Matched)
             };
         }
 
@@ -98,6 +65,7 @@ namespace RSDSystem.Services
             string source,
             string? assignedStaff,
             string? overridesJson = null,
+            string? manualMatchesJson = null,
             CancellationToken cancellationToken = default)
         {
             using var buffer = new MemoryStream();
@@ -105,25 +73,20 @@ namespace RSDSystem.Services
             buffer.Position = 0;
 
             var preview = await PreviewAsync(projectId, projectName, buffer, fileName, assignedStaff, cancellationToken);
+
+            // Apply staff-chosen matches for rows the auto-matcher could not resolve,
+            // then apply any punch-time edits made in the preview.
+            ApplyManualMatches(preview.Rows, manualMatchesJson, preview.CandidateEmployees);
             ApplyOverrides(preview.Rows, overridesJson);
+
             if (preview.Error != null || preview.Project == null)
             {
                 return new AttendanceImportResult { Error = preview.Error ?? "Import failed." };
             }
 
-            if (preview.ExtractedCount == 0)
-            {
-                return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
-            }
-
             if (preview.Rows.Count == 0)
             {
-                return new AttendanceImportResult
-                {
-                    Error = "None of the people in this file are assigned to "
-                        + preview.Project.ProjectName
-                        + ". Assign them to the project or import under the correct project."
-                };
+                return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
             }
 
             try
@@ -163,7 +126,9 @@ namespace RSDSystem.Services
                 {
                     EmployeeId = row.EmployeeId,
                     ExternalUserId = Clip(row.ExternalUserId, 40) ?? "",
-                    EmployeeName = Clip(row.EmployeeName, 150) ?? "",
+                    // Store the matched system name when we have one; otherwise keep the raw file name
+                    // so unmatched rows are still traceable in Attendance Records.
+                    EmployeeName = Clip(row.MatchedEmployeeName ?? row.EmployeeName, 150) ?? "",
                     WorkDate = row.WorkDate,
                     PeriodStart = preview.PeriodStart,
                     PeriodEnd = preview.PeriodEnd,
@@ -204,9 +169,8 @@ namespace RSDSystem.Services
                 PeriodStart = preview.PeriodStart,
                 PeriodEnd = preview.PeriodEnd,
                 RowCount = preview.Rows.Count,
-                MatchedCount = preview.MatchedCount,
-                UnmatchedCount = preview.UnmatchedCount,
-                FilteredOutCount = preview.FilteredOutCount,
+                MatchedCount = preview.Rows.Count(r => r.Matched),
+                UnmatchedCount = preview.Rows.Count(r => !r.Matched),
                 ReplacedPrevious = replaced
             };
         }
@@ -228,7 +192,14 @@ namespace RSDSystem.Services
             if (!string.IsNullOrWhiteSpace(status) &&
                 !string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(r => r.Status == status);
+                if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(r => !r.Matched);
+                }
+                else
+                {
+                    query = query.Where(r => r.Status == status);
+                }
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -576,31 +547,18 @@ namespace RSDSystem.Services
 
         private async Task<List<Employee>> LoadMatchPoolAsync(int projectId, CancellationToken cancellationToken)
         {
-            return await _db.Employees
+            var projectEmployees = await _db.Employees
                 .AsNoTracking()
                 .Where(e => e.ProjectId == projectId)
-                .OrderBy(e => e.LastName)
-                .ThenBy(e => e.FirstName)
                 .ToListAsync(cancellationToken);
+
+            return projectEmployees.Count > 0
+                ? projectEmployees
+                : await _db.Employees.AsNoTracking().ToListAsync(cancellationToken);
         }
 
-        private static List<AttendanceFilteredPerson> DistinctPeople(IEnumerable<AttendancePreviewRow> rows)
-        {
-            return rows
-                .GroupBy(r => (
-                    User: (r.ExternalUserId ?? "").Trim().ToLowerInvariant(),
-                    Name: (r.EmployeeName ?? "").Trim().ToLowerInvariant()
-                ))
-                .Select(g => new AttendanceFilteredPerson
-                {
-                    ExternalUserId = g.First().ExternalUserId,
-                    EmployeeName = g.First().EmployeeName
-                })
-                .OrderBy(p => p.EmployeeName)
-                .ThenBy(p => p.ExternalUserId)
-                .ToList();
-        }
-
+        // Extracts every row from the file exactly as it appears (raw name / raw ID),
+        // and separately records whether the auto-matcher found a system employee for it.
         private static List<AttendancePreviewRow> MapRows(AttendanceParseResult parsed, IReadOnlyList<Employee> employees)
         {
             var rows = new List<AttendancePreviewRow>();
@@ -614,10 +572,12 @@ namespace RSDSystem.Services
                 rows.Add(new AttendancePreviewRow
                 {
                     EmployeeId = employeeId,
-                    DisplayId = AttendanceDisplay.EmployeeId(
-                        employee?.EmployeeCode ?? row.ExternalUserId),
+                    // Raw, unfiltered values exactly as extracted from the uploaded file.
+                    DisplayId = string.IsNullOrWhiteSpace(row.ExternalUserId) ? "" : row.ExternalUserId.Trim(),
                     ExternalUserId = row.ExternalUserId,
-                    EmployeeName = employee?.FullName ?? row.EmployeeName,
+                    EmployeeName = string.IsNullOrWhiteSpace(row.EmployeeName) ? "" : row.EmployeeName.Trim(),
+                    // Populated only when the auto-matcher (or a manual match) resolves a system employee.
+                    MatchedEmployeeName = employee?.FullName,
                     WorkDate = row.WorkDate ?? parsed.PeriodStart,
                     TimeIn1 = row.TimeIn1,
                     TimeOut1 = row.TimeOut1,
@@ -635,11 +595,56 @@ namespace RSDSystem.Services
                         ? AttendanceFileParser.DeriveStatus(row)
                         : row.Status,
                     Matched = employeeId.HasValue,
-                    Note = employeeId.HasValue ? null : "No matching employee on this project."
+                    Note = employeeId.HasValue
+                        ? null
+                        : "This name does not match any employee in the system. Select the correct employee to match this record."
                 });
             }
 
             return rows;
+        }
+
+        // Applies staff-selected matches (from the "Select employee" dropdown in the preview)
+        // onto the raw rows before saving.
+        private static void ApplyManualMatches(
+            List<AttendancePreviewRow> rows, string? manualMatchesJson, IReadOnlyList<Employee> employees)
+        {
+            if (string.IsNullOrWhiteSpace(manualMatchesJson) || rows.Count == 0)
+                return;
+
+            List<AttendanceManualMatch>? matches;
+            try
+            {
+                matches = System.Text.Json.JsonSerializer.Deserialize<List<AttendanceManualMatch>>(
+                    manualMatchesJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return;
+            }
+
+            if (matches == null || matches.Count == 0)
+                return;
+
+            foreach (var m in matches)
+            {
+                var employee = employees.FirstOrDefault(e => e.EmployeeId == m.EmployeeId);
+                if (employee == null)
+                    continue;
+
+                var date = m.WorkDate.Date;
+                var row = rows.FirstOrDefault(r =>
+                    r.WorkDate?.Date == date &&
+                    string.Equals(r.ExternalUserId, m.ExternalUserId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(r.EmployeeName, m.EmployeeName, StringComparison.OrdinalIgnoreCase));
+                if (row == null)
+                    continue;
+
+                row.EmployeeId = employee.EmployeeId;
+                row.Matched = true;
+                row.MatchedEmployeeName = employee.FullName;
+                row.Note = null;
+            }
         }
 
         private static void ApplyOverrides(List<AttendancePreviewRow> rows, string? overridesJson)
