@@ -32,6 +32,7 @@ builder.Services.AddDbContext<PayrollDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<AttendanceImportService>();
+builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient("PayrollPrediction", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(8);
@@ -167,7 +168,16 @@ END");
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Attendance table create error: " + ex.Message);
+            Console.WriteLine("Attendance schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            NotificationSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Notification schema fix error: " + ex.Message);
         }
 
         var toAdd = new List<User>();

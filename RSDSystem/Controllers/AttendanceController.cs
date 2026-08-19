@@ -13,11 +13,13 @@ namespace RSDSystem.Controllers
 
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _imports;
+        private readonly NotificationService _notifications;
 
-        public AttendanceController(PayrollDbContext db, AttendanceImportService imports)
+        public AttendanceController(PayrollDbContext db, AttendanceImportService imports, NotificationService notifications)
         {
             _db = db;
             _imports = imports;
+            _notifications = notifications;
         }
 
         public async Task<IActionResult> Import()
@@ -115,6 +117,11 @@ namespace RSDSystem.Controllers
                 if (result.Error != null)
                     return Json(new { success = false, message = result.Error });
 
+                var importedProject = await _db.Projects.AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.ProjectId == result.ProjectId, HttpContext.RequestAborted);
+                if (importedProject != null)
+                    await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
+
                 return Json(new
                 {
                     success = true,
@@ -179,6 +186,16 @@ namespace RSDSystem.Controllers
             var importedBy = rows.Select(r => r.Import?.ImportedBy)
                 .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
 
+            var recordIds = rows.Select(r => r.AttendanceRecordId).ToList();
+            var pendingIds = recordIds.Count == 0
+                ? new HashSet<int>()
+                : (await _db.AttendanceCorrectionRequests.AsNoTracking()
+                    .Where(c => recordIds.Contains(c.AttendanceRecordId)
+                        && c.Status == CorrectionRequestStatuses.Pending)
+                    .Select(c => c.AttendanceRecordId)
+                    .ToListAsync(HttpContext.RequestAborted))
+                    .ToHashSet();
+
             return Json(new
             {
                 success = true,
@@ -215,7 +232,7 @@ namespace RSDSystem.Controllers
                     Status = r.Status,
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
-                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt))
+                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt, pendingIds.Contains(r.AttendanceRecordId)))
             });
         }
 
@@ -322,6 +339,20 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
+            var record = await _db.AttendanceRecords.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
+            if (record == null)
+                return Json(new { success = false, message = "Attendance row not found." });
+
+            if (!IsAdmin && record.Status == AttendanceStatuses.Complete)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Complete attendance needs an admin-reviewed correction request."
+                });
+            }
+
             var error = await _imports.UpdateRecordAsync(
                 recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, status,
                 HttpContext.RequestAborted);
@@ -329,6 +360,83 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = error });
 
             return Json(new { success = true, message = "Attendance row updated." });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RequestCorrection(
+            int recordId,
+            string? timeIn1,
+            string? timeOut1,
+            string? timeIn2,
+            string? timeOut2,
+            string? overtimeIn,
+            string? overtimeOut,
+            string? reason)
+        {
+            if (IsAdmin)
+            {
+                var direct = await _imports.UpdateRecordAsync(
+                    recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, null,
+                    HttpContext.RequestAborted);
+                if (direct != null)
+                    return Json(new { success = false, message = direct });
+                return Json(new { success = true, message = "Attendance row updated." });
+            }
+
+            var note = (reason ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(note))
+                return Json(new { success = false, message = "Enter a reason for this correction request." });
+
+            var record = await _db.AttendanceRecords
+                .Include(r => r.Employee)
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
+            if (record == null)
+                return Json(new { success = false, message = "Attendance row not found." });
+
+            var pending = await _db.AttendanceCorrectionRequests
+                .FirstOrDefaultAsync(c => c.AttendanceRecordId == recordId
+                    && c.Status == CorrectionRequestStatuses.Pending);
+            if (pending == null)
+            {
+                pending = new AttendanceCorrectionRequest
+                {
+                    AttendanceRecordId = record.AttendanceRecordId,
+                    ProjectId = record.ProjectId,
+                    EmployeeId = record.EmployeeId,
+                    CreatedAt = DateTime.Now
+                };
+                _db.AttendanceCorrectionRequests.Add(pending);
+            }
+
+            pending.EmployeeName = record.Employee?.FullName ?? record.EmployeeName;
+            pending.PayrollStaffName = ImportedBy();
+            pending.WorkDate = record.WorkDate;
+            pending.TimeIn1 = timeIn1;
+            pending.TimeOut1 = timeOut1;
+            pending.TimeIn2 = timeIn2;
+            pending.TimeOut2 = timeOut2;
+            pending.OvertimeIn = overtimeIn;
+            pending.OvertimeOut = overtimeOut;
+            pending.Reason = note;
+            pending.Status = CorrectionRequestStatuses.Pending;
+            pending.ReturnReason = null;
+            pending.ReviewedAt = null;
+            await _db.SaveChangesAsync();
+
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == record.ProjectId);
+            var projectName = string.IsNullOrWhiteSpace(project?.ProjectName) ? "the project" : project!.ProjectName!.Trim();
+            await _notifications.NotifyAdminsAsync(
+                NotificationKinds.AttendanceCorrectionRequest,
+                "Attendance Correction Request",
+                $"Payroll Staff requested to correct Employee: {pending.EmployeeName} attendance record(s) for {projectName}",
+                record.ProjectId,
+                pending.AttendanceCorrectionRequestId,
+                "/Notification/Index",
+                HttpContext.RequestAborted);
+
+            return Json(new { success = true, message = "Correction request sent to admin." });
         }
 
         private async Task<List<Project>> LoadProjectsAsync()
@@ -392,39 +500,49 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null) => new
+        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
         {
-            recordId,
-            row.EmployeeId,
-            // Raw extracted values (name / ID exactly as found in the file).
-            row.DisplayId,
-            row.ExternalUserId,
-            row.EmployeeName,
-            // Only set once the row is matched (auto or manual) to a system employee.
-            matchedEmployeeName = row.MatchedEmployeeName,
-            workDate = AttendanceDisplay.LongDate(row.WorkDate),
-            workDateIso = row.WorkDate?.ToString("yyyy-MM-dd"),
-            timeIn1 = AttendanceDisplay.Clock(row.TimeIn1),
-            timeOut1 = AttendanceDisplay.Clock(row.TimeOut1),
-            timeIn2 = AttendanceDisplay.Clock(row.TimeIn2),
-            timeOut2 = AttendanceDisplay.Clock(row.TimeOut2),
-            overtimeIn = AttendanceDisplay.Clock(row.OvertimeIn),
-            overtimeOut = AttendanceDisplay.Clock(row.OvertimeOut),
-            row.WorkHoursNormal,
-            row.WorkHoursActual,
-            row.LateMinutes,
-            row.EarlyMinutes,
-            row.OvertimeHours,
-            row.AbsenceDays,
-            row.Status,
-            statusClass = AttendanceStatuses.CssClass(row.Status),
-            row.Matched,
-            row.Note,
-            format,
-            importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
-            actionLabel = AttendanceStatuses.CountsAsWorked(row.Status) && row.Status == AttendanceStatuses.Complete
-                ? "Request Edit"
-                : "Edit"
-        };
+            var requestEdit = AttendanceStatuses.CountsAsWorked(row.Status) && row.Status == AttendanceStatuses.Complete;
+            string actionLabel;
+            if (pendingCorrection)
+                actionLabel = "Pending Review";
+            else if (requestEdit)
+                actionLabel = "Request Edit";
+            else
+                actionLabel = "Edit";
+
+            return new
+            {
+                recordId,
+                row.EmployeeId,
+                row.DisplayId,
+                row.ExternalUserId,
+                row.EmployeeName,
+                matchedEmployeeName = row.MatchedEmployeeName,
+                workDate = AttendanceDisplay.LongDate(row.WorkDate),
+                workDateIso = row.WorkDate?.ToString("yyyy-MM-dd"),
+                timeIn1 = AttendanceDisplay.Clock(row.TimeIn1),
+                timeOut1 = AttendanceDisplay.Clock(row.TimeOut1),
+                timeIn2 = AttendanceDisplay.Clock(row.TimeIn2),
+                timeOut2 = AttendanceDisplay.Clock(row.TimeOut2),
+                overtimeIn = AttendanceDisplay.Clock(row.OvertimeIn),
+                overtimeOut = AttendanceDisplay.Clock(row.OvertimeOut),
+                row.WorkHoursNormal,
+                row.WorkHoursActual,
+                row.LateMinutes,
+                row.EarlyMinutes,
+                row.OvertimeHours,
+                row.AbsenceDays,
+                row.Status,
+                statusClass = AttendanceStatuses.CssClass(row.Status),
+                row.Matched,
+                row.Note,
+                format,
+                importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
+                actionLabel,
+                pendingCorrection,
+                requestEdit
+            };
+        }
     }
 }

@@ -1,0 +1,157 @@
+@using RSDSystem.Models
+@{
+    ViewData["Title"] = "Reports";
+    var reportTypes = ViewBag.ReportTypes as string[] ?? Array.Empty<string>();
+    var projects = ViewBag.Projects as List<Project> ?? new List<Project>();
+}
+
+<div class="content-topbar">
+    <a asp-controller="Home" asp-action="Index" class="btn-back" style="margin-bottom:0">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card report-page-card">
+    <div class="report-page-title">Reports</div>
+
+    <div class="report-form">
+        <label class="form-lbl">Report Type</label>
+        <select id="reportType" class="form-ctrl">
+            @foreach (var type in reportTypes)
+            {
+                <option value="@type">@type</option>
+            }
+        </select>
+
+        <label class="form-lbl">Project Name</label>
+        <select id="reportProject" class="form-ctrl">
+            <option value="">Select project</option>
+            @foreach (var p in projects)
+            {
+                <option value="@p.ProjectId">@p.ProjectName</option>
+            }
+        </select>
+
+        <label class="form-lbl">Payroll Period</label>
+        <select id="reportPeriod" class="form-ctrl">
+            <option value="">Select a project first</option>
+        </select>
+
+        <button type="button" id="generateReportBtn" class="btn-primary-blue-solid report-generate-btn">Generate Report</button>
+    </div>
+
+    <div id="reportPreview" class="report-preview" hidden></div>
+
+    <div class="report-bottom-actions">
+        <button type="button" id="downloadPdfBtn" class="report-download-btn">Download PDF</button>
+        <button type="button" id="printReportBtn" class="report-print-btn">Print Report</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const typeEl = document.getElementById('reportType');
+        const projectEl = document.getElementById('reportProject');
+        const periodEl = document.getElementById('reportPeriod');
+        const preview = document.getElementById('reportPreview');
+        let lastQuery = null;
+
+        function needsPeriod() {
+            const type = typeEl.value;
+            return type !== 'Payroll Prediction Report' && type !== 'Payroll Anomaly Report';
+        }
+
+        async function loadPeriods() {
+            periodEl.innerHTML = '<option value="">Loading periods...</option>';
+            if (!projectEl.value) {
+                periodEl.innerHTML = '<option value="">Select a project first</option>';
+                return;
+            }
+            try {
+                const res = await fetch('/Report/Periods?projectId=' + encodeURIComponent(projectEl.value), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (!data.success || !data.periods.length) {
+                    periodEl.innerHTML = '<option value="">No periods found</option>';
+                    return;
+                }
+                periodEl.innerHTML = data.periods.map(p =>
+                    `<option value="${p.start}|${p.end}">${p.label}</option>`
+                ).join('');
+            } catch (err) {
+                periodEl.innerHTML = '<option value="">Could not load periods</option>';
+            }
+        }
+
+        function selectedPeriod() {
+            const value = periodEl.value;
+            if (!value || !value.includes('|')) return null;
+            const parts = value.split('|');
+            return { start: parts[0], end: parts[1] };
+        }
+
+        function queryString() {
+            const period = selectedPeriod();
+            const params = new URLSearchParams({
+                reportType: typeEl.value,
+                projectId: projectEl.value || '0'
+            });
+            if (period) {
+                params.set('periodStart', period.start);
+                params.set('periodEnd', period.end);
+            }
+            return params.toString();
+        }
+
+        async function generateReport() {
+            if (!projectEl.value) {
+                alert('Select a project first.');
+                return;
+            }
+            if (needsPeriod() && !selectedPeriod()) {
+                alert('Select a payroll period first.');
+                return;
+            }
+
+            preview.hidden = false;
+            preview.innerHTML = '<div class="text-muted">Generating report...</div>';
+            try {
+                const res = await fetch('/Report/Generate?' + queryString(), {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    preview.innerHTML = '<div class="text-danger">' + (data.message || 'Could not generate the report.') + '</div>';
+                    lastQuery = null;
+                    return;
+                }
+                lastQuery = queryString();
+                preview.innerHTML = data.html;
+            } catch (err) {
+                preview.innerHTML = '<div class="text-danger">Could not generate the report.</div>';
+                lastQuery = null;
+            }
+        }
+
+        function openPrint() {
+            if (!lastQuery) {
+                generateReport().then(function () {
+                    if (lastQuery) window.open('/Report/Print?' + lastQuery, '_blank');
+                });
+                return;
+            }
+            window.open('/Report/Print?' + lastQuery, '_blank');
+        }
+
+        projectEl.addEventListener('change', loadPeriods);
+        typeEl.addEventListener('change', function () {
+            periodEl.disabled = !needsPeriod();
+        });
+        document.getElementById('generateReportBtn').addEventListener('click', generateReport);
+        document.getElementById('printReportBtn').addEventListener('click', openPrint);
+        document.getElementById('downloadPdfBtn').addEventListener('click', openPrint);
+        periodEl.disabled = !needsPeriod();
+    </script>
+}
