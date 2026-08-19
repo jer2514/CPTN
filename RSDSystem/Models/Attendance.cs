@@ -43,6 +43,8 @@ namespace RSDSystem.Models
         public int AttendanceImportId { get; set; }
         public AttendanceImport? Import { get; set; }
 
+        public int ProjectId { get; set; }
+
         public int? EmployeeId { get; set; }
         public Employee? Employee { get; set; }
 
