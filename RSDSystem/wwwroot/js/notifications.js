@@ -126,7 +126,7 @@
     }
 
     async function openCorrectionModal(id) {
-        const overlay = document.getElementById('correctionOverlay');
+        const overlay = document.getElementById('attendanceCorrectionOverlay');
         if (!overlay) {
             window.location.href = '/Notification';
             return;
@@ -202,7 +202,7 @@
         });
     }
 
-    const overlay = document.getElementById('correctionOverlay');
+    const overlay = document.getElementById('attendanceCorrectionOverlay');
     if (overlay) {
         overlay.addEventListener('click', function (e) {
             if (e.target === overlay) overlay.classList.remove('open');
