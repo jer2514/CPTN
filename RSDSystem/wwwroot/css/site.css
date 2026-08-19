@@ -2949,6 +2949,11 @@ button.badge-btn {
     color: #8a6d00;
 }
 
+.att-status-early {
+    background: #e4d7ff;
+    color: #5b3cc4;
+}
+
 .att-status-absent {
     background: #ffc9c9;
     color: #b42318;

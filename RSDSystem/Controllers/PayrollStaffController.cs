@@ -567,6 +567,12 @@ namespace RSDSystem.Controllers
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
+             if (payroll.Status == PayrollStatusOptions.Submitted ||
+                 payroll.Status == PayrollStatusOptions.Approved)
+             {
+                 return Json(new { success = false, message = "Submitted or approved payroll cannot be changed." });
+             }
+
              payroll.Status = PayrollStatusOptions.Submitted;
              await _db.SaveChangesAsync();
 
@@ -581,6 +587,12 @@ namespace RSDSystem.Controllers
             var payroll = await _db.Set<Payroll>().FindAsync(id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
+
+            if (payroll.Status == PayrollStatusOptions.Submitted ||
+                payroll.Status == PayrollStatusOptions.Approved)
+            {
+                return Json(new { success = false, message = "Submitted or approved payroll cannot be deleted." });
+            }
 
             _db.Set<Payroll>().Remove(payroll);
             await _db.SaveChangesAsync();

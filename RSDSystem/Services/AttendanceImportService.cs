@@ -193,7 +193,7 @@ namespace RSDSystem.Services
             CancellationToken cancellationToken = default)
         {
             var query = RecordsForProject(projectId);
-            query = ApplyRecordFilters(query, search, status, periodStart, periodEnd);
+            query = ApplyRecordFilters(query, search, null, periodStart, periodEnd);
 
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 5, 100);
@@ -205,6 +205,17 @@ namespace RSDSystem.Services
                 .ToListAsync(cancellationToken);
 
             var rows = DeduplicateStoredRows(all);
+            foreach (var row in rows)
+                AttendanceRules.Apply(row);
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                !string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => !r.Matched).ToList();
+                else
+                    rows = rows.Where(r => AttendanceStatuses.MatchesFilter(r.Status, status)).ToList();
+            }
 
             var total = rows.Count;
             return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(), total);
@@ -288,6 +299,8 @@ namespace RSDSystem.Services
             var query = ApplyRecordFilters(
                 RecordsForProject(projectId), search, null, periodStart, periodEnd);
             var all = DeduplicateStoredRows(await query.ToListAsync(cancellationToken));
+            foreach (var row in all)
+                AttendanceRules.Apply(row);
 
             var groups = all
                 .GroupBy(r => r.EmployeeId.HasValue
@@ -348,6 +361,9 @@ namespace RSDSystem.Services
             var rows = DeduplicateStoredRows(await query.ToListAsync(cancellationToken));
             if (rows.Count == 0)
                 return null;
+
+            foreach (var row in rows)
+                AttendanceRules.Apply(row);
 
             return ToEmployeeSummary(rows);
         }
@@ -461,10 +477,9 @@ namespace RSDSystem.Services
                 DisplayId = AttendanceDisplay.EmployeeId(first.Employee?.EmployeeCode ?? first.ExternalUserId),
                 EmployeeName = first.Employee?.FullName ?? first.EmployeeName,
                 Matched = rows.Any(r => r.Matched),
-                DaysWorked = rows.Count(r =>
-                    r.Status is AttendanceStatuses.Complete or AttendanceStatuses.Late),
+                DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
-                DaysLate = rows.Count(r => r.Status == AttendanceStatuses.Late),
+                DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => r.Status == AttendanceStatuses.Incomplete),
                 RegularHours = rows.Sum(DayRegularHours),
                 OvertimeHours = rows.Sum(DayOvertimeHours)
@@ -475,14 +490,15 @@ namespace RSDSystem.Services
         {
             if (row.WorkHoursActual > 0)
                 return row.WorkHoursActual;
-            return AttendanceDisplay.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
+            return AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
         }
 
         private static decimal DayOvertimeHours(AttendanceRecord row)
         {
             if (row.OvertimeHours > 0)
                 return row.OvertimeHours;
-            return AttendanceDisplay.OvertimeHours(row.OvertimeIn, row.OvertimeOut);
+            return AttendanceRules.OvertimeHours(
+                row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
         }
 
         private static string PeriodKey(DateTime start, DateTime end) =>
@@ -633,21 +649,7 @@ namespace RSDSystem.Services
             record.TimeOut2 = EmptyToNull(timeOut2);
             record.OvertimeIn = EmptyToNull(overtimeIn);
             record.OvertimeOut = EmptyToNull(overtimeOut);
-            record.WorkHoursActual = AttendanceDisplay.RegularHours(
-                record.TimeIn1, record.TimeOut1, record.TimeIn2, record.TimeOut2);
-            record.OvertimeHours = AttendanceDisplay.OvertimeHours(record.OvertimeIn, record.OvertimeOut);
-            record.LateMinutes = LateMinutesFrom(record.TimeIn1);
-
-            if (!string.IsNullOrWhiteSpace(status) &&
-                AttendanceStatuses.All.Contains(status.Trim(), StringComparer.OrdinalIgnoreCase))
-            {
-                record.Status = AttendanceStatuses.All.First(s =>
-                    s.Equals(status.Trim(), StringComparison.OrdinalIgnoreCase));
-            }
-            else
-            {
-                record.Status = AttendanceFileParser.DeriveStatus(record);
-            }
+            AttendanceRules.Apply(record);
 
             await _db.SaveChangesAsync(cancellationToken);
             return null;
@@ -701,6 +703,8 @@ namespace RSDSystem.Services
             for (var day = periodStart; day <= periodEnd; day = day.AddDays(1))
             {
                 byDate.TryGetValue(day, out var row);
+                if (row != null)
+                    AttendanceRules.Apply(row);
                 edit.Days.Add(new AttendanceDayEdit
                 {
                     RecordId = row?.AttendanceRecordId ?? 0,
@@ -712,14 +716,15 @@ namespace RSDSystem.Services
                     OvertimeIn = AttendanceDisplay.HtmlTime(row?.OvertimeIn),
                     OvertimeOut = AttendanceDisplay.HtmlTime(row?.OvertimeOut),
                     Status = row?.Status ?? AttendanceStatuses.Absent,
-                    RegularHours = AttendanceDisplay.RegularHours(row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2),
-                    OvertimeHours = AttendanceDisplay.OvertimeHours(row?.OvertimeIn, row?.OvertimeOut)
+                    RegularHours = AttendanceRules.RegularHours(row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2),
+                    OvertimeHours = AttendanceRules.OvertimeHours(
+                        row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2, row?.OvertimeIn, row?.OvertimeOut)
                 });
             }
 
-            edit.DaysWorked = edit.Days.Count(d => d.Status is AttendanceStatuses.Complete or AttendanceStatuses.Late);
+            edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsWorked(d.Status));
             edit.DaysAbsent = edit.Days.Count(d => d.Status == AttendanceStatuses.Absent);
-            edit.DaysLate = edit.Days.Count(d => d.Status == AttendanceStatuses.Late);
+            edit.DaysLate = edit.Days.Count(d => AttendanceStatuses.CountsAsLate(d.Status));
             edit.DaysIncomplete = edit.Days.Count(d => d.Status == AttendanceStatuses.Incomplete);
             edit.RegularHours = edit.Days.Sum(d => d.RegularHours);
             edit.OvertimeHours = edit.Days.Sum(d => d.OvertimeHours);
@@ -778,11 +783,7 @@ namespace RSDSystem.Services
                 record.TimeOut2 = EmptyToNull(day.TimeOut2);
                 record.OvertimeIn = EmptyToNull(day.OvertimeIn);
                 record.OvertimeOut = EmptyToNull(day.OvertimeOut);
-                record.WorkHoursActual = AttendanceDisplay.RegularHours(
-                    record.TimeIn1, record.TimeOut1, record.TimeIn2, record.TimeOut2);
-                record.OvertimeHours = AttendanceDisplay.OvertimeHours(record.OvertimeIn, record.OvertimeOut);
-                record.LateMinutes = LateMinutesFrom(record.TimeIn1);
-                record.Status = AttendanceFileParser.DeriveStatus(record);
+                AttendanceRules.Apply(record);
             }
 
             await _db.SaveChangesAsync(cancellationToken);
@@ -906,6 +907,8 @@ namespace RSDSystem.Services
                     ? employees.FirstOrDefault(e => e.EmployeeId == employeeId.Value)
                     : null;
 
+                AttendanceRules.Apply(row);
+
                 rows.Add(new AttendancePreviewRow
                 {
                     EmployeeId = employeeId,
@@ -929,9 +932,7 @@ namespace RSDSystem.Services
                     EarlyMinutes = row.EarlyMinutes,
                     OvertimeHours = row.OvertimeHours,
                     AbsenceDays = row.AbsenceDays,
-                    Status = string.IsNullOrWhiteSpace(row.Status)
-                        ? AttendanceFileParser.DeriveStatus(row)
-                        : row.Status,
+                    Status = row.Status,
                     Matched = employeeId.HasValue,
                     Note = employeeId.HasValue
                         ? null
@@ -1020,11 +1021,7 @@ namespace RSDSystem.Services
                 row.TimeOut2 = EmptyToNull(edit.TimeOut2);
                 row.OvertimeIn = EmptyToNull(edit.OvertimeIn);
                 row.OvertimeOut = EmptyToNull(edit.OvertimeOut);
-                row.WorkHoursActual = AttendanceDisplay.RegularHours(
-                    row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
-                row.OvertimeHours = AttendanceDisplay.OvertimeHours(row.OvertimeIn, row.OvertimeOut);
-                row.LateMinutes = LateMinutesFrom(row.TimeIn1);
-                row.Status = AttendanceFileParser.DeriveStatus(new AttendanceRecord
+                var computed = new AttendanceRecord
                 {
                     TimeIn1 = row.TimeIn1,
                     TimeOut1 = row.TimeOut1,
@@ -1032,9 +1029,14 @@ namespace RSDSystem.Services
                     TimeOut2 = row.TimeOut2,
                     OvertimeIn = row.OvertimeIn,
                     OvertimeOut = row.OvertimeOut,
-                    WorkHoursActual = row.WorkHoursActual,
-                    LateMinutes = row.LateMinutes
-                });
+                    WorkHoursActual = row.WorkHoursActual
+                };
+                AttendanceRules.Apply(computed);
+                row.WorkHoursActual = computed.WorkHoursActual;
+                row.OvertimeHours = computed.OvertimeHours;
+                row.LateMinutes = computed.LateMinutes;
+                row.EarlyMinutes = computed.EarlyMinutes;
+                row.Status = computed.Status;
             }
         }
 
@@ -1044,14 +1046,6 @@ namespace RSDSystem.Services
             if (text.Length == 0 || text == "—" || text == "——")
                 return null;
             return text;
-        }
-
-        private static int LateMinutesFrom(string? timeIn)
-        {
-            if (!AttendanceDisplay.TryParseTime(timeIn, out var firstIn) || firstIn <= new TimeSpan(8, 15, 0))
-                return 0;
-
-            return Math.Max(0, (int)(firstIn - new TimeSpan(8, 0, 0)).TotalMinutes);
         }
 
         private static string DescribeSaveError(Exception ex)

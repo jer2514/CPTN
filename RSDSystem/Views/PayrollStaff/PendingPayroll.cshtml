@@ -156,16 +156,19 @@
         }
 
         // Draft / Correction -> Submit, View, Delete
-        // Submitted / Approved / other -> View, Delete
+        // Submitted / Approved -> View only
         function actionButtons(p) {
+            const status = (p.status || '').trim();
             let btns = '';
 
-            if (p.status === 'Draft' || p.status === 'Correction') {
+            if (status === 'Draft' || status === 'Correction') {
                 btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
             }
 
             btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-            btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            if (status === 'Draft' || status === 'Correction') {
+                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            }
             return btns;
         }
 

@@ -312,7 +312,7 @@ namespace RSDSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult UpdateRecord(
+        public async Task<IActionResult> UpdateRecord(
             int recordId,
             string? timeIn1,
             string? timeOut1,
@@ -322,7 +322,13 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
-            return Json(new { success = false, message = "Attendance records are view only." });
+            var error = await _imports.UpdateRecordAsync(
+                recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, status,
+                HttpContext.RequestAborted);
+            if (error != null)
+                return Json(new { success = false, message = error });
+
+            return Json(new { success = true, message = "Attendance row updated." });
         }
 
         private async Task<List<Project>> LoadProjectsAsync()
@@ -416,7 +422,9 @@ namespace RSDSystem.Controllers
             row.Note,
             format,
             importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
-            actionLabel = row.Status == AttendanceStatuses.Complete ? "Request Edit" : "Edit"
+            actionLabel = AttendanceStatuses.CountsAsWorked(row.Status) && row.Status == AttendanceStatuses.Complete
+                ? "Request Edit"
+                : "Edit"
         };
     }
 }

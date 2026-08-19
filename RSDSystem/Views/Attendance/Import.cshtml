@@ -55,12 +55,13 @@
                         <i class="bi bi-funnel"></i> Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
-                        <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Complete">Complete</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Incomplete</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Absent">Absent</a></li>
+                        <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Unmatched">Unmatched</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Incomplete">Incomplete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
                     </ul>
                 </div>
                 <div class="search-wrap">
@@ -96,7 +97,7 @@
 <div id="previewEditOverlay" class="att-edit-overlay" hidden>
     <div class="page-card att-edit-panel">
         <div class="att-page-title">Edit Attendance</div>
-        <div class="att-edit-sub">Change this day’s punches before you import. Status updates as you type.</div>
+        <div class="att-edit-sub">Morning 8:00–12:00 · Afternoon 13:00–17:00 · Overtime from 17:00. Late after 8:30. Early out before 16:45.</div>
         <div class="att-edit-meta">
             <div>
                 <div class="form-lbl">Employee ID</div>
@@ -240,7 +241,11 @@
                     ? true
                     : statusFilter === 'Unmatched'
                         ? !r.matched
-                        : r.status === statusFilter;
+                        : statusFilter === 'Late'
+                            ? (r.status === 'Late' || r.status === 'Late + Early Off')
+                            : statusFilter === 'Early Off'
+                                ? (r.status === 'Early Off' || r.status === 'Late + Early Off')
+                                : r.status === statusFilter;
                 const text = `${r.displayId} ${r.employeeName} ${r.externalUserId}`.toLowerCase();
                 return statusOk && (!q || text.includes(q));
             });
@@ -488,6 +493,8 @@
             Complete: 'att-status-complete',
             Incomplete: 'att-status-incomplete',
             Late: 'att-status-late',
+            'Early Off': 'att-status-early',
+            'Late + Early Off': 'att-status-late',
             Absent: 'att-status-absent'
         };
 
@@ -527,25 +534,45 @@
             return (parseInt(parts[0], 10) * 60) + parseInt(parts[1], 10);
         }
 
-        function hoursBetween(start, end) {
-            const from = minutesOf(start);
-            const to = minutesOf(end);
-            if (from === null || to === null) return 0;
-            let mins = to - from;
-            if (mins < 0) mins += 24 * 60;
-            return Math.round((mins / 60) * 100) / 100;
+        function overlapHours(timeIn, timeOut, winStart, winEnd) {
+            const start = minutesOf(timeIn);
+            const end = minutesOf(timeOut);
+            if (start === null || end === null) return 0;
+            let to = end < start ? end + 24 * 60 : end;
+            const from = Math.max(start, winStart);
+            const until = Math.min(to, winEnd);
+            if (until <= from) return 0;
+            return Math.round(((until - from) / 60) * 100) / 100;
+        }
+
+        function previewHours(row) {
+            const morning = overlapHours(row.timeIn1, row.timeOut1, 8 * 60, 12 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 8 * 60, 12 * 60);
+            const afternoon = overlapHours(row.timeIn1, row.timeOut1, 13 * 60, 17 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 13 * 60, 17 * 60);
+            const punchedOt = overlapHours(row.overtimeIn, row.overtimeOut, 17 * 60, 24 * 60);
+            const shiftOt = overlapHours(row.timeIn1, row.timeOut1, 17 * 60, 24 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 17 * 60, 24 * 60);
+            return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt > 0 ? punchedOt : shiftOt };
         }
 
         function previewStatus(row) {
-            const firstIn = row.timeIn1 || row.timeIn2;
-            if (!firstIn && !row.timeOut1 && !row.timeOut2 && !row.overtimeIn && !row.overtimeOut) {
-                return 'Absent';
-            }
-            const firstMinutes = minutesOf(firstIn);
-            if (firstMinutes !== null && firstMinutes > (8 * 60) + 15) return 'Late';
-            if ((!!row.timeIn1 !== !!row.timeOut1) || (!!row.timeIn2 !== !!row.timeOut2) || (row.overtimeIn && !row.overtimeOut)) {
-                return 'Incomplete';
-            }
+            const hasIn1 = !!row.timeIn1;
+            const hasOut1 = !!row.timeOut1;
+            const hasIn2 = !!row.timeIn2;
+            const hasOut2 = !!row.timeOut2;
+            const hasOtIn = !!row.overtimeIn;
+            const hasOtOut = !!row.overtimeOut;
+            if (!hasIn1 && !hasOut1 && !hasIn2 && !hasOut2 && !hasOtIn && !hasOtOut) return 'Absent';
+            if ((hasIn1 !== hasOut1) || (hasIn2 !== hasOut2) || (hasOtIn && !hasOtOut)) return 'Incomplete';
+            const firstIn = minutesOf(row.timeIn1);
+            const late = firstIn !== null && firstIn > (8 * 60) + 30;
+            const lastOut = minutesOf(row.timeOut2) ?? (minutesOf(row.timeOut1) !== null && minutesOf(row.timeOut1) >= 13 * 60
+                ? minutesOf(row.timeOut1) : null);
+            const early = lastOut !== null && lastOut < (17 * 60) - 15;
+            if (late && early) return 'Late + Early Off';
+            if (late) return 'Late';
+            if (early) return 'Early Off';
             return 'Complete';
         }
 
@@ -566,10 +593,9 @@
             const pill = document.getElementById('peStatus');
             pill.textContent = status;
             pill.className = 'status-pill ' + (statusClass[status] || 'att-status-incomplete');
-            const regular = hoursBetween(draft.timeIn1, draft.timeOut1) + hoursBetween(draft.timeIn2, draft.timeOut2);
-            const ot = hoursBetween(draft.overtimeIn, draft.overtimeOut);
+            const hours = previewHours(draft);
             document.getElementById('peHours').textContent =
-                regular.toFixed(2) + ' regular hours · ' + ot.toFixed(2) + ' overtime';
+                hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime';
         }
 
         function openPreviewEdit(index) {
