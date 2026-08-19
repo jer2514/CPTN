@@ -1,7 +1,6 @@
 @model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Attendance Records";
-    var isAdmin = ViewBag.IsAdmin == true;
     Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
 }
 
@@ -52,11 +51,12 @@
                         <i class="bi bi-funnel"></i> Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
-                        <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Complete">Complete</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Incomplete</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Absent">Absent</a></li>
+                        <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Incomplete">Incomplete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
                     </ul>
                 </div>
                 <div class="search-wrap">
@@ -79,10 +79,8 @@
                         <th>Time Out</th>
                         <th>Overtime In</th>
                         <th>Overtime Out</th>
-                        @if (!isAdmin)
-                        {
-                            <th>Status</th>
-                        }
+                        <th>Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="recordsBody"></tbody>
@@ -92,12 +90,7 @@
         <div class="att-preview-footer att-records-footer">
             <div class="att-footer-spacer"></div>
             <div id="recordsPager" class="att-pager"></div>
-            <div class="att-footer-actions">
-                @if (isAdmin)
-                {
-                    <button type="button" id="deleteBtn" class="del-btn-delete">Delete</button>
-                }
-            </div>
+            <div class="att-footer-actions"></div>
         </div>
     </div>
 
@@ -106,33 +99,54 @@
     </div>
 </div>
 
-@if (isAdmin)
-{
-    <div class="del-overlay" id="deleteOverlay">
-        <div class="del-modal">
-            <div class="del-icon-wrap">
-                <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+<div id="recordEditOverlay" class="att-edit-overlay" hidden>
+    <div class="page-card att-edit-panel">
+        <div class="att-page-title" id="recordEditTitle">Request Edit</div>
+        <div class="att-edit-sub">Morning 8:00–12:00 · Afternoon 13:00–17:00 · Overtime from 17:00. Late after 8:30. Early out before 16:45.</div>
+        <div class="att-edit-meta">
+            <div>
+                <div class="form-lbl">Employee ID</div>
+                <div class="slip-value" id="reDisplayId"></div>
             </div>
-            <div class="del-title">Delete this period?</div>
-            <div class="del-msg" id="deleteMsg">
-                This removes the daily punches payroll staff imported for the selected project and period.
+            <div>
+                <div class="form-lbl">Employee Name</div>
+                <div class="slip-value" id="reName"></div>
             </div>
-            <div class="del-actions">
-                <button type="button" class="del-btn-cancel" id="deleteCancelBtn">Cancel</button>
-                <button type="button" class="del-btn-delete" id="deleteConfirmBtn">Delete</button>
+            <div>
+                <div class="form-lbl">Date</div>
+                <div class="slip-value" id="reDate"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Status</div>
+                <span class="status-pill" id="reStatus">Absent</span>
+            </div>
+        </div>
+        <div class="att-edit-grid">
+            <label>Before Noon In<input type="time" id="reIn1" class="form-ctrl" /></label>
+            <label>Before Noon Out<input type="time" id="reOut1" class="form-ctrl" /></label>
+            <label>After Noon In<input type="time" id="reIn2" class="form-ctrl" /></label>
+            <label>After Noon Out<input type="time" id="reOut2" class="form-ctrl" /></label>
+            <label>Overtime In<input type="time" id="reOtIn" class="form-ctrl" /></label>
+            <label>Overtime Out<input type="time" id="reOtOut" class="form-ctrl" /></label>
+        </div>
+        <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime</div>
+        <div class="att-preview-footer">
+            <div class="att-edit-actions">
+                <button type="button" class="att-quick-btn" id="reStandard">8–5</button>
+                <button type="button" class="att-quick-btn" id="reClear">Clear</button>
+            </div>
+            <div class="att-edit-actions">
+                <button type="button" class="btn-outline-blue" id="reCancel">Cancel</button>
+                <button type="button" class="btn-primary-blue-solid" id="reSave">Save</button>
             </div>
         </div>
     </div>
-}
+</div>
 
 @section Scripts {
     <partial name="_ProjectListData" model="Model" />
-    @if (isAdmin)
-    {
-        @Html.AntiForgeryToken()
-    }
+    <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
     <script>
-        const isAdmin = @(isAdmin ? "true" : "false");
         const projectsEl = document.getElementById('project-list-data');
         const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
@@ -143,6 +157,7 @@
         let statusFilter = 'all';
         let currentPage = 1;
         let loadedPeriod = null;
+        let lastRows = [];
 
         function renderSuggestions(matches) {
             if (matches.length === 0) {
@@ -177,15 +192,34 @@
             if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
         });
 
+        const tokenInput = document.querySelector('#__afToken input[name="__RequestVerificationToken"]');
+        const token = tokenInput ? tokenInput.value : '';
+        const filterBtn = document.querySelector('.emp-controls .dropdown-toggle');
+        const statusClass = {
+            Complete: 'att-status-complete',
+            Incomplete: 'att-status-incomplete',
+            Late: 'att-status-late',
+            'Early Off': 'att-status-early',
+            'Late + Early Off': 'att-status-late',
+            Absent: 'att-status-absent'
+        };
+        let editingRecord = null;
+
         document.querySelectorAll('.filter-menu [data-status]').forEach(el => {
             el.addEventListener('click', function (e) {
                 e.preventDefault();
-                statusFilter = this.dataset.status;
+                statusFilter = this.dataset.status || 'all';
+                if (filterBtn) {
+                    filterBtn.innerHTML = statusFilter === 'all'
+                        ? '<i class="bi bi-funnel"></i> Filter'
+                        : '<i class="bi bi-funnel"></i> ' + statusFilter;
+                }
                 currentPage = 1;
-                loadRecords();
+                if (selectedPeriod()) loadRecords();
             });
         });
         document.getElementById('rowSearch').addEventListener('input', function () {
+            if (!selectedPeriod()) return;
             currentPage = 1;
             loadRecords();
         });
@@ -266,38 +300,40 @@
             const q = encodeURIComponent(document.getElementById('rowSearch').value.trim());
             const url = `/Attendance/GetRecords?projectId=${projectIdInput.value}&search=${q}&status=${encodeURIComponent(statusFilter)}&page=${currentPage}&periodStart=${period.start}&periodEnd=${period.end}`;
 
-            empty.style.display = 'block';
-            section.style.display = 'none';
-            empty.textContent = 'Loading attendance records...';
+            if (section.style.display === 'none') {
+                empty.style.display = 'block';
+                empty.textContent = 'Loading attendance records...';
+            }
 
             try {
                 const res = await fetch(url);
                 const data = await res.json();
                 if (!data.success) { empty.textContent = data.message; return; }
-                if (!data.rows.length) {
-                    empty.textContent = 'No imported attendance for this project and period.';
-                    return;
-                }
 
                 loadedPeriod = period;
+                lastRows = data.rows || [];
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
+                const filterNote = statusFilter !== 'all' ? ` · ${statusFilter}` : '';
                 document.getElementById('recordsMeta').textContent =
-                    `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${byline}`;
-                document.getElementById('recordsBody').innerHTML = data.rows.map(r => {
-                    const statusCell = isAdmin ? '' : `<td><span class="status-pill ${r.statusClass}">${r.status}</span></td>`;
-                    return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
-                        <td>${r.displayId || '——'}</td>
-                        <td>${r.employeeName || '——'}</td>
-                        <td>${dash(r.workDate)}</td>
-                        <td>${timeCell(r.timeIn1)}</td>
-                        <td>${timeCell(r.timeOut1)}</td>
-                        <td>${timeCell(r.timeIn2)}</td>
-                        <td>${timeCell(r.timeOut2)}</td>
-                        <td>${timeCell(r.overtimeIn)}</td>
-                        <td>${timeCell(r.overtimeOut)}</td>
-                        ${statusCell}
-                    </tr>`;
-                }).join('');
+                    `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${filterNote}${byline}`;
+                document.getElementById('recordsBody').innerHTML = data.rows.length
+                    ? data.rows.map(r => {
+                        const actionLabel = r.actionLabel || (r.status === 'Complete' ? 'Request Edit' : 'Edit');
+                        return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
+                            <td>${r.displayId || '——'}</td>
+                            <td>${r.employeeName || '——'}</td>
+                            <td>${dash(r.workDate)}</td>
+                            <td>${timeCell(r.timeIn1)}</td>
+                            <td>${timeCell(r.timeOut1)}</td>
+                            <td>${timeCell(r.timeIn2)}</td>
+                            <td>${timeCell(r.timeOut2)}</td>
+                            <td>${timeCell(r.overtimeIn)}</td>
+                            <td>${timeCell(r.overtimeOut)}</td>
+                            <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
+                            <td><button type="button" class="att-action-link" data-record-id="${r.recordId}">${actionLabel}</button></td>
+                        </tr>`;
+                    }).join('')
+                    : '<tr><td colspan="11" class="text-center text-muted py-4">No attendance rows match this filter.</td></tr>';
 
                 document.getElementById('recordsPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
@@ -327,51 +363,183 @@
             loadRecords();
         });
 
-        if (isAdmin) {
-            const overlay = document.getElementById('deleteOverlay');
-            document.getElementById('deleteBtn').addEventListener('click', function () {
-                const period = loadedPeriod || selectedPeriod();
-                if (!projectIdInput.value || !period) {
-                    alert('Load a project period first.');
-                    return;
-                }
-                document.getElementById('deleteMsg').textContent =
-                    `This permanently deletes the daily punches payroll staff imported for ${projectInput.value} (${period.label}). They can import the file again if needed.`;
-                overlay.classList.add('open');
-            });
-            document.getElementById('deleteCancelBtn').addEventListener('click', function () {
-                overlay.classList.remove('open');
-            });
-            overlay.addEventListener('click', function (e) {
-                if (e.target === overlay) overlay.classList.remove('open');
-            });
-            document.getElementById('deleteConfirmBtn').addEventListener('click', async function () {
-                const period = loadedPeriod || selectedPeriod();
-                if (!period) return;
-                const token = document.querySelector('input[name="__RequestVerificationToken"]');
-                const body = new URLSearchParams();
-                body.set('projectId', projectIdInput.value);
-                body.set('periodStart', period.start);
-                body.set('periodEnd', period.end);
-                if (token) body.set('__RequestVerificationToken', token.value);
-
-                const res = await fetch('/Attendance/DeletePeriod', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'RequestVerificationToken': token ? token.value : ''
-                    },
-                    body
-                });
-                const data = await res.json();
-                overlay.classList.remove('open');
-                if (!data.success) {
-                    alert(data.message || 'Could not delete attendance.');
-                    return;
-                }
-                currentPage = 1;
-                await loadPeriods(true);
-            });
+        function toHtmlTime(value) {
+            if (!value || value === '——') return '';
+            const text = String(value).trim();
+            const ampm = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (ampm) {
+                let hour = parseInt(ampm[1], 10);
+                const minute = ampm[2];
+                const period = ampm[3].toUpperCase();
+                if (period === 'AM' && hour === 12) hour = 0;
+                if (period === 'PM' && hour < 12) hour += 12;
+                return String(hour).padStart(2, '0') + ':' + minute;
+            }
+            const military = text.match(/^(\d{1,2}):(\d{2})/);
+            return military ? String(military[1]).padStart(2, '0') + ':' + military[2] : '';
         }
+
+        function fromHtmlTime(value) {
+            if (!value) return '';
+            const parts = String(value).split(':');
+            const hour = parseInt(parts[0], 10);
+            const minute = parts[1] || '00';
+            const period = hour >= 12 ? 'PM' : 'AM';
+            let display = hour % 12;
+            if (display === 0) display = 12;
+            return display + ':' + minute + ' ' + period;
+        }
+
+        function minutesOf(value) {
+            const html = toHtmlTime(value);
+            if (!html) return null;
+            const parts = html.split(':');
+            return (parseInt(parts[0], 10) * 60) + parseInt(parts[1], 10);
+        }
+
+        function overlapHours(timeIn, timeOut, winStart, winEnd) {
+            const start = minutesOf(timeIn);
+            const end = minutesOf(timeOut);
+            if (start === null || end === null) return 0;
+            let to = end < start ? end + 24 * 60 : end;
+            const from = Math.max(start, winStart);
+            const until = Math.min(to, winEnd);
+            if (until <= from) return 0;
+            return Math.round(((until - from) / 60) * 100) / 100;
+        }
+
+        function draftHours(draft) {
+            const morning = overlapHours(draft.timeIn1, draft.timeOut1, 8 * 60, 12 * 60)
+                + overlapHours(draft.timeIn2, draft.timeOut2, 8 * 60, 12 * 60);
+            const afternoon = overlapHours(draft.timeIn1, draft.timeOut1, 13 * 60, 17 * 60)
+                + overlapHours(draft.timeIn2, draft.timeOut2, 13 * 60, 17 * 60);
+            const punchedOt = overlapHours(draft.overtimeIn, draft.overtimeOut, 17 * 60, 24 * 60);
+            const shiftOt = overlapHours(draft.timeIn1, draft.timeOut1, 17 * 60, 24 * 60)
+                + overlapHours(draft.timeIn2, draft.timeOut2, 17 * 60, 24 * 60);
+            return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt > 0 ? punchedOt : shiftOt };
+        }
+
+        function draftStatus(draft) {
+            const hasIn1 = !!draft.timeIn1;
+            const hasOut1 = !!draft.timeOut1;
+            const hasIn2 = !!draft.timeIn2;
+            const hasOut2 = !!draft.timeOut2;
+            const hasOtIn = !!draft.overtimeIn;
+            const hasOtOut = !!draft.overtimeOut;
+            if (!hasIn1 && !hasOut1 && !hasIn2 && !hasOut2 && !hasOtIn && !hasOtOut) return 'Absent';
+            if ((hasIn1 !== hasOut1) || (hasIn2 !== hasOut2) || (hasOtIn && !hasOtOut)) return 'Incomplete';
+            const firstIn = minutesOf(draft.timeIn1);
+            const late = firstIn !== null && firstIn > (8 * 60) + 30;
+            const lastOut = minutesOf(draft.timeOut2) ?? (minutesOf(draft.timeOut1) !== null && minutesOf(draft.timeOut1) >= 13 * 60
+                ? minutesOf(draft.timeOut1) : null);
+            const early = lastOut !== null && lastOut < (17 * 60) - 15;
+            if (late && early) return 'Late + Early Off';
+            if (late) return 'Late';
+            if (early) return 'Early Off';
+            return 'Complete';
+        }
+
+        function overlayDraft() {
+            return {
+                timeIn1: fromHtmlTime(document.getElementById('reIn1').value),
+                timeOut1: fromHtmlTime(document.getElementById('reOut1').value),
+                timeIn2: fromHtmlTime(document.getElementById('reIn2').value),
+                timeOut2: fromHtmlTime(document.getElementById('reOut2').value),
+                overtimeIn: fromHtmlTime(document.getElementById('reOtIn').value),
+                overtimeOut: fromHtmlTime(document.getElementById('reOtOut').value)
+            };
+        }
+
+        function refreshRecordEditMeta() {
+            const draft = overlayDraft();
+            const status = draftStatus(draft);
+            const pill = document.getElementById('reStatus');
+            pill.textContent = status;
+            pill.className = 'status-pill ' + (statusClass[status] || 'att-status-incomplete');
+            const hours = draftHours(draft);
+            document.getElementById('reHours').textContent =
+                hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime';
+        }
+
+        function openRecordEdit(row) {
+            if (!row) return;
+            editingRecord = row;
+            document.getElementById('recordEditTitle').textContent = row.actionLabel || 'Request Edit';
+            document.getElementById('reDisplayId').textContent = row.displayId || '——';
+            document.getElementById('reName').textContent = row.employeeName || '——';
+            document.getElementById('reDate').textContent = row.workDate || '——';
+            document.getElementById('reIn1').value = toHtmlTime(row.timeIn1);
+            document.getElementById('reOut1').value = toHtmlTime(row.timeOut1);
+            document.getElementById('reIn2').value = toHtmlTime(row.timeIn2);
+            document.getElementById('reOut2').value = toHtmlTime(row.timeOut2);
+            document.getElementById('reOtIn').value = toHtmlTime(row.overtimeIn);
+            document.getElementById('reOtOut').value = toHtmlTime(row.overtimeOut);
+            refreshRecordEditMeta();
+            document.getElementById('recordEditOverlay').hidden = false;
+        }
+
+        function closeRecordEdit() {
+            document.getElementById('recordEditOverlay').hidden = true;
+            editingRecord = null;
+        }
+
+        document.getElementById('recordsBody').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-record-id]');
+            if (!btn) return;
+            const row = lastRows.find(r => String(r.recordId) === String(btn.dataset.recordId));
+            openRecordEdit(row);
+        });
+
+        document.getElementById('reCancel').addEventListener('click', closeRecordEdit);
+        document.getElementById('recordEditOverlay').addEventListener('click', function (e) {
+            if (e.target.id === 'recordEditOverlay') closeRecordEdit();
+        });
+        document.getElementById('reStandard').addEventListener('click', function () {
+            document.getElementById('reIn1').value = '08:00';
+            document.getElementById('reOut1').value = '12:00';
+            document.getElementById('reIn2').value = '13:00';
+            document.getElementById('reOut2').value = '17:00';
+            refreshRecordEditMeta();
+        });
+        document.getElementById('reClear').addEventListener('click', function () {
+            ['reIn1', 'reOut1', 'reIn2', 'reOut2', 'reOtIn', 'reOtOut'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            refreshRecordEditMeta();
+        });
+        ['reIn1', 'reOut1', 'reIn2', 'reOut2', 'reOtIn', 'reOtOut'].forEach(id => {
+            document.getElementById(id).addEventListener('input', refreshRecordEditMeta);
+        });
+        document.getElementById('reSave').addEventListener('click', async function () {
+            if (!editingRecord) return;
+            const draft = overlayDraft();
+            const body = new FormData();
+            body.set('recordId', editingRecord.recordId);
+            body.set('timeIn1', toHtmlTime(draft.timeIn1));
+            body.set('timeOut1', toHtmlTime(draft.timeOut1));
+            body.set('timeIn2', toHtmlTime(draft.timeIn2));
+            body.set('timeOut2', toHtmlTime(draft.timeOut2));
+            body.set('overtimeIn', toHtmlTime(draft.overtimeIn));
+            body.set('overtimeOut', toHtmlTime(draft.overtimeOut));
+            if (token) body.set('__RequestVerificationToken', token);
+
+            const res = await fetch('/Attendance/UpdateRecord', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'RequestVerificationToken': token },
+                body
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.message || 'Could not save the attendance row.');
+                return;
+            }
+            closeRecordEdit();
+            loadRecords();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !document.getElementById('recordEditOverlay').hidden) {
+                closeRecordEdit();
+            }
+        });
     </script>
 }
