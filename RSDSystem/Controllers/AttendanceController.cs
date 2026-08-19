@@ -22,13 +22,29 @@ namespace RSDSystem.Controllers
 
         public async Task<IActionResult> Import()
         {
+            if (IsAdmin)
+                return RedirectToAction(nameof(Records));
+
             ViewBag.PageTitle = "Import Attendance";
             return View(await LoadProjectsAsync());
         }
 
         public async Task<IActionResult> Records()
         {
-            ViewBag.PageTitle = "Attendance Records";
+            ViewBag.PageTitle = IsAdmin
+                ? "Attendance Records (Admin and Staff)"
+                : "Attendance Records";
+            ViewBag.IsAdmin = IsAdmin;
+            return View(await LoadProjectsAsync());
+        }
+
+        public async Task<IActionResult> Summary()
+        {
+            if (!IsAdmin)
+                return RedirectToAction(nameof(Records));
+
+            ViewBag.PageTitle = "Attendance Summary (Admin)";
+            ViewBag.IsAdmin = true;
             return View(await LoadProjectsAsync());
         }
 
@@ -125,20 +141,54 @@ namespace RSDSystem.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetRecords(int projectId, string? search, string? status, int page = 1)
+        public async Task<IActionResult> GetPeriods(int projectId)
         {
             var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
             if (project == null)
                 return Json(new { success = false, message = "Project not found." });
 
+            var periods = await _imports.ListPeriodsAsync(projectId, HttpContext.RequestAborted);
+            return Json(new
+            {
+                success = true,
+                projectName = project.ProjectName,
+                periods = periods.Select(p => new
+                {
+                    key = p.Key,
+                    start = p.Start.ToString("yyyy-MM-dd"),
+                    end = p.End.ToString("yyyy-MM-dd"),
+                    label = p.Label,
+                    importedBy = p.ImportedBy
+                })
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetRecords(
+            int projectId, string? search, string? status, int page = 1,
+            string? periodStart = null, string? periodEnd = null)
+        {
+            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+
+            var start = ParseIsoDate(periodStart);
+            var end = ParseIsoDate(periodEnd);
             const int pageSize = 10;
             var (rows, total) = await _imports.QueryRecordsAsync(
-                projectId, search, status, page, pageSize, HttpContext.RequestAborted);
+                projectId, search, status, page, pageSize, start, end, HttpContext.RequestAborted);
+
+            var importedBy = rows.Select(r => r.Import?.ImportedBy)
+                .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
 
             return Json(new
             {
                 success = true,
                 projectName = project.ProjectName,
+                periodLabel = start.HasValue && end.HasValue
+                    ? AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end)
+                    : null,
+                importedBy,
                 total,
                 page,
                 pageSize,
@@ -168,6 +218,85 @@ namespace RSDSystem.Controllers
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
                 }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt))
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetSummary(
+            int projectId, string? search, string? status, int page = 1,
+            string? periodStart = null, string? periodEnd = null)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Attendance summary is available to admin only." });
+
+            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+
+            var start = ParseIsoDate(periodStart);
+            var end = ParseIsoDate(periodEnd);
+            if (!start.HasValue || !end.HasValue)
+                return Json(new { success = false, message = "Select a period first." });
+
+            const int pageSize = 10;
+            var summary = await _imports.QuerySummaryAsync(
+                projectId, start, end, search, status, page, pageSize, HttpContext.RequestAborted);
+
+            return Json(new
+            {
+                success = true,
+                projectName = project.ProjectName,
+                periodLabel = AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end),
+                importedBy = summary.ImportedBy,
+                total = summary.Total,
+                page,
+                pageSize,
+                totalPages = Math.Max(1, (int)Math.Ceiling(summary.Total / (double)pageSize)),
+                totals = new
+                {
+                    employees = summary.Total,
+                    daysWorked = summary.DaysWorked,
+                    daysAbsent = summary.DaysAbsent,
+                    daysLate = summary.DaysLate,
+                    daysIncomplete = summary.DaysIncomplete,
+                    regularHours = summary.RegularHours,
+                    overtimeHours = summary.OvertimeHours,
+                    unmatched = summary.UnmatchedCount
+                },
+                rows = summary.Rows.Select(r => new
+                {
+                    r.EmployeeId,
+                    r.DisplayId,
+                    r.EmployeeName,
+                    r.Matched,
+                    r.DaysWorked,
+                    r.DaysAbsent,
+                    r.DaysLate,
+                    r.DaysIncomplete,
+                    regularHours = r.RegularHours.ToString("0.00"),
+                    overtimeHours = r.OvertimeHours.ToString("0.00")
+                })
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePeriod(int projectId, string? periodStart, string? periodEnd)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Only admin can delete imported attendance." });
+
+            var start = ParseIsoDate(periodStart);
+            var end = ParseIsoDate(periodEnd);
+            var (deleted, error) = await _imports.DeletePeriodAsync(
+                projectId, start, end, HttpContext.RequestAborted);
+            if (error != null)
+                return Json(new { success = false, message = error });
+
+            return Json(new
+            {
+                success = true,
+                message = $"Deleted {deleted} attendance row(s) for this period. Payroll staff can import the file again if needed."
             });
         }
 
@@ -232,6 +361,20 @@ namespace RSDSystem.Controllers
 
         private string ImportedBy() =>
             HttpContext.Session.GetString("FullName") ?? "Staff";
+
+        private bool IsAdmin =>
+            string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
+
+        private static DateTime? ParseIsoDate(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+            if (DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var date))
+                return AttendanceDisplay.UsableDate(date);
+            return AttendanceDisplay.UsableDate(DateTime.TryParse(value, out var parsed) ? parsed : null);
+        }
 
         private static string? ValidateUpload(IFormFile? file)
         {
