@@ -1,3 +1,4 @@
+@model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Payroll Prediction";
 }
@@ -8,7 +9,205 @@
 
 <div class="page-card">
     <div class="emp-title mb-3">Payroll Prediction</div>
-    <div class="text-center text-muted py-5">
-        This section will be added later.
+
+    <div class="genpay-controls">
+        <div class="genpay-select-wrap">
+            <label class="form-lbl">Project Name</label>
+            <div class="genpay-autocomplete">
+                <input type="text" id="projectInput" class="form-ctrl"
+                       placeholder="Type to search project..." autocomplete="off" />
+                <input type="hidden" id="projectIdInput" />
+                <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+            </div>
+        </div>
+        <button type="button" id="loadPredictionBtn" class="btn-primary-blue-solid">
+            <i class="bi bi-stars"></i> Load Prediction
+        </button>
+    </div>
+
+    <div id="predictionSection" style="display:none">
+        <div class="vp-period-list" id="predictionList"></div>
+    </div>
+
+    <div id="predictionEmpty" class="text-center text-muted py-5">
+        Select a project and click Load Prediction.
     </div>
 </div>
+
+<div id="predictionOverlay" class="att-edit-overlay" hidden>
+    <div class="page-card pred-result-panel">
+        <div class="emp-title mb-3">Prediction Result</div>
+        <div class="pred-result-row">
+            <span>Project Name</span>
+            <strong id="prProject">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span>Prediction Month</span>
+            <strong id="prMonth">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span>Predicted Payroll</span>
+            <strong id="prPredicted">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span>Allocated Budget</span>
+            <strong id="prBudget">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span>Budget Difference</span>
+            <strong id="prDifference">—</strong>
+        </div>
+        <div id="prRisk" class="pred-risk" hidden>
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <div class="pred-risk-title" id="prRiskTitle">Budget Exceeding Risk</div>
+                <div class="pred-risk-detail" id="prRiskDetail">Predicted payroll exceeds the allocated budget.</div>
+            </div>
+        </div>
+        <div class="pred-result-footer">
+            Prediction Generated: <span id="prGenerated">—</span>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ProjectListData" model="Model" />
+    <script>
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
+        const projectInput = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList = document.getElementById('projectSuggestions');
+        let lastPage = null;
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = '';
+            const q = projectInput.value.trim().toLowerCase();
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+        });
+        projectInput.addEventListener('focus', function () {
+            const q = projectInput.value.trim().toLowerCase();
+            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+        });
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
+        });
+
+        function peso(value) {
+            const amount = Number(value || 0);
+            return '₱ ' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderRows(page) {
+            const list = document.getElementById('predictionList');
+            list.innerHTML = (page.rows || []).map((row, index) => `
+                <div class="vp-period-card pred-forecast-card">
+                    <div class="pred-forecast-head">
+                        <span>Previous Payroll ${row.previousMonth1}</span>
+                        <span>Previous Payroll ${row.previousMonth2}</span>
+                        <span>Predicted Payroll ${row.predictionMonth}</span>
+                        <span>Allocated Budget ${row.predictionMonth}</span>
+                        <span>Action</span>
+                    </div>
+                    <div class="pred-forecast-body">
+                        <span>${peso(row.previousAmount1)}</span>
+                        <span>${peso(row.previousAmount2)}</span>
+                        <span>${peso(row.predictedPayroll)}</span>
+                        <span>${peso(row.allocatedBudget)}</span>
+                        <span>
+                            <button type="button" class="pill-btn pill-view" data-row-index="${index}">
+                                <i class="bi bi-eye-fill"></i> View
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openResult(row, generatedAt, projectName) {
+            document.getElementById('prProject').textContent = projectName || '—';
+            document.getElementById('prMonth').textContent = row.predictionMonth || '—';
+            document.getElementById('prPredicted').textContent = peso(row.predictedPayroll);
+            document.getElementById('prBudget').textContent = peso(row.allocatedBudget);
+            document.getElementById('prDifference').textContent = peso(row.budgetDifference);
+            const risk = document.getElementById('prRisk');
+            if (row.riskTitle) {
+                document.getElementById('prRiskTitle').textContent = row.riskTitle;
+                document.getElementById('prRiskDetail').textContent = row.riskDetail || '';
+                risk.hidden = false;
+                risk.classList.toggle('pred-risk-warn', !!row.exceedsBudget);
+            } else {
+                risk.hidden = true;
+            }
+            document.getElementById('prGenerated').textContent = generatedAt || '—';
+            document.getElementById('predictionOverlay').hidden = false;
+        }
+
+        function closeResult() {
+            document.getElementById('predictionOverlay').hidden = true;
+        }
+
+        document.getElementById('predictionList').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-row-index]');
+            if (!btn || !lastPage) return;
+            const row = lastPage.rows[Number(btn.dataset.rowIndex)];
+            if (row) openResult(row, lastPage.generatedAt, lastPage.projectName);
+        });
+        document.getElementById('predictionOverlay').addEventListener('click', function (e) {
+            if (e.target.id === 'predictionOverlay') closeResult();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeResult();
+        });
+
+        document.getElementById('loadPredictionBtn').addEventListener('click', async function () {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+
+            const empty = document.getElementById('predictionEmpty');
+            const section = document.getElementById('predictionSection');
+            section.style.display = 'none';
+            empty.style.display = 'block';
+            empty.textContent = 'Loading payroll prediction...';
+
+            try {
+                const res = await fetch('/Payroll/GetPrediction?projectId=' + projectIdInput.value, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    empty.textContent = data.message || 'Could not load a prediction for this project.';
+                    return;
+                }
+                lastPage = data;
+                renderRows(data);
+                empty.style.display = 'none';
+                section.style.display = 'block';
+            } catch (err) {
+                empty.textContent = 'Could not load payroll prediction.';
+            }
+        });
+    </script>
+}
