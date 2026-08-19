@@ -192,6 +192,7 @@ namespace RSDSystem.Controllers
                     predictionMonth = string.IsNullOrWhiteSpace(r.PredictionLabel)
                         ? r.PredictionMonth.ToString("MMMM yyyy", DateCulture)
                         : r.PredictionLabel,
+                    predictedBudget = r.PredictedPayroll,
                     predictedPayroll = r.PredictedPayroll,
                     allocatedBudget = r.AllocatedBudget,
                     budgetDifference = r.BudgetDifference,
