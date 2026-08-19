@@ -15,6 +15,7 @@
     const schedules = Array.isArray(config.schedules) ? config.schedules : [];
     const boundMin = config.boundMin || '';
     const boundMax = config.boundMax || '';
+    const hasSchedule = !!config.hasSchedule;
     const isEdit = !!config.isEdit;
     const existingPayrollId = Number(config.payrollId || 0);
     const returnUrl = config.returnUrl || '';
@@ -49,6 +50,32 @@
         }) || null;
     }
 
+    function coveringScheduleForRange(startIso, endIso) {
+        if (!startIso || !endIso) return null;
+        return schedules.find(function (s) {
+            return s.start.localeCompare(startIso) <= 0 && endIso.localeCompare(s.end) <= 0;
+        }) || null;
+    }
+
+    function formatHintDate(iso) {
+        if (!iso) return '';
+        const date = new Date(iso + 'T00:00:00');
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function updateScheduleHint(cover) {
+        const hint = document.getElementById('payPeriodScheduleHint');
+        if (!hint || !hasSchedule) return;
+        const startIso = cover ? cover.start : boundMin;
+        const endIso = cover ? cover.end : boundMax;
+        if (!startIso && !endIso) return;
+        hint.textContent = 'Pay period must fall within the payroll schedule: '
+            + (formatHintDate(startIso) || 'the schedule start')
+            + ' – '
+            + (formatHintDate(endIso) || 'the schedule end');
+    }
+
     function clampBounds(min, max) {
         const calendarMin = '2000-01-01';
         const calendarMax = '2099-12-31';
@@ -75,6 +102,7 @@
         const rawMax = earlierDate(cover ? cover.end : boundMax, boundMax);
         const rawMin = laterDate(boundMin, cover ? cover.start : boundMin) || boundMin;
         const range = clampBounds(rawMin, rawMax);
+        updateScheduleHint(cover);
 
         startEl.min = range.min;
         let startMax = earlierDate(range.max, endEl.value) || range.max;
@@ -193,12 +221,24 @@
             ok = false;
         }
 
+        if (!hasSchedule) {
+            showFieldError('payPeriodStart', 'A payroll schedule must be added by the admin before generating payroll.');
+            return false;
+        }
+
         if (boundMin && start && start.localeCompare(boundMin) < 0) {
-            showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(boundMin) + '.');
+            showFieldError('payPeriodStart', 'Pay period starting date must be on or after the payroll schedule start (' + formatIsoDate(boundMin) + ').');
             ok = false;
         }
         if (boundMax && end && end.localeCompare(boundMax) > 0) {
-            showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(boundMax) + '.');
+            showFieldError('payPeriodEnd', 'Pay period ending date must be on or before the payroll schedule end (' + formatIsoDate(boundMax) + ').');
+            ok = false;
+        }
+        if (ok && start && end && !coveringScheduleForRange(start, end)) {
+            const cover = coveringSchedule(start);
+            const startLabel = formatHintDate(cover ? cover.start : boundMin);
+            const endLabel = formatHintDate(cover ? cover.end : boundMax);
+            showFieldError('payPeriodStart', 'Pay period must fall within the payroll schedule: ' + startLabel + ' – ' + endLabel + '.');
             ok = false;
         }
 

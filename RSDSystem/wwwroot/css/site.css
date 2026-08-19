@@ -2068,6 +2068,12 @@ button.badge-btn {
     line-height: 1.4;
 }
 
+.slip-schedule-hint-warn {
+    background: #fff4e5;
+    border-color: #f0c36d;
+    color: #8a5a00;
+}
+
 /* ── Pending Payroll — status rows & pills ──────────────── */
 .row-correction td {
     background: #ffe4c4 !important;
