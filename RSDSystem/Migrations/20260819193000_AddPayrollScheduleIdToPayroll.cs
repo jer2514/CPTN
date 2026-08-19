@@ -15,18 +15,29 @@ namespace RSDSystem.Migrations
             migrationBuilder.Sql(@"
 IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
 AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NULL
-BEGIN
     ALTER TABLE [Payrolls] ADD [PayrollScheduleId] int NULL;
-
-    ALTER TABLE [Payrolls] ADD CONSTRAINT [FK_Payrolls_PayrollSchedules_PayrollScheduleId]
-        FOREIGN KEY ([PayrollScheduleId]) REFERENCES [PayrollSchedules] ([PayrollScheduleId]) ON DELETE SET NULL;
-
-    CREATE INDEX [IX_Payrolls_PayrollScheduleId] ON [Payrolls] ([PayrollScheduleId]);
-END
-
+");
+            migrationBuilder.Sql(@"
 IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
 AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NOT NULL
-BEGIN
+AND OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
+AND OBJECT_ID(N'dbo.FK_Payrolls_PayrollSchedules_PayrollScheduleId', N'F') IS NULL
+    ALTER TABLE [Payrolls] ADD CONSTRAINT [FK_Payrolls_PayrollSchedules_PayrollScheduleId]
+        FOREIGN KEY ([PayrollScheduleId]) REFERENCES [PayrollSchedules] ([PayrollScheduleId]) ON DELETE SET NULL;
+");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_Payrolls_PayrollScheduleId'
+      AND object_id = OBJECT_ID(N'dbo.Payrolls')
+)
+    CREATE INDEX [IX_Payrolls_PayrollScheduleId] ON [Payrolls] ([PayrollScheduleId]);
+");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NOT NULL
     UPDATE p
     SET PayrollScheduleId = s.PayrollScheduleId
     FROM [Payrolls] p
@@ -39,18 +50,18 @@ BEGIN
         ORDER BY sch.StartingDate DESC, sch.PayrollScheduleId DESC
     ) s
     WHERE p.PayrollScheduleId IS NULL;
-
-    IF NOT EXISTS (
-        SELECT 1 FROM sys.indexes
-        WHERE name = N'IX_Payrolls_EmployeeId_PayrollScheduleId'
-          AND object_id = OBJECT_ID(N'dbo.Payrolls')
-    )
-    BEGIN
-        CREATE UNIQUE INDEX [IX_Payrolls_EmployeeId_PayrollScheduleId]
-            ON [Payrolls] ([EmployeeId], [PayrollScheduleId])
-            WHERE [PayrollScheduleId] IS NOT NULL;
-    END
-END
+");
+            migrationBuilder.Sql(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NOT NULL
+AND NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_Payrolls_EmployeeId_PayrollScheduleId'
+      AND object_id = OBJECT_ID(N'dbo.Payrolls')
+)
+    CREATE UNIQUE INDEX [IX_Payrolls_EmployeeId_PayrollScheduleId]
+        ON [Payrolls] ([EmployeeId], [PayrollScheduleId])
+        WHERE [PayrollScheduleId] IS NOT NULL;
 ");
         }
 
