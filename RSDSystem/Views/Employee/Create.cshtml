@@ -75,24 +75,6 @@
                 <label class="form-lbl">Gender <span class="req-star">*</span></label>
                 <select name="Gender" class="@Ctrl("Gender")" data-validate="required" data-label="Gender">
                     <option value="">Select</option>
-<<<<<<< HEAD
-                    @if (Model.Gender == "Male")
-                    {
-                        <option value="Male" selected>Male</option>
-                        <option value="Female">Female</option>
-                    }
-                    else if (Model.Gender == "Female")
-                    {
-                        <option value="Male">Male</option>
-                        <option value="Female" selected>Female</option>
-                    }
-                    else
-                    {
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                    }
-=======
->>>>>>> master
                     <option value="Male" @(Model.Gender == "Male" ? "selected" : null)>Male</option>
                     <option value="Female" @(Model.Gender == "Female" ? "selected" : null)>Female</option>
                 </select>
@@ -114,15 +96,9 @@
         <!-- Email | Contact Number -->
         <div class="form-row form-row-2">
             <div>
-<<<<<<< HEAD
                 <label class="form-lbl">Email</label>
                 <input type="email" name="Email" value="@Model.Email" maxlength="100"
                        class="@Ctrl("Email")" data-validate="email" data-label="Email" />
-=======
->>>>>>> master
-                <label class="form-lbl">Email <span class="req-star">*</span></label>
-                <input type="email" name="Email" value="@Model.Email" maxlength="100"
-                       class="@Ctrl("Email")" data-validate="required|email" data-label="Email" />
                 <span class="field-error" data-error-for="Email">@Err("Email")</span>
             </div>
             <div>
@@ -143,14 +119,6 @@
                     <option value="">Select project</option>
                     @foreach (var p in projects)
                     {
-                        if (p.ProjectId == Model.ProjectId)
-                        {
-                            <option value="@p.ProjectId" selected>@p.ProjectName</option>
-                        }
-                        else
-                        {
-                            <option value="@p.ProjectId">@p.ProjectName</option>
-                        }
                         <option value="@p.ProjectId" @(Model.ProjectId == p.ProjectId ? "selected" : null)>@p.ProjectName</option>
                     }
                 </select>
@@ -166,14 +134,6 @@
                     <option value="">Select</option>
                     @foreach (var j in jobs)
                     {
-                        if (j == Model.JobClassification)
-                        {
-                            <option value="@j" selected>@j</option>
-                        }
-                        else
-                        {
-                            <option value="@j">@j</option>
-                        }
                         <option value="@j" @(Model.JobClassification == j ? "selected" : null)>@j</option>
                     }
                 </select>

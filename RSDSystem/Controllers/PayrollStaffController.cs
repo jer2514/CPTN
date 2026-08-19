@@ -411,8 +411,7 @@ namespace RSDSystem.Controllers
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
-
-            return Json(new { success = false, message = "Employee not found." });
+                return Json(new { success = false, message = "Employee not found." });
 
             return Json(new { success = true, message = $"Payroll generated for {emp.FullName}." });
         }
