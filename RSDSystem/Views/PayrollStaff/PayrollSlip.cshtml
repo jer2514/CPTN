@@ -20,6 +20,8 @@
     var returnUrl = ViewBag.ReturnUrl as string ?? "";
     var slipConfig = JsonSerializer.Serialize(new
     {
+        employeeId = Model.EmployeeId,
+        projectId = project?.ProjectId ?? 0,
         dailyRate = Model.DailyRate,
         hourlyRate = Model.RatePerHour,
         boundMin = minDate,
@@ -139,8 +141,8 @@ else
             <div>
                 <label class="form-lbl">Regular Days Worked <span class="req-star">*</span></label>
                 <input type="number" name="regularDaysWorked" id="regularDaysWorked" class="form-ctrl"
-                       step="1" min="1" value="@daysWorked"
-                       data-validate="positiveInt" data-label="Regular days worked" />
+                       step="1" min="0" value="@daysWorked"
+                       data-validate="nonNegInt" data-label="Regular days worked" />
                 <span class="field-error" data-error-for="regularDaysWorked"></span>
             </div>
             <div>

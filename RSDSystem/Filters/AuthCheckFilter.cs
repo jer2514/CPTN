@@ -61,7 +61,9 @@ namespace RSDSystem.Filters
                     || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "GetPeriods", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "GetSummary", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(action, "DeletePeriod", StringComparison.OrdinalIgnoreCase));
+                    || string.Equals(action, "DeletePeriod", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(action, "GetAttendanceTotals", StringComparison.OrdinalIgnoreCase));
         }
     }
 }
