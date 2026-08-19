@@ -5,31 +5,17 @@
     Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
 }
 
-<div class="content-topbar @(isAdmin ? "att-admin-topbar" : "")">
-    @if (isAdmin)
-    {
-        <div class="att-topbar-heading">Attendance Records (Admin and Staff)</div>
-    }
+<div class="content-topbar">
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
 <div class="page-card">
-    @if (!isAdmin)
-    {
-        <div class="att-page-title">Attendance Records</div>
-    }
+    <div class="att-page-title">Attendance Records</div>
 
     @if (ViewBag.ShowingAllProjects == true)
     {
         <div class="genpay-fallback-note">
             Showing all active projects — none are currently assigned to your account specifically.
-        </div>
-    }
-
-    @if (isAdmin)
-    {
-        <div class="att-source-note">
-            Daily punches imported by payroll staff. Choose a project and period to review the same rows they saved.
         </div>
     }
 

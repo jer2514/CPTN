@@ -3245,29 +3245,6 @@ button.badge-btn {
     color: #0d7a3e;
 }
 
-.att-admin-topbar {
-    background: #5c6370;
-    color: #fff;
-    border-radius: 10px;
-    padding: 12px 18px;
-    margin-top: 0;
-    margin-bottom: 18px;
-}
-
-.att-topbar-heading {
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: #fff;
-}
-
-.att-source-note {
-    font-size: 13px;
-    color: #5b6f94;
-    margin: -4px 0 16px;
-}
-
 .att-filter-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

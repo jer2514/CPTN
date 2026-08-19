@@ -31,9 +31,7 @@ namespace RSDSystem.Controllers
 
         public async Task<IActionResult> Records()
         {
-            ViewBag.PageTitle = IsAdmin
-                ? "Attendance Records (Admin and Staff)"
-                : "Attendance Records";
+            ViewBag.PageTitle = "Attendance Records";
             ViewBag.IsAdmin = IsAdmin;
             return View(await LoadProjectsAsync());
         }
@@ -43,7 +41,7 @@ namespace RSDSystem.Controllers
             if (!IsAdmin)
                 return RedirectToAction(nameof(Records));
 
-            ViewBag.PageTitle = "Attendance Summary (Admin)";
+            ViewBag.PageTitle = "Attendance Summary";
             ViewBag.IsAdmin = true;
             return View(await LoadProjectsAsync());
         }
