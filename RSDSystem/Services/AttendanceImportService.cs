@@ -124,6 +124,7 @@ namespace RSDSystem.Services
             {
                 batch.Records.Add(new AttendanceRecord
                 {
+                    ProjectId = preview.Project.ProjectId,
                     EmployeeId = row.EmployeeId,
                     ExternalUserId = Clip(row.ExternalUserId, 40) ?? "",
                     // Store the matched system name when we have one; otherwise keep the raw file name
@@ -424,6 +425,7 @@ namespace RSDSystem.Services
                     record = new AttendanceRecord
                     {
                         AttendanceImportId = model.AttendanceImportId,
+                        ProjectId = import.ProjectId,
                         EmployeeId = model.EmployeeId,
                         ExternalUserId = model.ExternalUserId,
                         EmployeeName = model.EmployeeName,

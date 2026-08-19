@@ -78,6 +78,7 @@ BEGIN
     CREATE TABLE [dbo].[AttendanceRecords] (
         [AttendanceRecordId] int IDENTITY(1,1) NOT NULL CONSTRAINT [PK_AttendanceRecords] PRIMARY KEY,
         [AttendanceImportId] int NOT NULL,
+        [ProjectId] int NOT NULL,
         [EmployeeId] int NULL,
         [ExternalUserId] nvarchar(40) NOT NULL,
         [EmployeeName] nvarchar(150) NOT NULL,
@@ -113,6 +114,7 @@ BEGIN
     CREATE TABLE [dbo].[AttendanceRecords] (
         [AttendanceRecordId] int IDENTITY(1,1) NOT NULL CONSTRAINT [PK_AttendanceRecords] PRIMARY KEY,
         [AttendanceImportId] int NOT NULL,
+        [ProjectId] int NOT NULL,
         [EmployeeId] int NULL,
         [ExternalUserId] nvarchar(40) NOT NULL,
         [EmployeeName] nvarchar(150) NOT NULL,
@@ -203,6 +205,22 @@ BEGIN
         ALTER TABLE [dbo].[AttendanceRecords] ADD [Matched] bit NOT NULL CONSTRAINT [DF_AttendanceRecords_Matched] DEFAULT(0);
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'EmployeeId') IS NULL
         ALTER TABLE [dbo].[AttendanceRecords] ADD [EmployeeId] int NULL;
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'ProjectId') IS NULL
+    BEGIN
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [ProjectId] int NULL;
+        UPDATE r SET r.[ProjectId] = i.[ProjectId]
+        FROM [dbo].[AttendanceRecords] r
+        INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId];
+        IF NOT EXISTS (SELECT 1 FROM [dbo].[AttendanceRecords] WHERE [ProjectId] IS NULL)
+            ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [ProjectId] int NOT NULL;
+    END
+    ELSE
+    BEGIN
+        UPDATE r SET r.[ProjectId] = i.[ProjectId]
+        FROM [dbo].[AttendanceRecords] r
+        INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId]
+        WHERE r.[ProjectId] IS NULL;
+    END
 
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') IS NOT NULL AND COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') < 80
         ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [TimeIn1] nvarchar(40) NULL;
