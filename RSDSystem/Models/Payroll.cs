@@ -15,6 +15,9 @@ namespace RSDSystem.Models
         public int ProjectId { get; set; }
         public Project? Project { get; set; }
 
+        public int? PayrollScheduleId { get; set; }
+        public PayrollSchedule? PayrollSchedule { get; set; }
+
         public DateTime PayPeriodStart { get; set; }
         public DateTime PayPeriodEnd { get; set; }
 

@@ -49,6 +49,7 @@
                     <th>Employee ID</th>
                     <th>Employee Name</th>
                     <th>Job</th>
+                    <th>Period</th>
                     <th>Status</th>
                     <th>Action</th>
                 </tr>
@@ -155,7 +156,8 @@
             return '';
         }
 
-        // Draft / Correction -> Submit, View, Delete
+        // Draft -> Submit, View, Delete
+        // Correction -> Submit, View
         // Submitted / Approved -> View only
         function actionButtons(p) {
             const status = (p.status || '').trim();
@@ -166,7 +168,7 @@
             }
 
             btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-            if (status === 'Draft' || status === 'Correction') {
+            if (status === 'Draft') {
                 btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
             }
             return btns;
@@ -180,6 +182,7 @@
                     <td>${p.displayId}</td>
                     <td>${p.employeeName}</td>
                     <td>${p.job}</td>
+                    <td>${p.period || '—'}</td>
                     <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">

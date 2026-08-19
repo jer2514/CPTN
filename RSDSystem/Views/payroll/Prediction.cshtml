@@ -30,7 +30,7 @@
     </div>
 
     <div id="predictionEmpty" class="text-center text-muted py-5">
-        Select a project and click Load Prediction.
+        Select a project and click Load Prediction to forecast the next monthly budget from the previous two months.
     </div>
 </div>
 
@@ -46,16 +46,20 @@
             <strong id="prMonth">—</strong>
         </div>
         <div class="pred-result-row">
-            <span>Predicted Payroll</span>
+            <span id="prPrevious1Label">Previous Budget</span>
+            <strong id="prPrevious1">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span id="prPrevious2Label">Previous Budget</span>
+            <strong id="prPrevious2">—</strong>
+        </div>
+        <div class="pred-result-row">
+            <span>Predicted Monthly Budget</span>
             <strong id="prPredicted">—</strong>
         </div>
+        <div class="pred-result-hint">Predicted from this project’s previous two monthly budgets.</div>
         <div class="pred-result-row">
-            <span>Allocated Budget</span>
-            <strong id="prBudget">—</strong>
-        </div>
-        <div class="pred-result-hint">Allocated budget is the project monthly budget for this month.</div>
-        <div class="pred-result-row">
-            <span>Budget Difference</span>
+            <span>Change from last month</span>
             <strong id="prDifference">—</strong>
         </div>
         <div id="prRisk" class="pred-risk" hidden>
@@ -124,17 +128,15 @@
             list.innerHTML = (page.rows || []).map((row, index) => `
                 <div class="vp-period-card pred-forecast-card">
                     <div class="pred-forecast-head">
-                        <span>Previous Payroll ${row.previousMonth1}</span>
-                        <span>Previous Payroll ${row.previousMonth2}</span>
-                        <span>Predicted Payroll ${row.predictionMonth}</span>
-                        <span>Allocated Budget ${row.predictionMonth}</span>
+                        <span>Previous Budget ${row.previousMonth1}</span>
+                        <span>Previous Budget ${row.previousMonth2}</span>
+                        <span>Predicted Budget ${row.predictionMonth}</span>
                         <span>Action</span>
                     </div>
                     <div class="pred-forecast-body">
                         <span>${peso(row.previousAmount1)}</span>
                         <span>${peso(row.previousAmount2)}</span>
-                        <span>${peso(row.predictedPayroll)}</span>
-                        <span>${peso(row.allocatedBudget)}</span>
+                        <span>${peso(row.predictedBudget ?? row.predictedPayroll)}</span>
                         <span>
                             <button type="button" class="pill-btn pill-view" data-row-index="${index}">
                                 <i class="bi bi-eye-fill"></i> View
@@ -148,8 +150,15 @@
         function openResult(row, generatedAt, projectName) {
             document.getElementById('prProject').textContent = projectName || '—';
             document.getElementById('prMonth').textContent = row.predictionMonth || '—';
-            document.getElementById('prPredicted').textContent = peso(row.predictedPayroll);
-            document.getElementById('prBudget').textContent = peso(row.allocatedBudget);
+            document.getElementById('prPrevious1Label').textContent = row.previousMonth1
+                ? ('Previous Budget ' + row.previousMonth1)
+                : 'Previous Budget';
+            document.getElementById('prPrevious2Label').textContent = row.previousMonth2
+                ? ('Previous Budget ' + row.previousMonth2)
+                : 'Previous Budget';
+            document.getElementById('prPrevious1').textContent = peso(row.previousAmount1);
+            document.getElementById('prPrevious2').textContent = peso(row.previousAmount2);
+            document.getElementById('prPredicted').textContent = peso(row.predictedBudget ?? row.predictedPayroll);
             document.getElementById('prDifference').textContent = peso(row.budgetDifference);
             const risk = document.getElementById('prRisk');
             if (row.riskTitle) {
@@ -199,7 +208,7 @@
             const section = document.getElementById('predictionSection');
             section.style.display = 'none';
             empty.style.display = 'block';
-            empty.textContent = 'Loading payroll prediction...';
+            empty.textContent = 'Loading budget prediction...';
 
             try {
                 const url = '/Payroll/GetPrediction?projectId=' + projectIdInput.value
@@ -217,7 +226,7 @@
                 empty.style.display = 'none';
                 section.style.display = 'block';
             } catch (err) {
-                empty.textContent = 'Could not load payroll prediction.';
+                empty.textContent = 'Could not load budget prediction.';
             }
         });
     </script>

@@ -13,6 +13,7 @@
     var endMin = string.IsNullOrEmpty(defaultStart) ? minDate : defaultStart;
     var isEdit = ViewBag.IsEdit is true;
     var payrollId = ViewBag.PayrollId is int pid ? pid : 0;
+    var payrollScheduleId = ViewBag.PayrollScheduleId is int sid ? sid : 0;
     var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
     var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
     var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
@@ -26,6 +27,7 @@
         hourlyRate = Model.RatePerHour,
         boundMin = minDate,
         boundMax = maxDate,
+        hasSchedule = ViewBag.HasPayrollSchedule is true,
         isEdit,
         payrollId,
         returnUrl,
@@ -69,6 +71,7 @@ else
         <input type="hidden" name="employeeId" value="@Model.EmployeeId" />
         <input type="hidden" name="projectId" value="@project?.ProjectId" />
         <input type="hidden" name="payrollId" value="@payrollId" />
+        <input type="hidden" name="payrollScheduleId" value="@payrollScheduleId" />
 
         <div class="slip-row3">
             <div>
@@ -100,17 +103,23 @@ else
             </div>
         </div>
 
-        @if (!string.IsNullOrEmpty(minDate) || !string.IsNullOrEmpty(maxDate))
+        @if (ViewBag.HasPayrollSchedule is true && (!string.IsNullOrEmpty(minDate) || !string.IsNullOrEmpty(maxDate)))
         {
-            var projectStartLabel = !string.IsNullOrEmpty(minDate)
+            var scheduleStartLabel = !string.IsNullOrEmpty(minDate)
                 ? DateTime.Parse(minDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
-                : "the project start";
-            var projectEndLabel = !string.IsNullOrEmpty(maxDate)
+                : "the schedule start";
+            var scheduleEndLabel = !string.IsNullOrEmpty(maxDate)
                 ? DateTime.Parse(maxDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
-                : "the project end";
-            <div class="slip-schedule-hint">
-                Pay period must fall within the project dates:
-                @projectStartLabel – @projectEndLabel
+                : "the schedule end";
+            <div class="slip-schedule-hint" id="payPeriodScheduleHint">
+                Pay period must fall within the payroll schedule:
+                @scheduleStartLabel – @scheduleEndLabel
+            </div>
+        }
+        else
+        {
+            <div class="slip-schedule-hint slip-schedule-hint-warn" id="payPeriodScheduleHint">
+                A payroll schedule must be added by the admin before generating payroll.
             </div>
         }
 
@@ -171,7 +180,8 @@ else
             </div>
         </div>
 
-        <button type="submit" id="generateBtn" class="btn-primary-blue-block">
+        <button type="submit" id="generateBtn" class="btn-primary-blue-block"
+                @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
             @(isEdit ? "Save Changes" : "Generate Payroll")
         </button>
     </form>

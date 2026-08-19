@@ -11,14 +11,16 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _attendance;
+        private readonly NotificationService _notifications;
 
         // TODO: replace with the signed-in user's FullName once auth/session is wired up
         private const string CurrentStaffName = "Patrick Bateman";
 
-        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance)
+        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance, NotificationService notifications)
         {
             _db = db;
             _attendance = attendance;
+            _notifications = notifications;
         }
 
         // GET /PayrollStaff  → "To do task" dashboard
@@ -114,43 +116,118 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetProjectEmployees(int projectId)
         {
-            var project = await _db.Projects.FindAsync(projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
-
-            var employees = await _db.Employees
-                  .Where(e => e.ProjectId == projectId)
-                  .OrderBy(e => e.LastName)
-                  .ToListAsync();
-
-            var generatedEmployeeIds = await _db.Set<Payroll>()
-                  .Where(p => p.ProjectId == projectId)
-                  .Select(p => p.EmployeeId)
-                  .Distinct()
-                  .ToListAsync();
-
-            var result = employees.Select(e => new
+            try
             {
-                e.EmployeeId,
-                DisplayId = EmployeeIds.Format(e.EmployeeCode),
-                Name = e.FullName,
-                e.JobClassification,
-                e.DailyRate,
-                e.RatePerHour,
-                e.IsActive,
-                AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId)
-            });
+                var project = await _db.Projects.FindAsync(projectId);
+                if (project == null)
+                    return Json(new { success = false, message = "Project not found." });
 
-            return Json(new { success = true, projectName = project.ProjectName, employees = result });
+                var employees = await _db.Employees
+                      .Where(e => e.ProjectId == projectId)
+                      .OrderBy(e => e.LastName)
+                      .ToListAsync();
+
+                var schedules = await _db.Set<PayrollSchedule>()
+                    .Where(s => s.ProjectId == projectId)
+                    .OrderBy(s => s.StartingDate)
+                    .ToListAsync();
+                var openSchedule = PayrollPeriods.Open(schedules);
+
+                var generatedEmployeeIds = new HashSet<int>();
+                try
+                {
+                    generatedEmployeeIds = await GeneratedEmployeeIdsAsync(projectId, openSchedule, includeScheduleId: true);
+                }
+                catch
+                {
+                    try
+                    {
+                        generatedEmployeeIds = await GeneratedEmployeeIdsAsync(projectId, openSchedule, includeScheduleId: false);
+                    }
+                    catch
+                    {
+                        generatedEmployeeIds = new HashSet<int>();
+                    }
+                }
+
+                var result = employees.Select(e => new
+                {
+                    e.EmployeeId,
+                    DisplayId = EmployeeIds.Format(e.EmployeeCode),
+                    Name = e.FullName,
+                    e.JobClassification,
+                    e.DailyRate,
+                    e.RatePerHour,
+                    e.IsActive,
+                    AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId)
+                });
+
+                return Json(new
+                {
+                    success = true,
+                    projectName = project.ProjectName,
+                    hasSchedule = openSchedule != null,
+                    scheduleId = openSchedule?.PayrollScheduleId,
+                    scheduleLabel = openSchedule != null ? PayrollPeriods.Label(openSchedule) : null,
+                    message = openSchedule == null
+                        ? (schedules.Count == 0
+                            ? "Ask the admin to add a payroll schedule before generating payroll."
+                            : "All payroll schedules for this project are marked done. Ask the admin to add the next schedule.")
+                        : null,
+                    employees = result
+                });
+            }
+            catch
+            {
+                return Json(new { success = false, message = "Could not load employees for this project." });
+            }
+        }
+
+        private async Task<HashSet<int>> GeneratedEmployeeIdsAsync(
+            int projectId, PayrollSchedule? openSchedule, bool includeScheduleId)
+        {
+            if (openSchedule == null)
+                return new HashSet<int>();
+
+            if (includeScheduleId)
+            {
+                var payrolls = await _db.Set<Payroll>()
+                    .AsNoTracking()
+                    .Where(p => p.ProjectId == projectId)
+                    .Select(p => new { p.EmployeeId, p.PayrollScheduleId, p.PayPeriodStart, p.PayPeriodEnd })
+                    .ToListAsync();
+                return payrolls
+                    .Where(p => PayrollPeriods.BelongsTo(
+                        p.PayrollScheduleId, p.PayPeriodStart, p.PayPeriodEnd, openSchedule))
+                    .Select(p => p.EmployeeId)
+                    .ToHashSet();
+            }
+
+            var dated = await _db.Set<Payroll>()
+                .AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => new { p.EmployeeId, p.PayPeriodStart, p.PayPeriodEnd })
+                .ToListAsync();
+            return dated
+                .Where(p => PayrollPeriods.BelongsTo(
+                    null, p.PayPeriodStart, p.PayPeriodEnd, openSchedule))
+                .Select(p => p.EmployeeId)
+                .ToHashSet();
         }
 
         // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
-        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null, string? returnUrl = null,
+        public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null,
+            int? scheduleId = null, string? returnUrl = null,
             int? daysWorked = null, int? absentDays = null, decimal? overtimeHours = null)
         {
             var emp = await _db.Employees.FindAsync(employeeId);
             var project = await _db.Projects.FindAsync(projectId);
             if (emp == null || project == null) return NotFound();
+
+            var schedules = await _db.Set<PayrollSchedule>()
+                .Where(s => s.ProjectId == projectId)
+                .OrderBy(s => s.StartingDate)
+                .ToListAsync();
 
             Payroll? existing = null;
             if (payrollId.HasValue && payrollId.Value > 0)
@@ -169,10 +246,18 @@ namespace RSDSystem.Controllers
             }
             else
             {
-                existing = await _db.Set<Payroll>()
-                    .Where(p => p.EmployeeId == employeeId && p.ProjectId == projectId)
-                    .OrderByDescending(p => p.GeneratedDate)
-                    .FirstOrDefaultAsync();
+                var targetSchedule = scheduleId.HasValue
+                    ? schedules.FirstOrDefault(s => s.PayrollScheduleId == scheduleId.Value)
+                    : PayrollPeriods.Open(schedules);
+
+                if (targetSchedule != null)
+                {
+                    var matches = await _db.Set<Payroll>()
+                        .Where(p => p.EmployeeId == employeeId && p.ProjectId == projectId)
+                        .OrderByDescending(p => p.GeneratedDate)
+                        .ToListAsync();
+                    existing = matches.FirstOrDefault(p => PayrollPeriods.BelongsTo(p, targetSchedule));
+                }
 
                 if (existing != null)
                 {
@@ -195,15 +280,11 @@ namespace RSDSystem.Controllers
                 }
             }
 
-            var schedules = await _db.Set<PayrollSchedule>()
-                .Where(s => s.ProjectId == projectId)
-                .OrderBy(s => s.StartingDate)
-                .ToListAsync();
-
-            var projectStart = DateRules.IsUsableDate(project.StartingDate)
-                ? project.StartingDate!.Value.Date : (DateTime?)null;
-            var projectEnd = DateRules.IsUsableDate(project.EstimateEndDate)
-                ? project.EstimateEndDate!.Value.Date : (DateTime?)null;
+            var activeSchedule = existing != null
+                ? PayrollPeriods.ForPayroll(schedules, existing)
+                : (scheduleId.HasValue
+                    ? schedules.FirstOrDefault(s => s.PayrollScheduleId == scheduleId.Value)
+                    : PayrollPeriods.Open(schedules));
 
             DateTime defaultStart;
             DateTime defaultEnd;
@@ -212,10 +293,15 @@ namespace RSDSystem.Controllers
                 defaultStart = existing.PayPeriodStart.Date;
                 defaultEnd = existing.PayPeriodEnd.Date;
             }
+            else if (activeSchedule != null)
+            {
+                defaultStart = activeSchedule.StartingDate.Date;
+                defaultEnd = activeSchedule.EndDate.Date;
+            }
             else
             {
-                (defaultStart, defaultEnd) = await ResolvePayPeriodAsync(
-                    projectId, schedules, projectStart, projectEnd, HttpContext.RequestAborted);
+                defaultStart = DateTime.Today;
+                defaultEnd = DateTime.Today;
             }
 
             if (defaultEnd < defaultStart)
@@ -234,8 +320,8 @@ namespace RSDSystem.Controllers
             ViewBag.DisplayId = EmployeeIds.Format(emp.EmployeeCode);
             ViewBag.Project = project;
             ViewBag.Schedules = schedules;
-            ViewBag.ProjectStart = projectStart?.ToString("yyyy-MM-dd") ?? "";
-            ViewBag.ProjectEnd = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.HasPayrollSchedule = activeSchedule != null;
+            ViewBag.PayrollScheduleId = activeSchedule?.PayrollScheduleId ?? 0;
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
             ViewBag.DefaultDaysWorked = daysWorked
@@ -251,8 +337,12 @@ namespace RSDSystem.Controllers
                 ?? attendance?.OvertimeHours
                 ?? 0;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
-            ViewBag.MinDate = projectStart?.ToString("yyyy-MM-dd") ?? "";
-            ViewBag.MaxDate = projectEnd?.ToString("yyyy-MM-dd") ?? "";
+            ViewBag.MinDate = activeSchedule != null
+                ? activeSchedule.StartingDate.ToString("yyyy-MM-dd")
+                : "";
+            ViewBag.MaxDate = activeSchedule != null
+                ? activeSchedule.EndDate.ToString("yyyy-MM-dd")
+                : "";
             ViewBag.AttendanceFound = attendance != null;
 
             return View(emp);
@@ -315,6 +405,7 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Project not found." });
 
             var errors = new Dictionary<string, string>();
+            PayrollSchedule? coveringSchedule = null;
 
             foreach (var result in DateRules.ValidateDateRange(
                 payPeriodStart, payPeriodEnd,
@@ -350,17 +441,27 @@ namespace RSDSystem.Controllers
                 if (overtimeHours > otCapDays * 24)
                     errors["overtimeHours"] = "Overtime hours cannot exceed 24 hours per day worked.";
 
-                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodStart.Date < project.StartingDate!.Value.Date)
-                    errors["payPeriodStart"] = "Pay period cannot start before the project starting date.";
+                var schedules = await _db.Set<PayrollSchedule>()
+                    .Where(s => s.ProjectId == projectId)
+                    .OrderBy(s => s.StartingDate)
+                    .ToListAsync();
 
-                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodEnd.Date > project.EstimateEndDate!.Value.Date)
-                    errors["payPeriodEnd"] = "Pay period cannot end after the project estimate end date.";
-
-                if (DateRules.IsUsableDate(project.StartingDate) && payPeriodEnd.Date < project.StartingDate!.Value.Date)
-                    errors["payPeriodEnd"] = "Pay period cannot end before the project starting date.";
-
-                if (DateRules.IsUsableDate(project.EstimateEndDate) && payPeriodStart.Date > project.EstimateEndDate!.Value.Date)
-                    errors["payPeriodStart"] = "Pay period cannot start after the project estimate end date.";
+                if (schedules.Count == 0)
+                {
+                    errors["payPeriodStart"] = "A payroll schedule must be added by the admin before generating payroll.";
+                }
+                else
+                {
+                    coveringSchedule = PayrollPeriods.Covering(schedules, payPeriodStart, payPeriodEnd);
+                    if (coveringSchedule == null)
+                    {
+                        var open = PayrollPeriods.Open(schedules);
+                        var rangeLabel = open != null
+                            ? PayrollPeriods.Label(open)
+                            : "the payroll schedule set by the admin";
+                        errors["payPeriodStart"] = $"Pay period must fall within the payroll schedule: {rangeLabel}.";
+                    }
+                }
             }
 
             decimal regularPay = emp.DailyRate * regularDaysWorked;
@@ -405,6 +506,7 @@ namespace RSDSystem.Controllers
             {
                 payroll.PayPeriodStart = payPeriodStart.Date;
                 payroll.PayPeriodEnd = payPeriodEnd.Date;
+                payroll.PayrollScheduleId = coveringSchedule?.PayrollScheduleId ?? payroll.PayrollScheduleId;
                 payroll.RegularDaysWorked = regularDaysWorked;
                 payroll.OvertimeHours = overtimeHours;
                 payroll.AbsentDays = absentDays;
@@ -418,14 +520,24 @@ namespace RSDSystem.Controllers
             }
             else
             {
-                var alreadyGenerated = await _db.Set<Payroll>().AnyAsync(p =>
-                    p.EmployeeId == employeeId && p.ProjectId == projectId);
-                if (alreadyGenerated)
+                if (coveringSchedule == null)
                 {
                     return Json(new
                     {
                         success = false,
-                        message = "Payroll has already been generated for this employee."
+                        message = "A payroll schedule must be added by the admin before generating payroll."
+                    });
+                }
+
+                var alreadyGenerated = await _db.Set<Payroll>()
+                    .Where(p => p.EmployeeId == employeeId && p.ProjectId == projectId)
+                    .ToListAsync();
+                if (alreadyGenerated.Any(p => PayrollPeriods.BelongsTo(p, coveringSchedule)))
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = "Payroll has already been generated for this employee in this schedule."
                     });
                 }
 
@@ -433,6 +545,7 @@ namespace RSDSystem.Controllers
                 {
                     EmployeeId = employeeId,
                     ProjectId = projectId,
+                    PayrollScheduleId = coveringSchedule.PayrollScheduleId,
                     PayPeriodStart = payPeriodStart.Date,
                     PayPeriodEnd = payPeriodEnd.Date,
                     RegularDaysWorked = regularDaysWorked,
@@ -523,21 +636,36 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Project not found." });
 
             var payrolls = await _db.Set<Payroll>()
-                                    .Include(p => p.Employee)
-                                    .Where(p => p.ProjectId == projectId)
-                                    .ToListAsync();
+                .AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => new
+                {
+                    p.PayrollId,
+                    p.Status,
+                    p.NetPay,
+                    p.PayPeriodStart,
+                    p.PayPeriodEnd,
+                    p.GeneratedDate,
+                    EmployeeCode = p.Employee != null ? p.Employee.EmployeeCode : null,
+                    FirstName = p.Employee != null ? p.Employee.FirstName : null,
+                    LastName = p.Employee != null ? p.Employee.LastName : null,
+                    Job = p.Employee != null ? p.Employee.JobClassification : null
+                })
+                .ToListAsync();
 
             var ordered = payrolls
                 .OrderBy(p => PayrollStatusOptions.SortRank(p.Status))
+                .ThenByDescending(p => p.PayPeriodStart)
                 .ThenByDescending(p => p.GeneratedDate)
                 .Select(p => new
                 {
                     p.PayrollId,
-                    DisplayId = EmployeeIds.Format(p.Employee?.EmployeeCode),
-                    EmployeeName = p.Employee?.FullName,
-                    Job = p.Employee?.JobClassification,
+                    DisplayId = EmployeeIds.Format(p.EmployeeCode),
+                    EmployeeName = string.Join(" ", new[] { p.FirstName, p.LastName }.Where(n => !string.IsNullOrWhiteSpace(n))),
+                    p.Job,
                     p.Status,
-                    p.NetPay
+                    p.NetPay,
+                    Period = PayrollPeriods.Label(p.PayPeriodStart, p.PayPeriodEnd)
                 });
 
             return Json(new { success = true, projectName = project.ProjectName, payrolls = ordered });
@@ -563,7 +691,9 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitPayroll(int id)
         {
-             var payroll = await _db.Set<Payroll>().FindAsync(id);
+             var payroll = await _db.Set<Payroll>()
+                 .Include(p => p.Project)
+                 .FirstOrDefaultAsync(p => p.PayrollId == id);
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
@@ -575,6 +705,9 @@ namespace RSDSystem.Controllers
 
              payroll.Status = PayrollStatusOptions.Submitted;
              await _db.SaveChangesAsync();
+
+             if (payroll.Project != null)
+                 await _notifications.NotifyPayrollSubmittedAsync(payroll.Project, payroll.GeneratedBy, HttpContext.RequestAborted);
 
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }
@@ -589,9 +722,10 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Payroll record not found." });
 
             if (payroll.Status == PayrollStatusOptions.Submitted ||
-                payroll.Status == PayrollStatusOptions.Approved)
+                payroll.Status == PayrollStatusOptions.Approved ||
+                payroll.Status == PayrollStatusOptions.Correction)
             {
-                return Json(new { success = false, message = "Submitted or approved payroll cannot be deleted." });
+                return Json(new { success = false, message = "Submitted, approved, or correction payroll cannot be deleted." });
             }
 
             _db.Set<Payroll>().Remove(payroll);
@@ -604,37 +738,6 @@ namespace RSDSystem.Controllers
         {
              // TODO: clear auth/session once login is implemented
              return RedirectToAction(nameof(Index));
-        }
-
-        private async Task<(DateTime Start, DateTime End)> ResolvePayPeriodAsync(
-            int projectId,
-            List<PayrollSchedule> schedules,
-            DateTime? projectStart,
-            DateTime? projectEnd,
-            CancellationToken cancellationToken)
-        {
-            var open = schedules
-                .Where(s => !s.TaskCompleted)
-                .OrderBy(s => s.StartingDate)
-                .FirstOrDefault();
-            if (open != null)
-                return (open.StartingDate.Date, open.EndDate.Date);
-
-            var latestSchedule = schedules
-                .OrderByDescending(s => s.StartingDate)
-                .FirstOrDefault();
-            if (latestSchedule != null)
-                return (latestSchedule.StartingDate.Date, latestSchedule.EndDate.Date);
-
-            var periods = await _attendance.ListPeriodsAsync(projectId, cancellationToken);
-            if (periods.Count > 0)
-                return (periods[0].Start, periods[0].End);
-
-            var start = projectStart ?? DateTime.Today.AddDays(-6);
-            var end = projectEnd ?? DateTime.Today;
-            if (end < start)
-                end = start;
-            return (start, end);
         }
 
         private string? SafeReturnUrl(string? returnUrl)
