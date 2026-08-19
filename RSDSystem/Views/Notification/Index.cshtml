@@ -1,4 +1,5 @@
 @model List<RSDSystem.Models.AppNotification>
+@using RSDSystem.Services
 @{
     ViewData["Title"] = "Notifications";
     var role = Context.Session.GetString("Role");
@@ -10,7 +11,7 @@
 }
 
 <div class="content-topbar">
-    <a asp-controller="@backController" asp-action="Index" class="btn-back" style="margin-bottom:0">
+    <a asp-controller="@backController" asp-action="Index" class="btn-back">
         <i class="bi bi-arrow-left"></i> Back
     </a>
     <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
@@ -20,7 +21,7 @@
     <div class="notif-page-title">Notifications</div>
 
     <div class="notif-filter-bar">
-        <span>All</span>
+        <span class="notif-filter-active">All</span>
         <button type="button" class="notif-mark-all" id="notifPageMarkAll">mark all as read</button>
     </div>
 
@@ -46,7 +47,10 @@
                         <i class="bi @RSDSystem.Models.NotificationKinds.Icon(item.Kind)"></i>
                     </span>
                     <span class="notif-page-copy">
-                        <span class="notif-item-title">@item.Title</span>
+                        <span class="notif-item-top">
+                            <span class="notif-item-title">@item.Title</span>
+                            <span class="notif-item-time">@NotificationService.RelativeTime(item.CreatedAt)</span>
+                        </span>
                         <span class="notif-item-msg">@item.Message</span>
                     </span>
                     @if (!item.IsRead)
