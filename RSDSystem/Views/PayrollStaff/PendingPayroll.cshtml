@@ -1,4 +1,5 @@
-﻿@{
+﻿@model List<RSDSystem.Models.Project>
+@{
     ViewData["Title"] = "Pending Payroll";
     Layout = "_PayrollStaffLayout";
 }
@@ -62,13 +63,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput   = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -242,8 +240,8 @@
         function confirmDelete(payrollId) {
             pendingDeleteId = payrollId;
             const row = currentPayrolls.find(p => p.payrollId === payrollId);
-            const name = row?.employeeName || 'this employee';
-            const status = (row?.status || 'payroll').toLowerCase();
+            const name = (row && row.employeeName) || 'this employee';
+            const status = ((row && row.status) || 'payroll').toLowerCase();
             document.getElementById('deleteTitle').textContent = 'Delete Payroll?';
             document.getElementById('deleteMsg').textContent =
                 `This will permanently remove ${name}'s ${status} payroll record. This action cannot be undone.`;

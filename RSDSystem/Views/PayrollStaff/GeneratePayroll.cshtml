@@ -70,14 +70,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        // ── Project data pushed from server ─────────────────────────
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                    @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput   = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -217,7 +213,8 @@
             btn.disabled = true;
             btn.textContent = 'Generating...';
 
-            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
             const form = new FormData();
             form.append('employeeId', employeeId);
             form.append('projectId', currentProjectId);

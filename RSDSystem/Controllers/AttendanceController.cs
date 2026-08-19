@@ -129,7 +129,7 @@ namespace RSDSystem.Controllers
                     result.RowCount,
                     result.MatchedCount,
                     result.UnmatchedCount,
-                    result.FilteredOutCount
+                    filteredOutCount = result.FilteredOutCount
                 });
             }
             catch (Exception ex)

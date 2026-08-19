@@ -137,20 +137,18 @@
 
 @section Scripts {
     <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
         const suggestList = document.getElementById('projectSuggestions');
         const fileInput = document.getElementById('fileInput');
         const fileNameInput = document.getElementById('fileNameInput');
-        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]')?.value;
+        const tokenInput = document.querySelector('#__afToken input[name="__RequestVerificationToken"]');
+        const token = tokenInput ? tokenInput.value : '';
 
         let previewRows = [];
         let previewFormat = 'Statistic';
@@ -234,7 +232,7 @@
                 empty.textContent = names.length
                     ? 'Project loaded. Choose the attendance file and click Load File to extract, then keep only this project\'s employees.'
                     : 'Assign employees to this project first.';
-            } catch {
+            } catch (err) {
                 empty.textContent = 'Could not load the project roster.';
             }
         });
@@ -350,7 +348,7 @@
             });
             const text = await res.text();
             let data = null;
-            try { data = JSON.parse(text); } catch { data = null; }
+            try { data = JSON.parse(text); } catch (err) { data = null; }
             if (data) return data;
             if (res.status === 401 || res.status === 302)
                 throw new Error('Your session expired. Refresh the page and sign in again.');
@@ -409,7 +407,7 @@
                 empty.style.display = 'none';
                 section.style.display = 'block';
                 renderPreview();
-            } catch {
+            } catch (err) {
                 empty.textContent = 'Could not read the attendance file.';
             }
         });
