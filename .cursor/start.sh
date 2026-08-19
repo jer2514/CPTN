@@ -61,12 +61,20 @@ echo "==> Preparing SQL Server engine"
 if pgrep -x sqlservr >/dev/null 2>&1; then
     echo "    sqlservr already running"
 else
-    # If a data file exists but cannot be opened with O_DIRECT it is a stale,
-    # read-only lower-layer copy from the image; start clean instead.
-    if [ -f "$MASTER_MDF" ] && \
-       ! sudo dd if="$MASTER_MDF" iflag=direct bs=4096 count=1 of=/dev/null >/dev/null 2>&1; then
-        echo "    Detected unusable (read-only overlay) database files"
-        reset_datadir
+    # A data directory that was baked into an environment snapshot lands in the
+    # read-only overlay lower layer. SQL Server then fails to open its files with
+    # O_DIRECT (Error 17113 / 87). Reinitialize on the writable layer when the
+    # data dir looks foreign: a master.mdf that fails an O_DIRECT probe, OR a
+    # non-empty dir missing master.mdf (a partially-baked first-run state). A
+    # truly empty dir is left alone so SQL Server can do a clean first-time setup.
+    if [ -d "$MSSQL_DATA" ] && sudo test -n "$(sudo sh -c "ls -A '$MSSQL_DATA' 2>/dev/null")"; then
+        if [ ! -f "$MASTER_MDF" ]; then
+            echo "    Detected a partial/foreign data directory (no master.mdf)"
+            reset_datadir
+        elif ! sudo dd if="$MASTER_MDF" iflag=direct bs=4096 count=1 of=/dev/null >/dev/null 2>&1; then
+            echo "    Detected unusable (read-only overlay) database files"
+            reset_datadir
+        fi
     fi
 
     launch_engine
@@ -90,6 +98,13 @@ wait_ready 30 >/dev/null || true
 
 echo "==> Applying EF Core migrations"
 dotnet ef database update --project "$REPO_ROOT/RSDSystem/RSDSystem.csproj"
+
+# Avoid launching a second instance if the app is already serving (e.g. this
+# script was run manually while the configured start command is also active).
+if curl -s -o /dev/null http://localhost:5114/Account/Login 2>/dev/null; then
+    echo "==> Web app already serving on http://localhost:5114; leaving it running"
+    exit 0
+fi
 
 echo "==> Starting the RSD Payroll web app on $ASPNETCORE_URLS"
 echo "    Demo logins: demo / Demo@123 (Admin), payroll / Payroll@123 (Payroll Staff)"
