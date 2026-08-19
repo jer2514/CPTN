@@ -32,29 +32,6 @@ namespace RSDSystem.Controllers
             return View(await LoadProjectsAsync());
         }
 
-        [HttpGet]
-        public async Task<IActionResult> ProjectRoster(int? projectId, string? projectName)
-        {
-            var roster = await _imports.GetRosterAsync(
-                projectId, projectName, StaffScope(), HttpContext.RequestAborted);
-            if (roster?.Project == null)
-                return Json(new { success = false, message = "Project not found. Type a project name and click Load." });
-
-            return Json(new
-            {
-                success = true,
-                projectId = roster.Project.ProjectId,
-                projectName = roster.Project.ProjectName,
-                employeeCount = roster.Employees.Count,
-                employees = roster.Employees.Select(e => new
-                {
-                    id = e.EmployeeId,
-                    code = AttendanceDisplay.EmployeeId(e.EmployeeCode),
-                    name = e.FullName
-                })
-            });
-        }
-
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
@@ -80,16 +57,18 @@ namespace RSDSystem.Controllers
                 format = preview.Format,
                 periodStart = AttendanceDisplay.LongDate(preview.PeriodStart),
                 periodEnd = AttendanceDisplay.LongDate(preview.PeriodEnd),
-                extractedCount = preview.ExtractedCount,
                 matchedCount = preview.MatchedCount,
                 unmatchedCount = preview.UnmatchedCount,
-                filteredOutCount = preview.FilteredOutCount,
-                filteredPeople = preview.FilteredPeople.Select(p => new
-                {
-                    externalUserId = p.ExternalUserId,
-                    employeeName = p.EmployeeName
-                }),
-                projectEmployees = preview.ProjectEmployees,
+                // Candidate employees for the "Select employee" dropdown on unmatched rows.
+                candidates = preview.CandidateEmployees
+                    .OrderBy(e => e.FirstName)
+                    .ThenBy(e => e.LastName)
+                    .Select(e => new
+                    {
+                        id = e.EmployeeId,
+                        name = e.FullName,
+                        code = AttendanceDisplay.EmployeeId(e.EmployeeCode)
+                    }),
                 rows = preview.Rows.Select(r => ToRowJson(r))
             });
         }
@@ -97,7 +76,8 @@ namespace RSDSystem.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
-        public async Task<IActionResult> ImportFile(int? projectId, string? projectName, IFormFile? file, string? overridesJson)
+        public async Task<IActionResult> ImportFile(
+            int? projectId, string? projectName, IFormFile? file, string? overridesJson, string? manualMatchesJson)
         {
             try
             {
@@ -115,6 +95,7 @@ namespace RSDSystem.Controllers
                     AttendanceImportSources.Manual,
                     StaffScope(),
                     overridesJson,
+                    manualMatchesJson,
                     HttpContext.RequestAborted);
 
                 if (result.Error != null)
@@ -123,13 +104,14 @@ namespace RSDSystem.Controllers
                 return Json(new
                 {
                     success = true,
-                    message = ImportMessage(result),
+                    message = result.ReplacedPrevious
+                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
                     result.ImportId,
                     result.ProjectId,
                     result.RowCount,
                     result.MatchedCount,
-                    result.UnmatchedCount,
-                    result.FilteredOutCount
+                    result.UnmatchedCount
                 });
             }
             catch (Exception ex)
@@ -168,6 +150,7 @@ namespace RSDSystem.Controllers
                         r.Employee?.EmployeeCode ?? r.ExternalUserId),
                     ExternalUserId = r.ExternalUserId,
                     EmployeeName = r.Employee?.FullName ?? r.EmployeeName,
+                    MatchedEmployeeName = r.Employee?.FullName,
                     WorkDate = r.WorkDate,
                     TimeIn1 = r.TimeIn1,
                     TimeOut1 = r.TimeOut1,
@@ -250,20 +233,6 @@ namespace RSDSystem.Controllers
         private string ImportedBy() =>
             HttpContext.Session.GetString("FullName") ?? "Staff";
 
-        private static string ImportMessage(AttendanceImportResult result)
-        {
-            var message = result.ReplacedPrevious
-                ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
-
-            if (result.FilteredOutCount > 0)
-            {
-                message += $" {result.FilteredOutCount} people from the file were not on this project and were skipped.";
-            }
-
-            return message;
-        }
-
         private static string? ValidateUpload(IFormFile? file)
         {
             if (file == null || file.Length == 0)
@@ -280,9 +249,12 @@ namespace RSDSystem.Controllers
         {
             recordId,
             row.EmployeeId,
+            // Raw extracted values (name / ID exactly as found in the file).
             row.DisplayId,
             row.ExternalUserId,
             row.EmployeeName,
+            // Only set once the row is matched (auto or manual) to a system employee.
+            matchedEmployeeName = row.MatchedEmployeeName,
             workDate = AttendanceDisplay.LongDate(row.WorkDate),
             workDateIso = row.WorkDate?.ToString("yyyy-MM-dd"),
             timeIn1 = AttendanceDisplay.Clock(row.TimeIn1),

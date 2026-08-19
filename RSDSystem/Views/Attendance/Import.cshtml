@@ -33,8 +33,6 @@
         </div>
     </div>
 
-    <div id="projectBanner" class="att-project-banner" style="display:none"></div>
-
     <div class="att-import-row">
         <div class="att-field">
             <label class="form-lbl">Attendance File</label>
@@ -48,8 +46,6 @@
         </div>
     </div>
 
-    <div id="extractBar" class="att-extract-bar" style="display:none"></div>
-
     <div id="previewSection" class="att-preview" style="display:none">
         <div class="emp-card-head" style="margin-top:6px">
             <div id="previewMeta" class="att-preview-meta"></div>
@@ -60,6 +56,7 @@
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Complete">Complete</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Incomplete">Incomplete</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
@@ -71,6 +68,11 @@
                     <input type="text" id="rowSearch" placeholder="Search User" />
                 </div>
             </div>
+        </div>
+
+        <div id="unmatchedBanner" class="genpay-fallback-note" style="display:none">
+            Some rows could not be automatically matched to an employee. Use the dropdown in the
+            <strong>Matched Employee</strong> column to select the correct employee for each highlighted row before importing.
         </div>
 
         <div class="att-table-wrap">
@@ -87,7 +89,7 @@
     </div>
 
     <div id="previewEmpty" class="text-center text-muted py-5">
-        Load a project, choose the attendance file, then click Load File. Only employees assigned to that project stay in the preview.
+        Select a project, choose the Employee Attendance Table Excel file, then click Load File to preview daily time cards.
     </div>
 </div>
 
@@ -141,7 +143,7 @@
         const allProjects = [
             @foreach (var p in Model)
             {
-                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
+                    @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
             }
         ];
 
@@ -153,10 +155,21 @@
         const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]')?.value;
 
         let previewRows = [];
+        let candidateEmployees = [];
+        let lastFileName = '';
+        let lastPeriodText = '';
         let previewFormat = 'Statistic';
         let statusFilter = 'all';
         let currentPage = 1;
         const pageSize = 10;
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
 
         function renderSuggestions(matches) {
             if (matches.length === 0) {
@@ -194,49 +207,13 @@
             if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
         });
 
-        document.getElementById('loadProjectBtn').addEventListener('click', async function () {
-            if (!projectIdInput.value && !projectInput.value.trim()) {
+        document.getElementById('loadProjectBtn').addEventListener('click', function () {
+            if (!projectIdInput.value) {
                 alert('Please select a project from the suggestion list.');
                 return;
             }
-
-            const banner = document.getElementById('projectBanner');
-            const extractBar = document.getElementById('extractBar');
-            const empty = document.getElementById('previewEmpty');
-            const section = document.getElementById('previewSection');
-            extractBar.style.display = 'none';
-            section.style.display = 'none';
-            empty.style.display = 'block';
-            banner.style.display = 'none';
-            empty.textContent = 'Loading project...';
-
-            try {
-                const params = new URLSearchParams({
-                    projectId: projectIdInput.value || '0',
-                    projectName: projectInput.value.trim()
-                });
-                const res = await fetch('/Attendance/ProjectRoster?' + params.toString(), {
-                    headers: { 'Accept': 'application/json' }
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    empty.textContent = data.message || 'Project not found.';
-                    return;
-                }
-
-                projectIdInput.value = data.projectId;
-                projectInput.value = data.projectName;
-                const names = (data.employees || []).map(e => e.name);
-                banner.style.display = 'block';
-                banner.innerHTML = names.length
-                    ? '<strong>' + data.projectName + '</strong> loaded. Matching will use ' + names.join(', ') + '.'
-                    : '<strong>' + data.projectName + '</strong> has no assigned employees. Assign people to this project before importing.';
-                empty.textContent = names.length
-                    ? 'Project loaded. Choose the attendance file and click Load File to extract, then keep only this project\'s employees.'
-                    : 'Assign employees to this project first.';
-            } catch {
-                empty.textContent = 'Could not load the project roster.';
-            }
+            document.getElementById('previewEmpty').textContent =
+                'Project loaded. Choose the attendance file and click Load File.';
         });
 
         document.getElementById('chooseFileBtn').addEventListener('click', () => fileInput.click());
@@ -261,7 +238,11 @@
         function filteredRows() {
             const q = document.getElementById('rowSearch').value.trim().toLowerCase();
             return previewRows.filter(r => {
-                const statusOk = statusFilter === 'all' || r.status === statusFilter;
+                const statusOk = statusFilter === 'all'
+                    ? true
+                    : statusFilter === 'Unmatched'
+                        ? !r.matched
+                        : r.status === statusFilter;
                 const text = `${r.displayId} ${r.employeeName} ${r.externalUserId}`.toLowerCase();
                 return statusOk && (!q || text.includes(q));
             });
@@ -276,6 +257,39 @@
             return text === '——' ? `<span class="att-empty">${text}</span>` : text;
         }
 
+        function matchOptionsHtml(selectedId) {
+            return candidateEmployees.map(c =>
+                `<option value="${c.id}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+            ).join('');
+        }
+
+        function matchCellHtml(row, index) {
+            if (row.matched) {
+                const name = escapeHtml(row.matchedEmployeeName || 'Matched');
+                if (row.manuallyMatched) {
+                    return `<span class="badge-active">${name}</span>
+                            <button type="button" class="att-action-link js-change-match" data-row-index="${index}">Change</button>`;
+                }
+                return `<span class="badge-active">${name}</span>`;
+            }
+
+            return `<select class="form-ctrl att-match-select" data-row-index="${index}">
+                        <option value="">Select employee…</option>
+                        ${matchOptionsHtml('')}
+                    </select>`;
+        }
+
+        function updateMatchSummary() {
+            const matched = previewRows.filter(r => r.matched).length;
+            const unmatched = previewRows.length - matched;
+
+            document.getElementById('previewMeta').textContent =
+                `${lastFileName} · ${lastPeriodText} · ${matched} matched, ${unmatched} unmatched`;
+
+            const banner = document.getElementById('unmatchedBanner');
+            if (banner) banner.style.display = unmatched > 0 ? 'block' : 'none';
+        }
+
         function renderPreview() {
             const rows = filteredRows();
             const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -285,21 +299,25 @@
             document.getElementById('previewHead').innerHTML = `<tr>
                     <th>Employee ID</th><th>Employee Name</th><th>Date</th>
                     <th>Time In</th><th>Time Out</th><th>Time In</th><th>Time Out</th>
-                    <th>Overtime In</th><th>Overtime Out</th><th>Status</th><th>Action</th>
+                    <th>Overtime In</th><th>Overtime Out</th><th>Status</th>
+                    <th>Matched Employee</th><th>Action</th>
                    </tr>`;
 
             document.getElementById('previewBody').innerHTML = pageRows.map(r => {
+                const index = previewRows.indexOf(r);
                 const status = `<span class="status-pill ${statusClass[r.status] || r.statusClass || ''}">${r.status}</span>`;
-                const action = `<button type="button" class="att-action-link" data-edit-index="${previewRows.indexOf(r)}">${r.edited ? 'Edited' : (r.actionLabel || 'Edit')}</button>`;
+                const action = `<button type="button" class="att-action-link" data-edit-index="${index}">${r.edited ? 'Edited' : (r.actionLabel || 'Edit')}</button>`;
                 const rowClass = [r.matched ? '' : 'att-row-unmatched', r.edited ? 'att-row-edited' : ''].filter(Boolean).join(' ');
                 return `<tr class="${rowClass}">
-                    <td>${r.displayId || '——'}</td>
-                    <td>${r.employeeName || '——'}</td>
+                    <td>${escapeHtml(r.displayId) || '——'}</td>
+                    <td>${escapeHtml(r.employeeName) || '——'}</td>
                     <td>${dash(r.workDate)}</td>
                     <td>${timeCell(r.timeIn1)}</td><td>${timeCell(r.timeOut1)}</td>
                     <td>${timeCell(r.timeIn2)}</td><td>${timeCell(r.timeOut2)}</td>
                     <td>${timeCell(r.overtimeIn)}</td><td>${timeCell(r.overtimeOut)}</td>
-                    <td>${status}</td><td>${action}</td></tr>`;
+                    <td>${status}</td>
+                    <td>${matchCellHtml(r, index)}</td>
+                    <td>${action}</td></tr>`;
             }).join('');
 
             document.getElementById('previewPager').innerHTML =
@@ -312,6 +330,43 @@
             const btn = e.target.closest('[data-dir]');
             if (!btn || btn.disabled) return;
             currentPage += Number(btn.dataset.dir);
+            renderPreview();
+        });
+
+        // Manual matching: pick an employee for an unmatched row.
+        document.getElementById('previewBody').addEventListener('change', function (e) {
+            const sel = e.target.closest('.att-match-select');
+            if (!sel) return;
+            const index = Number(sel.dataset.rowIndex);
+            const row = previewRows[index];
+            if (!row || !sel.value) return;
+
+            const candidate = candidateEmployees.find(c => String(c.id) === sel.value);
+            if (!candidate) return;
+
+            row.employeeId = candidate.id;
+            row.matched = true;
+            row.matchedEmployeeName = candidate.name;
+            row.manuallyMatched = true;
+
+            updateMatchSummary();
+            renderPreview();
+        });
+
+        // Undo a manual match so the row goes back to "Select employee…".
+        document.getElementById('previewBody').addEventListener('click', function (e) {
+            const changeBtn = e.target.closest('.js-change-match');
+            if (!changeBtn) return;
+            const index = Number(changeBtn.dataset.rowIndex);
+            const row = previewRows[index];
+            if (!row) return;
+
+            row.matched = false;
+            row.matchedEmployeeName = null;
+            row.manuallyMatched = false;
+            row.employeeId = null;
+
+            updateMatchSummary();
             renderPreview();
         });
 
@@ -329,6 +384,7 @@
             form.append('projectId', projectIdInput.value);
             form.append('projectName', projectInput.value);
             form.append('file', fileInput.files[0]);
+
             const edits = previewRows.filter(r => r.edited).map(r => ({
                 externalUserId: r.externalUserId,
                 employeeName: r.employeeName,
@@ -341,6 +397,15 @@
                 overtimeOut: toHtmlTime(r.overtimeOut)
             }));
             if (edits.length) form.append('overridesJson', JSON.stringify(edits));
+
+            const manualMatches = previewRows.filter(r => r.manuallyMatched && r.employeeId).map(r => ({
+                externalUserId: r.externalUserId,
+                employeeName: r.employeeName,
+                workDate: r.workDateIso,
+                employeeId: r.employeeId
+            }));
+            if (manualMatches.length) form.append('manualMatchesJson', JSON.stringify(manualMatches));
+
             if (token) form.append('__RequestVerificationToken', token);
 
             const res = await fetch(url, {
@@ -360,10 +425,8 @@
         document.getElementById('loadFileBtn').addEventListener('click', async function () {
             const empty = document.getElementById('previewEmpty');
             const section = document.getElementById('previewSection');
-            const extractBar = document.getElementById('extractBar');
             empty.style.display = 'block';
             section.style.display = 'none';
-            extractBar.style.display = 'none';
             empty.textContent = 'Reading attendance file...';
 
             try {
@@ -372,42 +435,19 @@
                 if (!data.success) { empty.textContent = data.message; return; }
 
                 previewRows = data.rows || [];
+                candidateEmployees = data.candidates || [];
                 previewFormat = data.format || 'Statistic';
                 currentPage = 1;
                 statusFilter = 'all';
 
-                const period = data.periodStart && data.periodEnd
+                lastFileName = data.fileName || '';
+                lastPeriodText = (data.periodStart && data.periodEnd)
                     ? `${data.periodStart} – ${data.periodEnd}`
                     : 'Period not found in file';
-                const filtered = (data.filteredPeople || []).map(p => {
-                    const name = p.employeeName || p.externalUserId || 'Unknown';
-                    return p.externalUserId && p.employeeName
-                        ? `${p.employeeName} (${p.externalUserId})`
-                        : name;
-                });
-                document.getElementById('previewMeta').textContent =
-                    `${data.fileName} · ${period} · ${data.matchedCount || 0} kept for this project`;
-                extractBar.style.display = 'block';
-                extractBar.innerHTML =
-                    `<div><strong>Raw file extracted</strong> from ${data.fileName || 'the attendance file'} · ${data.extractedCount || 0} person-day rows</div>
-                     <div class="att-extract-stats">
-                        <span class="att-stat">${data.extractedCount || 0} extracted</span>
-                        <span class="att-stat att-stat-ok">${data.matchedCount || 0} matched ${data.projectName || 'this project'}</span>
-                        <span class="att-stat att-stat-warn">${data.filteredOutCount || 0} filtered out</span>
-                     </div>
-                     ${filtered.length
-                        ? `<div class="att-extract-dropped">Filtered out because they are not assigned to this project: ${filtered.join(', ')}.</div>`
-                        : '<div class="att-extract-dropped att-extract-kept">Everyone in the file belongs to this project.</div>'}`;
-
-                if (!previewRows.length) {
-                    empty.style.display = 'block';
-                    section.style.display = 'none';
-                    empty.textContent = 'No employees in this file match the loaded project. Nothing will be imported.';
-                    return;
-                }
 
                 empty.style.display = 'none';
                 section.style.display = 'block';
+                updateMatchSummary();
                 renderPreview();
             } catch {
                 empty.textContent = 'Could not read the attendance file.';
@@ -419,7 +459,12 @@
                 alert('Load a file before importing.');
                 return;
             }
-            if (!confirm('Import these attendance rows? If this project already has attendance for the same dates, those rows will be replaced.')) return;
+
+            const unmatched = previewRows.filter(r => !r.matched).length;
+            const confirmMsg = unmatched > 0
+                ? `${unmatched} row(s) are still unmatched and will be saved without a linked employee. Continue importing?`
+                : 'Import these attendance rows? If this project already has attendance for the same dates, those rows will be replaced.';
+            if (!confirm(confirmMsg)) return;
 
             const btn = this;
             btn.disabled = true;
