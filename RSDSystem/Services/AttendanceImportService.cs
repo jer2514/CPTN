@@ -41,6 +41,7 @@ namespace RSDSystem.Services
 
             // Extract the raw rows first, unmatched — matching is applied on top of that raw data.
             var rows = MapRows(parsed, employees);
+            rows = DeduplicateRows(rows);
 
             return new AttendancePreviewResult
             {
@@ -78,6 +79,7 @@ namespace RSDSystem.Services
             // then apply any punch-time edits made in the preview.
             ApplyManualMatches(preview.Rows, manualMatchesJson, preview.CandidateEmployees);
             ApplyOverrides(preview.Rows, overridesJson);
+            preview.Rows = DeduplicateRows(preview.Rows);
 
             if (preview.Error != null || preview.Project == null)
             {
@@ -107,8 +109,8 @@ namespace RSDSystem.Services
                 FileName = Clip(Path.GetFileName(fileName), 260) ?? "attendance.xls",
                 Source = Clip(source, 20) ?? AttendanceImportSources.Manual,
                 Format = Clip(preview.Format, 30) ?? AttendanceFormats.Daily,
-                PeriodStart = preview.PeriodStart,
-                PeriodEnd = preview.PeriodEnd,
+                PeriodStart = AttendanceDisplay.UsableDate(preview.PeriodStart),
+                PeriodEnd = AttendanceDisplay.UsableDate(preview.PeriodEnd),
                 ImportedBy = Clip(importedBy, 150),
                 ImportedAt = DateTime.Now,
                 RowCount = preview.Rows.Count
@@ -116,12 +118,16 @@ namespace RSDSystem.Services
 
             var replaced = await ReplaceOverlappingImportsAsync(
                 preview.Project.ProjectId,
-                preview.PeriodStart,
-                preview.PeriodEnd,
+                AttendanceDisplay.UsableDate(preview.PeriodStart),
+                AttendanceDisplay.UsableDate(preview.PeriodEnd),
                 cancellationToken);
+
+            await RemoveConflictingRecordsAsync(
+                preview.Project.ProjectId, preview.Rows, cancellationToken);
 
             foreach (var row in preview.Rows)
             {
+                var workDate = AttendanceDisplay.UsableDate(row.WorkDate);
                 batch.Records.Add(new AttendanceRecord
                 {
                     ProjectId = preview.Project.ProjectId,
@@ -130,9 +136,9 @@ namespace RSDSystem.Services
                     // Store the matched system name when we have one; otherwise keep the raw file name
                     // so unmatched rows are still traceable in Attendance Records.
                     EmployeeName = Clip(row.MatchedEmployeeName ?? row.EmployeeName, 150) ?? "",
-                    WorkDate = row.WorkDate,
-                    PeriodStart = preview.PeriodStart,
-                    PeriodEnd = preview.PeriodEnd,
+                    WorkDate = workDate,
+                    PeriodStart = AttendanceDisplay.UsableDate(preview.PeriodStart),
+                    PeriodEnd = AttendanceDisplay.UsableDate(preview.PeriodEnd),
                     TimeIn1 = ClipTime(row.TimeIn1),
                     TimeOut1 = ClipTime(row.TimeOut1),
                     TimeIn2 = ClipTime(row.TimeIn2),
@@ -243,23 +249,19 @@ namespace RSDSystem.Services
             DateTime? periodEnd,
             CancellationToken cancellationToken)
         {
-            var start = (periodStart ?? periodEnd)?.Date;
-            var end = (periodEnd ?? periodStart)?.Date;
+            var start = AttendanceDisplay.UsableDate(periodStart ?? periodEnd);
+            var end = AttendanceDisplay.UsableDate(periodEnd ?? periodStart);
+
+            // A missing period must not wipe every import on the project.
+            if (!start.HasValue || !end.HasValue)
+                return false;
 
             var existing = await _db.AttendanceImports
                 .Include(i => i.Records)
                 .Where(i => i.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            List<AttendanceImport> toRemove;
-            if (!start.HasValue || !end.HasValue)
-            {
-                toRemove = existing;
-            }
-            else
-            {
-                toRemove = existing.Where(i => PeriodsOverlap(i, start.Value, end.Value)).ToList();
-            }
+            var toRemove = existing.Where(i => PeriodsOverlap(i, start.Value, end.Value)).ToList();
 
             if (toRemove.Count == 0)
                 return false;
@@ -268,13 +270,95 @@ namespace RSDSystem.Services
             return true;
         }
 
+        private async Task RemoveConflictingRecordsAsync(
+            int projectId,
+            List<AttendancePreviewRow> rows,
+            CancellationToken cancellationToken)
+        {
+            var employeeIds = rows
+                .Where(r => r.EmployeeId.HasValue)
+                .Select(r => r.EmployeeId!.Value)
+                .Distinct()
+                .ToList();
+
+            var dates = rows
+                .Select(r => AttendanceDisplay.UsableDate(r.WorkDate))
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value.Date)
+                .Distinct()
+                .ToList();
+
+            var incomingNullEmployeeIds = rows
+                .Where(r => r.EmployeeId.HasValue && !AttendanceDisplay.UsableDate(r.WorkDate).HasValue)
+                .Select(r => r.EmployeeId!.Value)
+                .Distinct()
+                .ToList();
+
+            // The unique employee+date index is global, so conflicts are not limited to this project.
+            var existing = await _db.AttendanceRecords
+                .Where(r =>
+                    r.EmployeeId != null && employeeIds.Contains(r.EmployeeId.Value) &&
+                    (
+                        (r.WorkDate != null && r.WorkDate.Value.Year < 1900) ||
+                        (r.WorkDate != null && dates.Contains(r.WorkDate.Value.Date)) ||
+                        (incomingNullEmployeeIds.Contains(r.EmployeeId.Value) &&
+                         (r.WorkDate == null || r.WorkDate.Value.Year < 1900))
+                    ))
+                .ToListAsync(cancellationToken);
+
+            if (existing.Count > 0)
+                _db.AttendanceRecords.RemoveRange(existing);
+        }
+
+        private static List<AttendancePreviewRow> DeduplicateRows(List<AttendancePreviewRow> rows)
+        {
+            foreach (var row in rows)
+                row.WorkDate = AttendanceDisplay.UsableDate(row.WorkDate);
+
+            return rows
+                .GroupBy(r => r.EmployeeId.HasValue
+                    ? "e:" + r.EmployeeId.Value + ":" + (r.WorkDate?.ToString("yyyy-MM-dd") ?? "none")
+                    : "u:" + (r.ExternalUserId ?? "").Trim().ToLowerInvariant()
+                        + ":" + (r.EmployeeName ?? "").Trim().ToLowerInvariant()
+                        + ":" + (r.WorkDate?.ToString("yyyy-MM-dd") ?? "none"))
+                .Select(g => g
+                    .OrderByDescending(r => PunchScore(r))
+                    .ThenByDescending(r => r.Matched)
+                    .First())
+                .ToList();
+        }
+
+        private static int PunchScore(AttendancePreviewRow row)
+        {
+            var score = 0;
+            if (!string.IsNullOrWhiteSpace(row.TimeIn1)) score++;
+            if (!string.IsNullOrWhiteSpace(row.TimeOut1)) score++;
+            if (!string.IsNullOrWhiteSpace(row.TimeIn2)) score++;
+            if (!string.IsNullOrWhiteSpace(row.TimeOut2)) score++;
+            if (!string.IsNullOrWhiteSpace(row.OvertimeIn)) score++;
+            if (!string.IsNullOrWhiteSpace(row.OvertimeOut)) score++;
+            return score;
+        }
+
         private static bool PeriodsOverlap(AttendanceImport import, DateTime start, DateTime end)
         {
-            var importStart = (import.PeriodStart ?? import.PeriodEnd)?.Date
-                ?? import.Records.Where(r => r.WorkDate.HasValue).Select(r => r.WorkDate!.Value.Date).DefaultIfEmpty(start).Min();
-            var importEnd = (import.PeriodEnd ?? import.PeriodStart)?.Date
-                ?? import.Records.Where(r => r.WorkDate.HasValue).Select(r => r.WorkDate!.Value.Date).DefaultIfEmpty(end).Max();
-            return importStart <= end && importEnd >= start;
+            var recordDates = import.Records
+                .Select(r => AttendanceDisplay.UsableDate(r.WorkDate))
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .ToList();
+
+            var importStart = AttendanceDisplay.UsableDate(import.PeriodStart)
+                ?? AttendanceDisplay.UsableDate(import.PeriodEnd)
+                ?? (recordDates.Count > 0 ? recordDates.Min() : (DateTime?)null);
+            var importEnd = AttendanceDisplay.UsableDate(import.PeriodEnd)
+                ?? AttendanceDisplay.UsableDate(import.PeriodStart)
+                ?? (recordDates.Count > 0 ? recordDates.Max() : (DateTime?)null);
+
+            if (!importStart.HasValue || !importEnd.HasValue)
+                return false;
+
+            return importStart.Value <= end && importEnd.Value >= start;
         }
 
         public async Task<string?> UpdateRecordAsync(
@@ -494,6 +578,9 @@ namespace RSDSystem.Services
             var open = schedules.Where(s => !s.TaskCompleted).ToList();
             var pool = open.Count > 0 ? open : schedules;
 
+            fileStart = AttendanceDisplay.UsableDate(fileStart);
+            fileEnd = AttendanceDisplay.UsableDate(fileEnd);
+
             if (fileStart.HasValue)
             {
                 var end = (fileEnd ?? fileStart).Value.Date;
@@ -580,7 +667,8 @@ namespace RSDSystem.Services
                     EmployeeName = string.IsNullOrWhiteSpace(row.EmployeeName) ? "" : row.EmployeeName.Trim(),
                     // Populated only when the auto-matcher (or a manual match) resolves a system employee.
                     MatchedEmployeeName = employee?.FullName,
-                    WorkDate = row.WorkDate ?? parsed.PeriodStart,
+                    WorkDate = AttendanceDisplay.UsableDate(row.WorkDate)
+                        ?? AttendanceDisplay.UsableDate(parsed.PeriodStart),
                     TimeIn1 = row.TimeIn1,
                     TimeOut1 = row.TimeOut1,
                     TimeIn2 = row.TimeIn2,
@@ -634,9 +722,9 @@ namespace RSDSystem.Services
                 if (employee == null)
                     continue;
 
-                var date = m.WorkDate.Date;
+                var date = AttendanceDisplay.UsableDate(m.WorkDate);
                 var row = rows.FirstOrDefault(r =>
-                    r.WorkDate?.Date == date &&
+                    AttendanceDisplay.UsableDate(r.WorkDate) == date &&
                     string.Equals(r.ExternalUserId, m.ExternalUserId, StringComparison.OrdinalIgnoreCase) &&
                     string.Equals(r.EmployeeName, m.EmployeeName, StringComparison.OrdinalIgnoreCase));
                 if (row == null)
@@ -670,9 +758,9 @@ namespace RSDSystem.Services
 
             foreach (var edit in edits)
             {
-                var date = edit.WorkDate.Date;
+                var date = AttendanceDisplay.UsableDate(edit.WorkDate);
                 var row = rows.FirstOrDefault(r =>
-                    r.WorkDate?.Date == date &&
+                    AttendanceDisplay.UsableDate(r.WorkDate) == date &&
                     (string.Equals(r.ExternalUserId, edit.ExternalUserId, StringComparison.OrdinalIgnoreCase)
                      || string.Equals(r.EmployeeName, edit.EmployeeName, StringComparison.OrdinalIgnoreCase)));
                 if (row == null)
@@ -740,6 +828,13 @@ namespace RSDSystem.Services
             if (sql.Contains("multiple cascade paths", StringComparison.OrdinalIgnoreCase))
             {
                 return "The attendance tables could not be created because of a database constraint. Restart the app and try again.";
+            }
+
+            if (sql.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
+                sql.Contains("UNIQUE KEY", StringComparison.OrdinalIgnoreCase) ||
+                sql.Contains("unique index", StringComparison.OrdinalIgnoreCase))
+            {
+                return "This file has more than one row for the same employee on the same date, or that day was already imported. Check the dates in the file and try again.";
             }
 
             return sql;

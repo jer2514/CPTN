@@ -25,6 +25,8 @@ namespace RSDSystem.Services
             {
                 // Tables are already usable; skip optional column patches.
             }
+
+            PatchUniqueDateIndex(db);
         }
 
         public static async Task EnsureAsync(PayrollDbContext db, CancellationToken cancellationToken = default)
@@ -47,6 +49,38 @@ namespace RSDSystem.Services
             catch
             {
                 // Tables are already usable; skip optional column patches.
+            }
+
+            await PatchUniqueDateIndexAsync(db);
+        }
+
+        private static void PatchUniqueDateIndex(PayrollDbContext db)
+        {
+            foreach (var sql in UniqueDateIndexSqls)
+            {
+                try
+                {
+                    db.Database.ExecuteSqlRaw(sql);
+                }
+                catch
+                {
+                    // Unique-date index is optional; import still deduplicates in memory.
+                }
+            }
+        }
+
+        private static async Task PatchUniqueDateIndexAsync(PayrollDbContext db)
+        {
+            foreach (var sql in UniqueDateIndexSqls)
+            {
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync(sql);
+                }
+                catch
+                {
+                    // Unique-date index is optional; import still deduplicates in memory.
+                }
             }
         }
 
@@ -235,5 +269,112 @@ BEGIN
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeOut') IS NOT NULL AND COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeOut') < 80
         ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [OvertimeOut] nvarchar(40) NULL;
 END";
+
+        // Each statement runs in its own batch so ALTER COLUMN is visible to later UPDATEs.
+        private static readonly string[] UniqueDateIndexSqls =
+        {
+            DropUniqueDateIndexSql,
+            MakeWorkDateNullableSql,
+            MakeLegacyDateNullableSql,
+            CleanDummyDatesSql,
+            DeleteDuplicateWorkDatesSql,
+            CreateFilteredUniqueDateIndexSql
+        };
+
+        private const string DropUniqueDateIndexSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.key_constraints
+        WHERE name = N'IX_AttendanceRecords_EmployeeId_Date'
+          AND parent_object_id = OBJECT_ID(N'dbo.AttendanceRecords'))
+        ALTER TABLE [dbo].[AttendanceRecords] DROP CONSTRAINT [IX_AttendanceRecords_EmployeeId_Date];
+
+    IF EXISTS (
+        SELECT 1 FROM sys.key_constraints
+        WHERE name = N'IX_AttendanceRecords_EmployeeId_WorkDate'
+          AND parent_object_id = OBJECT_ID(N'dbo.AttendanceRecords'))
+        ALTER TABLE [dbo].[AttendanceRecords] DROP CONSTRAINT [IX_AttendanceRecords_EmployeeId_WorkDate];
+
+    IF EXISTS (
+        SELECT 1 FROM sys.key_constraints
+        WHERE name = N'UQ_AttendanceRecords_EmployeeId_Date'
+          AND parent_object_id = OBJECT_ID(N'dbo.AttendanceRecords'))
+        ALTER TABLE [dbo].[AttendanceRecords] DROP CONSTRAINT [UQ_AttendanceRecords_EmployeeId_Date];
+
+    IF EXISTS (
+        SELECT 1 FROM sys.key_constraints
+        WHERE name = N'UQ_AttendanceRecords_EmployeeId_WorkDate'
+          AND parent_object_id = OBJECT_ID(N'dbo.AttendanceRecords'))
+        ALTER TABLE [dbo].[AttendanceRecords] DROP CONSTRAINT [UQ_AttendanceRecords_EmployeeId_WorkDate];
+
+    IF EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_AttendanceRecords_EmployeeId_Date'
+          AND object_id = OBJECT_ID(N'dbo.AttendanceRecords')
+          AND is_unique_constraint = 0)
+        DROP INDEX [IX_AttendanceRecords_EmployeeId_Date] ON [dbo].[AttendanceRecords];
+
+    IF EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_AttendanceRecords_EmployeeId_WorkDate'
+          AND object_id = OBJECT_ID(N'dbo.AttendanceRecords')
+          AND is_unique_constraint = 0)
+        DROP INDEX [IX_AttendanceRecords_EmployeeId_WorkDate] ON [dbo].[AttendanceRecords];
+END";
+
+        private const string MakeWorkDateNullableSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AttendanceRecords', N'WorkDate') IS NOT NULL
+   AND COLUMNPROPERTY(OBJECT_ID(N'dbo.AttendanceRecords'), N'WorkDate', 'AllowsNull') = 0
+    ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [WorkDate] datetime2 NULL;";
+
+        private const string MakeLegacyDateNullableSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AttendanceRecords', N'Date') IS NOT NULL
+   AND COLUMNPROPERTY(OBJECT_ID(N'dbo.AttendanceRecords'), N'Date', 'AllowsNull') = 0
+    ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [Date] datetime2 NULL;";
+
+        private const string CleanDummyDatesSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'WorkDate') IS NOT NULL
+       AND COLUMNPROPERTY(OBJECT_ID(N'dbo.AttendanceRecords'), N'WorkDate', 'AllowsNull') = 1
+        UPDATE [dbo].[AttendanceRecords] SET [WorkDate] = NULL WHERE [WorkDate] < '19000101';
+
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'Date') IS NOT NULL
+       AND COLUMNPROPERTY(OBJECT_ID(N'dbo.AttendanceRecords'), N'Date', 'AllowsNull') = 1
+        UPDATE [dbo].[AttendanceRecords] SET [Date] = NULL WHERE [Date] < '19000101';
+END";
+
+        private const string DeleteDuplicateWorkDatesSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AttendanceRecords', N'WorkDate') IS NOT NULL
+    DELETE FROM [dbo].[AttendanceRecords]
+    WHERE [AttendanceRecordId] IN (
+        SELECT [AttendanceRecordId]
+        FROM (
+            SELECT [AttendanceRecordId],
+                ROW_NUMBER() OVER (
+                    PARTITION BY [EmployeeId], CAST([WorkDate] AS date)
+                    ORDER BY [AttendanceRecordId] DESC
+                ) AS rn
+            FROM [dbo].[AttendanceRecords]
+            WHERE [EmployeeId] IS NOT NULL AND [WorkDate] IS NOT NULL AND [WorkDate] >= '19000101'
+        ) ranked
+        WHERE rn > 1
+    );";
+
+        private const string CreateFilteredUniqueDateIndexSql = @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AttendanceRecords', N'EmployeeId') IS NOT NULL
+   AND COL_LENGTH(N'dbo.AttendanceRecords', N'WorkDate') IS NOT NULL
+   AND NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_AttendanceRecords_EmployeeId_Date'
+          AND object_id = OBJECT_ID(N'dbo.AttendanceRecords'))
+    CREATE UNIQUE INDEX [IX_AttendanceRecords_EmployeeId_Date]
+        ON [dbo].[AttendanceRecords]([EmployeeId], [WorkDate])
+        WHERE [EmployeeId] IS NOT NULL AND [WorkDate] IS NOT NULL;";
     }
 }

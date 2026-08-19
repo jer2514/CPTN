@@ -180,6 +180,8 @@ namespace RSDSystem.Services
         {
             if (result.Rows.Count == 0)
                 return;
+            if (start.Year < 1900 || end.Year < 1900)
+                return;
 
             var rangeStart = start.Date;
             var rangeEnd = end.Date;
@@ -1108,13 +1110,18 @@ namespace RSDSystem.Services
             if (Regex.IsMatch(text, @"^\d{1,2}:\d{2}"))
                 return null;
             if (text.Contains(' ') && DateTime.TryParse(text.Split(' ')[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out var iso)
-                && Regex.IsMatch(text.Split(' ')[0], @"^\d{4}-\d{2}-\d{2}$"))
+                && Regex.IsMatch(text.Split(' ')[0], @"^\d{4}-\d{2}-\d{2}$")
+                && iso.Year >= 1900)
                 return iso.Date;
 
             var formats = new[] { "yyyy-MM-dd", "MM/dd/yyyy", "M/d/yyyy", "MMMM d, yyyy", "MMM d, yyyy" };
-            if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                && dt.Year >= 1900)
                 return dt.Date;
-            return DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ? dt.Date : null;
+            if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt)
+                && dt.Year >= 1900)
+                return dt.Date;
+            return null;
         }
 
         private sealed class EmployeeBlock
