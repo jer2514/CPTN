@@ -824,8 +824,7 @@ namespace RSDSystem.Services
             if (schedules.Count == 0)
                 return null;
 
-            var open = schedules.Where(s => !s.TaskCompleted).ToList();
-            var pool = open.Count > 0 ? open : schedules;
+            var pool = schedules;
 
             fileStart = AttendanceDisplay.UsableDate(fileStart);
             fileEnd = AttendanceDisplay.UsableDate(fileEnd);

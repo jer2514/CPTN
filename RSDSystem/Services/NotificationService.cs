@@ -20,7 +20,8 @@ namespace RSDSystem.Services
             int? projectId = null, int? relatedId = null, string? url = null,
             CancellationToken cancellationToken = default)
         {
-            if (await RecentlyNotifiedAsync(NotificationRoles.Admin, null, kind, projectId, relatedId, cancellationToken))
+            if (await HasOpenAsync(NotificationRoles.Admin, null, kind, projectId, relatedId, cancellationToken)
+                || await RecentlyNotifiedAsync(NotificationRoles.Admin, null, kind, projectId, relatedId, cancellationToken))
                 return;
 
             _db.AppNotifications.Add(new AppNotification
@@ -47,7 +48,8 @@ namespace RSDSystem.Services
                 return;
 
             var name = staffName.Trim();
-            if (await RecentlyNotifiedAsync(NotificationRoles.PayrollStaff, name, kind, projectId, relatedId, cancellationToken))
+            if (await HasOpenAsync(NotificationRoles.PayrollStaff, name, kind, projectId, relatedId, cancellationToken)
+                || await RecentlyNotifiedAsync(NotificationRoles.PayrollStaff, name, kind, projectId, relatedId, cancellationToken))
                 return;
 
             _db.AppNotifications.Add(new AppNotification
@@ -65,24 +67,29 @@ namespace RSDSystem.Services
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task NotifyPayrollSubmittedAsync(Project project, string? submittedBy, CancellationToken cancellationToken = default)
+        public async Task NotifyPayrollSubmittedAsync(Project project, Payroll payroll, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
+            var packetId = PayrollPeriods.PacketId(payroll);
             await NotifyAdminsAsync(
                 NotificationKinds.PayrollSubmitted,
                 "Payroll Submitted",
                 $"Payroll for {name} has been submitted for approval.",
                 project.ProjectId,
-                null,
-                "/Payroll/ReviewProject?projectId=" + project.ProjectId,
+                packetId,
+                PayrollPeriods.ReviewUrl(payroll),
                 cancellationToken);
 
-            await NotifyPayrollAlertsAsync(project, cancellationToken);
+            await NotifyPayrollAlertsAsync(project, payroll, cancellationToken);
         }
 
-        public async Task NotifyPayrollAlertsAsync(Project project, CancellationToken cancellationToken = default)
+        public async Task NotifyPayrollAlertsAsync(Project project, Payroll payroll, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
+            var packetId = PayrollPeriods.PacketId(payroll);
+            var start = payroll.PayPeriodStart.Date;
+            var end = payroll.PayPeriodEnd.Date;
+
             try
             {
                 var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken);
@@ -97,15 +104,30 @@ namespace RSDSystem.Services
                         "/Payroll/Prediction",
                         cancellationToken);
 
-                    if (page.Rows.Any(r => r.UnusualChange))
+                    var row = page.Rows[0];
+                    if (row.UnusualChange)
                     {
                         await NotifyAdminsAsync(
                             NotificationKinds.PayrollAnomalyPattern,
                             "Payroll Anomaly",
-                            "A significant increase in payroll was detected compared with the usual payroll pattern.",
+                            row.PreviousAmount2 >= row.PreviousAmount1
+                                ? "A significant increase in payroll was detected compared with the usual payroll pattern."
+                                : "A significant decrease in payroll was detected compared with the usual payroll pattern.",
                             project.ProjectId,
-                            null,
+                            packetId,
                             "/Payroll/Prediction",
+                            cancellationToken);
+                    }
+
+                    if (row.PredictedPayroll > row.AllocatedBudget)
+                    {
+                        await NotifyAdminsAsync(
+                            NotificationKinds.PayrollAnomalyBudget,
+                            "Payroll Anomaly",
+                            $"Payroll for {name} may exceed the allocated project budget.",
+                            project.ProjectId,
+                            packetId,
+                            PayrollPeriods.ReviewUrl(payroll),
                             cancellationToken);
                     }
                 }
@@ -115,34 +137,66 @@ namespace RSDSystem.Services
                 // Prediction is optional; submission still succeeded.
             }
 
-            var budget = project.PayrollBudget ?? 0;
-            if (budget <= 0)
-                return;
-
-            var latest = await _db.Payrolls.AsNoTracking()
-                .Where(p => p.ProjectId == project.ProjectId)
-                .OrderByDescending(p => p.PayPeriodEnd)
-                .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd })
-                .FirstOrDefaultAsync(cancellationToken);
-            if (latest == null)
-                return;
-
-            var periodTotal = await _db.Payrolls.AsNoTracking()
-                .Where(p => p.ProjectId == project.ProjectId
-                    && p.PayPeriodStart == latest.PayPeriodStart
-                    && p.PayPeriodEnd == latest.PayPeriodEnd)
-                .SumAsync(p => (decimal?)p.NetPay, cancellationToken) ?? 0;
-
-            if (periodTotal > budget)
+            var periodTotal = await PacketTotalAsync(project.ProjectId, start, end, payroll.PayrollScheduleId, cancellationToken);
+            var monthlyBudget = await MonthlyBudgetForAsync(project.ProjectId, start, cancellationToken);
+            if (monthlyBudget.HasValue && periodTotal > monthlyBudget.Value)
             {
                 await NotifyAdminsAsync(
                     NotificationKinds.PayrollAnomalyBudget,
                     "Payroll Anomaly",
                     $"Payroll for {name} may exceed the allocated project budget.",
                     project.ProjectId,
-                    null,
-                    "/Payroll/ReviewProject?projectId=" + project.ProjectId,
+                    packetId,
+                    PayrollPeriods.ReviewUrl(payroll),
                     cancellationToken);
+            }
+
+            var previousTotal = await PreviousPacketTotalAsync(project.ProjectId, start, cancellationToken);
+            if (previousTotal.HasValue)
+            {
+                var forecast = PayrollPredictionEngine.Forecast(new PayrollForecastInput
+                {
+                    PreviousPayroll1 = previousTotal.Value,
+                    PreviousPayroll2 = periodTotal,
+                    AllocatedBudget = monthlyBudget ?? periodTotal
+                });
+                if (forecast.UnusualChange)
+                {
+                    await NotifyAdminsAsync(
+                        NotificationKinds.PayrollAnomalyPattern,
+                        "Payroll Anomaly",
+                        periodTotal >= previousTotal.Value
+                            ? "A significant increase in payroll was detected compared with the usual payroll pattern."
+                            : "A significant decrease in payroll was detected compared with the usual payroll pattern.",
+                        project.ProjectId,
+                        packetId,
+                        "/Payroll/Prediction",
+                        cancellationToken);
+                    }
+            }
+        }
+
+        public async Task NotifyPredictionIfReadyAsync(Project project, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken);
+                if (page.Rows.Count == 0 || page.Error != null)
+                    return;
+
+                var name = ProjectName(project);
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollPredictionAvailable,
+                    "Payroll Prediction Available",
+                    $"Payroll prediction for {name} is now available for review.",
+                    project.ProjectId,
+                    null,
+                    "/Payroll/Prediction",
+                    cancellationToken);
+            }
+            catch
+            {
+                // Prediction is optional.
             }
         }
 
@@ -177,17 +231,20 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
-        public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, CancellationToken cancellationToken = default)
+        public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, int remainingInPacket, CancellationToken cancellationToken = default)
         {
+            if (remainingInPacket > 0)
+                return;
+
             var staff = StaffFor(payroll, project);
-            var name = ProjectName(project) is var n && n != "the project" ? n : "payroll";
+            var name = ProjectName(project);
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayrollApproved,
                 "Payroll Approved",
                 $"Payroll for {name} has been approved by the Admin.",
                 payroll.ProjectId,
-                payroll.PayrollId,
+                PayrollPeriods.PacketId(payroll),
                 "/PayrollStaff/PendingPayroll?projectId=" + payroll.ProjectId,
                 cancellationToken);
         }
@@ -195,13 +252,14 @@ namespace RSDSystem.Services
         public async Task NotifyPayrollReturnedAsync(Payroll payroll, Project? project, string reason, CancellationToken cancellationToken = default)
         {
             var staff = StaffFor(payroll, project);
+            var name = ProjectName(project);
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayrollCorrection,
                 "Payroll Correction",
-                $"Payroll for {staff} has been returned by the Admin for correction.",
+                $"Payroll for {name} has been returned by the Admin for correction.",
                 payroll.ProjectId,
-                payroll.PayrollId,
+                PayrollPeriods.PacketId(payroll),
                 "/PayrollStaff/PendingPayroll?projectId=" + payroll.ProjectId,
                 cancellationToken);
         }
@@ -302,6 +360,68 @@ namespace RSDSystem.Services
             return source.Where(n => n.RecipientRole == NotificationRoles.PayrollStaff
                 && n.RecipientName != null
                 && n.RecipientName.Trim() == name);
+        }
+
+        private async Task<bool> HasOpenAsync(
+            string role, string? name, string kind, int? projectId, int? relatedId,
+            CancellationToken cancellationToken)
+        {
+            var query = _db.AppNotifications.AsNoTracking()
+                .Where(n => n.RecipientRole == role
+                    && n.Kind == kind
+                    && !n.IsRead
+                    && n.ProjectId == projectId);
+
+            if (!string.IsNullOrWhiteSpace(name))
+                query = query.Where(n => n.RecipientName == name);
+
+            if (relatedId.HasValue)
+                query = query.Where(n => n.RelatedId == relatedId);
+
+            return await query.AnyAsync(cancellationToken);
+        }
+
+        private async Task<decimal> PacketTotalAsync(
+            int projectId, DateTime start, DateTime end, int? scheduleId, CancellationToken cancellationToken)
+        {
+            var query = _db.Payrolls.AsNoTracking().Where(p => p.ProjectId == projectId);
+            if (scheduleId is int id && id > 0)
+                query = query.Where(p => p.PayrollScheduleId == id);
+            else
+                query = query.Where(p => p.PayPeriodStart.Date == start && p.PayPeriodEnd.Date == end);
+
+            return await query.SumAsync(p => (decimal?)p.NetPay, cancellationToken) ?? 0;
+        }
+
+        private async Task<decimal?> PreviousPacketTotalAsync(int projectId, DateTime currentStart, CancellationToken cancellationToken)
+        {
+            var previous = await _db.Payrolls.AsNoTracking()
+                .Where(p => p.ProjectId == projectId && p.PayPeriodEnd.Date < currentStart)
+                .GroupBy(p => new { p.PayPeriodStart, p.PayPeriodEnd, p.PayrollScheduleId })
+                .Select(g => new
+                {
+                    g.Key.PayPeriodEnd,
+                    Total = g.Sum(p => p.NetPay)
+                })
+                .OrderByDescending(g => g.PayPeriodEnd)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return previous?.Total;
+        }
+
+        private async Task<decimal?> MonthlyBudgetForAsync(int projectId, DateTime periodStart, CancellationToken cancellationToken)
+        {
+            var month = new DateTime(periodStart.Year, periodStart.Month, 1);
+            var match = await _db.Set<ProjectMonthlyBudget>().AsNoTracking()
+                .Where(b => b.ProjectId == projectId)
+                .OrderByDescending(b => b.MonthDate)
+                .ToListAsync(cancellationToken);
+            if (match.Count == 0)
+                return null;
+
+            var forMonth = match.FirstOrDefault(b =>
+                b.MonthDate.Year == month.Year && b.MonthDate.Month == month.Month);
+            return (forMonth ?? match[0]).Amount;
         }
 
         private async Task<bool> RecentlyNotifiedAsync(

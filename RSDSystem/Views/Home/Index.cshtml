@@ -39,6 +39,7 @@
 <!-- Panels -->
 <div class="dash-panels-row">
 
+    <div class="dash-stack">
     <!-- Pending Payroll Approval -->
     <div class="dash-panel">
         <div class="dash-panel-head">
@@ -55,6 +56,7 @@
             </thead>
             @{
                 var pendingApprovals = ViewBag.PendingApprovals as IEnumerable<RSDSystem.Models.PendingApprovalRow>;
+                var pendingCorrections = ViewBag.PendingCorrections as IEnumerable<RSDSystem.Models.PendingCorrectionRow>;
             }
             <tbody>
                 @if (pendingApprovals == null || !pendingApprovals.Any())
@@ -72,7 +74,7 @@
                         <tr>
                             <td>@p.StaffName</td>
                             <td>@p.ProjectName</td>
-                            <td>@p.Date.ToString("MM-dd-yy")</td>
+                            <td title="@p.PeriodStart.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture) – @p.PeriodEnd.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)">@p.PeriodStart.ToString("MM-dd-yy")</td>
                             <td>
                                 <div class="dropdown">
                                     <button type="button" class="kebab-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
@@ -81,7 +83,7 @@
                                     <ul class="dropdown-menu">
                                         <li>
                                             <a class="dropdown-item"
-                                               href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })">
+                                               href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId, start = p.PeriodStart.ToString("yyyy-MM-dd"), end = p.PeriodEnd.ToString("yyyy-MM-dd"), scheduleId = p.PayrollScheduleId })">
                                                 Review
                                             </a>
                                         </li>
@@ -93,6 +95,56 @@
                 }
             </tbody>
         </table>
+    </div>
+
+    <div class="dash-panel">
+        <div class="dash-panel-head">
+            <span class="dash-panel-title">Pending Attendance Corrections</span>
+        </div>
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Staff Name</th>
+                    <th>Project</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (pendingCorrections == null || !pendingCorrections.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            No correction requests yet.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var c in pendingCorrections)
+                    {
+                        <tr>
+                            <td>@c.StaffName</td>
+                            <td>@c.ProjectName</td>
+                            <td>@(c.WorkDate?.ToString("MM-dd-yy") ?? "—")</td>
+                            <td>
+                                <div class="dropdown">
+                                    <button type="button" class="kebab-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <button type="button" class="dropdown-item" onclick="rsdOpenCorrection(@c.CorrectionId)">Review</button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
     </div>
 
     <!-- Payroll Schedules -->

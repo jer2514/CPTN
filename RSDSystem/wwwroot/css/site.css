@@ -3733,8 +3733,11 @@ button.badge-btn {
     color: #163F8B;
 }
 
-.dash-stats-row-2 {
-    grid-template-columns: repeat(2, minmax(220px, 280px));
+.dash-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
 }
 
 .kebab-btn {

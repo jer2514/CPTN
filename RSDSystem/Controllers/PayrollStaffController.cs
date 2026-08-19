@@ -170,9 +170,7 @@ namespace RSDSystem.Controllers
                     scheduleId = openSchedule?.PayrollScheduleId,
                     scheduleLabel = openSchedule != null ? PayrollPeriods.Label(openSchedule) : null,
                     message = openSchedule == null
-                        ? (schedules.Count == 0
-                            ? "Ask the admin to add a payroll schedule before generating payroll."
-                            : "All payroll schedules for this project are marked done. Ask the admin to add the next schedule.")
+                        ? "Ask the admin to add a payroll schedule before generating payroll."
                         : null,
                     employees = result
                 });
@@ -707,7 +705,7 @@ namespace RSDSystem.Controllers
              await _db.SaveChangesAsync();
 
              if (payroll.Project != null)
-                 await _notifications.NotifyPayrollSubmittedAsync(payroll.Project, payroll.GeneratedBy, HttpContext.RequestAborted);
+                 await _notifications.NotifyPayrollSubmittedAsync(payroll.Project, payroll, HttpContext.RequestAborted);
 
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }

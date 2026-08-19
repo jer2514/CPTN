@@ -120,7 +120,10 @@ namespace RSDSystem.Controllers
                 var importedProject = await _db.Projects.AsNoTracking()
                     .FirstOrDefaultAsync(p => p.ProjectId == result.ProjectId, HttpContext.RequestAborted);
                 if (importedProject != null)
+                {
                     await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
+                    await _notifications.NotifyPredictionIfReadyAsync(importedProject, HttpContext.RequestAborted);
+                }
 
                 return Json(new
                 {

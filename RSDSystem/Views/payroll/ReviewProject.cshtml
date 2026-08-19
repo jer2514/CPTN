@@ -4,6 +4,9 @@
     var projectId = ViewBag.ProjectId is int pid ? pid : 0;
     int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
     int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
+    var periodStart = ViewBag.PeriodStart as string ?? "";
+    var periodEnd = ViewBag.PeriodEnd as string ?? "";
+    var scheduleId = ViewBag.ScheduleId as int?;
 }
 
 <div class="content-topbar">
@@ -33,6 +36,9 @@
         {
             <a asp-action="ReviewProject"
                asp-route-projectId="@projectId"
+               asp-route-start="@periodStart"
+               asp-route-end="@periodEnd"
+               asp-route-scheduleId="@scheduleId"
                asp-route-page="@(currentPage - 1)">&lt;</a>
         }
         else
@@ -43,6 +49,9 @@
         {
             <a asp-action="ReviewProject"
                asp-route-projectId="@projectId"
+               asp-route-start="@periodStart"
+               asp-route-end="@periodEnd"
+               asp-route-scheduleId="@scheduleId"
                asp-route-page="@(currentPage + 1)">&gt;</a>
         }
         else
@@ -85,6 +94,9 @@
     <script>
         const projectId = @projectId;
         const currentPage = @currentPage;
+        const periodStart = '@periodStart';
+        const periodEnd = '@periodEnd';
+        const scheduleId = '@(scheduleId?.ToString() ?? "")';
         const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]').value;
         let pendingPayrollId = 0;
         let lastRemaining = 0;
@@ -127,16 +139,22 @@
         function showResult(data) {
             if (!data.success) { alert(data.message || 'Something went wrong.'); return; }
             lastRemaining = Number(data.remaining || 0);
+            window.__lastReview = data;
             document.getElementById('actionResultMsg').textContent = data.message;
             document.getElementById('actionResultOverlay').classList.add('open');
         }
 
         function finishReviewAction() {
+            const data = window.__lastReview || {};
             if (lastRemaining <= 0) {
                 window.location.href = '@Url.Action("Index", "Home")';
                 return;
             }
-            window.location.href = '/Payroll/ReviewProject?projectId=' + projectId + '&page=' + currentPage;
+            window.location.href = '/Payroll/ReviewProject?projectId=' + (data.projectId || projectId)
+                + '&start=' + encodeURIComponent(data.start || periodStart)
+                + '&end=' + encodeURIComponent(data.end || periodEnd)
+                + (data.scheduleId || scheduleId ? '&scheduleId=' + (data.scheduleId || scheduleId) : '')
+                + '&page=' + currentPage;
         }
     </script>
 }

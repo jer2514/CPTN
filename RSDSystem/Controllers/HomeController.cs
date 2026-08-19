@@ -107,6 +107,9 @@ namespace RSDSystem.Controllers
                 .Select(p => new
                 {
                     p.ProjectId,
+                    p.PayrollScheduleId,
+                    p.PayPeriodStart,
+                    p.PayPeriodEnd,
                     p.GeneratedBy,
                     p.GeneratedDate,
                     ProjectName = p.Project != null ? p.Project.ProjectName ?? "" : "",
@@ -115,7 +118,13 @@ namespace RSDSystem.Controllers
                 .ToListAsync();
 
             ViewBag.PendingApprovals = submitted
-                .GroupBy(p => p.ProjectId)
+                .GroupBy(p => new
+                {
+                    p.ProjectId,
+                    ScheduleId = p.PayrollScheduleId ?? 0,
+                    Start = p.PayPeriodStart.Date,
+                    End = p.PayPeriodEnd.Date
+                })
                 .Select(g =>
                 {
                     var latest = g.OrderByDescending(x => x.GeneratedDate).First();
@@ -124,14 +133,32 @@ namespace RSDSystem.Controllers
                         : latest.AssignedStaff;
                     return new PendingApprovalRow
                     {
-                        ProjectId = g.Key,
+                        ProjectId = g.Key.ProjectId,
+                        PayrollScheduleId = g.Key.ScheduleId > 0 ? g.Key.ScheduleId : null,
                         StaffName = string.IsNullOrWhiteSpace(staffName) ? "Payroll Staff" : staffName,
                         ProjectName = string.IsNullOrWhiteSpace(latest.ProjectName) ? "—" : latest.ProjectName,
-                        Date = latest.GeneratedDate
+                        Date = g.Key.Start,
+                        PeriodStart = g.Key.Start,
+                        PeriodEnd = g.Key.End
                     };
                 })
-                .OrderByDescending(r => r.Date)
+                .OrderByDescending(r => r.PeriodStart)
+                .ThenByDescending(r => r.PeriodEnd)
                 .ToList();
+
+            ViewBag.PendingCorrections = await _db.AttendanceCorrectionRequests
+                .AsNoTracking()
+                .Where(c => c.Status == CorrectionRequestStatuses.Pending)
+                .OrderByDescending(c => c.CreatedAt)
+                .Select(c => new PendingCorrectionRow
+                {
+                    CorrectionId = c.AttendanceCorrectionRequestId,
+                    StaffName = c.PayrollStaffName,
+                    ProjectName = c.Project != null ? c.Project.ProjectName ?? "—" : "—",
+                    EmployeeName = c.EmployeeName,
+                    WorkDate = c.WorkDate
+                })
+                .ToListAsync();
 
             return View();
         }

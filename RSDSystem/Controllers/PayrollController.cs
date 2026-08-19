@@ -484,17 +484,32 @@ namespace RSDSystem.Controllers
         }
 
         // GET /Payroll/ReviewProject?projectId=
-        public async Task<IActionResult> ReviewProject(int projectId, int page = 1)
+        public async Task<IActionResult> ReviewProject(
+            int projectId, DateTime? start, DateTime? end, int? scheduleId, int page = 1)
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
             const int pageSize = 2;
-            var slips = await _db.Set<Payroll>()
+            var query = _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
-                .Where(p => p.ProjectId == projectId && p.Status == PayrollStatusOptions.Submitted)
-                .ToListAsync();
+                .Where(p => p.ProjectId == projectId && p.Status == PayrollStatusOptions.Submitted);
+
+            if (scheduleId is int sid && sid > 0)
+            {
+                query = query.Where(p => p.PayrollScheduleId == sid
+                    || (p.PayrollScheduleId == null && start.HasValue && end.HasValue
+                        && p.PayPeriodStart.Date == start.Value.Date
+                        && p.PayPeriodEnd.Date == end.Value.Date));
+            }
+            else if (start.HasValue && end.HasValue)
+            {
+                query = query.Where(p =>
+                    p.PayPeriodStart.Date == start.Value.Date && p.PayPeriodEnd.Date == end.Value.Date);
+            }
+
+            var slips = await query.ToListAsync();
 
             if (slips.Count == 0)
                 return RedirectToAction("Index", "Home");
@@ -509,8 +524,12 @@ namespace RSDSystem.Controllers
             if (page < 1) page = 1;
             if (page > totalPages) page = totalPages;
 
+            var sample = slips[0];
             ViewBag.ProjectId = projectId;
-            ViewBag.ProjectName = slips[0].Project?.ProjectName ?? "Project";
+            ViewBag.ProjectName = sample.Project?.ProjectName ?? "Project";
+            ViewBag.PeriodStart = (start ?? sample.PayPeriodStart).ToString("yyyy-MM-dd");
+            ViewBag.PeriodEnd = (end ?? sample.PayPeriodEnd).ToString("yyyy-MM-dd");
+            ViewBag.ScheduleId = scheduleId ?? sample.PayrollScheduleId;
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPages;
             return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
@@ -546,17 +565,18 @@ namespace RSDSystem.Controllers
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
 
-            await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
-
-            var remaining = await _db.Set<Payroll>().CountAsync(p =>
-                p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
+            var remaining = await CountSubmittedInPacketAsync(payroll);
+            await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, remaining, HttpContext.RequestAborted);
 
             return Json(new
             {
                 success = true,
                 message = "Payroll has been approved.",
                 remaining,
-                projectId = payroll.ProjectId
+                projectId = payroll.ProjectId,
+                start = payroll.PayPeriodStart.ToString("yyyy-MM-dd"),
+                end = payroll.PayPeriodEnd.ToString("yyyy-MM-dd"),
+                scheduleId = payroll.PayrollScheduleId
             });
         }
 
@@ -580,16 +600,33 @@ namespace RSDSystem.Controllers
 
             await _notifications.NotifyPayrollReturnedAsync(payroll, payroll.Project, reason.Trim(), HttpContext.RequestAborted);
 
-            var remaining = await _db.Set<Payroll>().CountAsync(p =>
-                p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
+            var remaining = await CountSubmittedInPacketAsync(payroll);
 
             return Json(new
             {
                 success = true,
                 message = "Payroll has been returned for correction.",
                 remaining,
-                projectId = payroll.ProjectId
+                projectId = payroll.ProjectId,
+                start = payroll.PayPeriodStart.ToString("yyyy-MM-dd"),
+                end = payroll.PayPeriodEnd.ToString("yyyy-MM-dd"),
+                scheduleId = payroll.PayrollScheduleId
             });
+        }
+
+        private async Task<int> CountSubmittedInPacketAsync(Payroll payroll)
+        {
+            var query = _db.Set<Payroll>().Where(p =>
+                p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
+
+            if (payroll.PayrollScheduleId is int sid && sid > 0)
+                query = query.Where(p => p.PayrollScheduleId == sid);
+            else
+                query = query.Where(p =>
+                    p.PayPeriodStart.Date == payroll.PayPeriodStart.Date
+                    && p.PayPeriodEnd.Date == payroll.PayPeriodEnd.Date);
+
+            return await query.CountAsync();
         }
 
 

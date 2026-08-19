@@ -13,12 +13,45 @@ namespace RSDSystem.Helpers
     {
         private static readonly CultureInfo Dates = CultureInfo.InvariantCulture;
 
+        /// <summary>
+        /// Latest admin schedule for generate/import. Mark as Done only checks
+        /// off the staff to-do list; it does not close this pay period.
+        /// </summary>
         public static PayrollSchedule? Open(IEnumerable<PayrollSchedule> schedules) =>
             schedules
-                .Where(s => !s.TaskCompleted)
                 .OrderByDescending(s => s.StartingDate.Date)
                 .ThenByDescending(s => s.PayrollScheduleId)
                 .FirstOrDefault();
+
+        public static int PacketId(Payroll payroll) =>
+            payroll.PayrollScheduleId is int id && id > 0
+                ? id
+                : payroll.PayPeriodStart.Year * 10000 + payroll.PayPeriodStart.Month * 100 + payroll.PayPeriodStart.Day;
+
+        public static bool SamePacket(Payroll payroll, int projectId, DateTime start, DateTime end, int? scheduleId)
+        {
+            if (payroll.ProjectId != projectId)
+                return false;
+            if (scheduleId is int id && id > 0)
+                return payroll.PayrollScheduleId == id
+                    || (payroll.PayrollScheduleId == null
+                        && payroll.PayPeriodStart.Date == start.Date
+                        && payroll.PayPeriodEnd.Date == end.Date);
+            return payroll.PayPeriodStart.Date == start.Date && payroll.PayPeriodEnd.Date == end.Date;
+        }
+
+        public static string ReviewUrl(int projectId, DateTime start, DateTime end, int? scheduleId = null)
+        {
+            var url = "/Payroll/ReviewProject?projectId=" + projectId
+                + "&start=" + start.ToString("yyyy-MM-dd", Dates)
+                + "&end=" + end.ToString("yyyy-MM-dd", Dates);
+            if (scheduleId is int id && id > 0)
+                url += "&scheduleId=" + id;
+            return url;
+        }
+
+        public static string ReviewUrl(Payroll payroll) =>
+            ReviewUrl(payroll.ProjectId, payroll.PayPeriodStart, payroll.PayPeriodEnd, payroll.PayrollScheduleId);
 
         public static PayrollSchedule? Covering(
             IEnumerable<PayrollSchedule> schedules, DateTime start, DateTime end)
