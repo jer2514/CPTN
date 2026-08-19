@@ -13,12 +13,14 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
         private readonly PayrollPredictionService _predictions;
+        private readonly NotificationService _notifications;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
-        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions)
+        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions, NotificationService notifications)
         {
             _db = db;
             _predictions = predictions;
+            _notifications = notifications;
         }
 
         private IActionResult? RequireAdmin()
@@ -534,13 +536,17 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
         {
-            var payroll = await _db.Set<Payroll>().FindAsync(id);
+            var payroll = await _db.Set<Payroll>()
+                .Include(p => p.Project)
+                .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
+
+            await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -562,13 +568,17 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(reason))
                 return Json(new { success = false, message = "Please provide a reason for correction." });
 
-            var payroll = await _db.Set<Payroll>().FindAsync(id);
+            var payroll = await _db.Set<Payroll>()
+                .Include(p => p.Project)
+                .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
             payroll.Status = PayrollStatusOptions.Correction;
             payroll.CorrectionReason = reason.Trim();
             await _db.SaveChangesAsync();
+
+            await _notifications.NotifyPayrollReturnedAsync(payroll, payroll.Project, reason.Trim(), HttpContext.RequestAborted);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -606,6 +616,11 @@ namespace RSDSystem.Controllers
 
             _db.Set<PayrollSchedule>().Add(schedule);
             await _db.SaveChangesAsync();
+
+            var assigned = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == ProjectId);
+            if (assigned != null)
+                await _notifications.NotifyNewTaskAsync(assigned, HttpContext.RequestAborted);
 
             TempData["Success"] = "Schedule added. Payroll staff can generate payroll for this period.";
             return RedirectToAction("Index", "Home");

@@ -13,12 +13,12 @@
 
 <div class="dash-header">
     <div class="dash-welcome">Welcome back, @fullName</div>
-    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
 </div>
 
 
 <!-- Stat cards -->
-<div class="dash-stats-row">
+<div class="dash-stats-row dash-stats-row-2">
     <div class="dash-stat-card">
         <div class="dash-stat-icon"><i class="bi bi-buildings-fill"></i></div>
         <div>
@@ -32,14 +32,6 @@
         <div>
             <div class="dash-stat-number">@ViewBag.ActiveEmployees</div>
             <div class="dash-stat-label">Active Employees</div>
-        </div>
-    </div>
-
-    <div class="dash-stat-card">
-        <div class="dash-stat-icon"><i class="bi bi-person-lines-fill"></i></div>
-        <div>
-            <div class="dash-stat-number">@ViewBag.ActivePayrollStaff</div>
-            <div class="dash-stat-label">Active Payroll Staff</div>
         </div>
     </div>
 </div>
@@ -82,8 +74,19 @@
                             <td>@p.ProjectName</td>
                             <td>@p.Date.ToString("MM-dd-yy")</td>
                             <td>
-                                <a href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })"
-                                   class="pill-btn pill-view">Review</a>
+                                <div class="dropdown">
+                                    <button type="button" class="kebab-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item"
+                                               href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })">
+                                                Review
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
                             </td>
                         </tr>
                     }

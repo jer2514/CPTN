@@ -18,6 +18,8 @@ namespace RSDSystem.Models
         public DbSet<Payroll> Payrolls { get; set; }
         public DbSet<AttendanceImport> AttendanceImports { get; set; }
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
+        public DbSet<AppNotification> AppNotifications { get; set; }
+        public DbSet<AttendanceCorrectionRequest> AttendanceCorrectionRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -134,6 +136,21 @@ namespace RSDSystem.Models
                 .HasForeignKey(r => r.EmployeeId)
                 .OnDelete(DeleteBehavior.NoAction)
                 .IsRequired(false);
+
+            modelBuilder.Entity<AppNotification>()
+                .HasIndex(n => new { n.RecipientRole, n.RecipientName, n.CreatedAt });
+
+            modelBuilder.Entity<AttendanceCorrectionRequest>()
+                .HasOne(c => c.Record)
+                .WithMany()
+                .HasForeignKey(c => c.AttendanceRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AttendanceCorrectionRequest>()
+                .HasOne(c => c.Project)
+                .WithMany()
+                .HasForeignKey(c => c.ProjectId)
+                .OnDelete(DeleteBehavior.NoAction);
         }
     }
 }

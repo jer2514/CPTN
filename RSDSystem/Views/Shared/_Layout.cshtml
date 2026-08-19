@@ -10,11 +10,11 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=26" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css?v=27" rel="stylesheet" asp-append-version="true" />
     <link href="~/css/site.css?v=3" rel="stylesheet" />
 </head>
 
-<body>
+<body data-role="@(Context.Session.GetString("Role") ?? "")">
 
     <div class="app-layout">
 
@@ -167,6 +167,49 @@
         }
     </div>
 
+    <form id="__notifToken" style="display:none">@Html.AntiForgeryToken()</form>
+
+    <div class="del-overlay" id="correctionOverlay">
+        <div class="corr-modal">
+            <div class="corr-title">Attendance Correction Request</div>
+            <div class="corr-meta">
+                <div><strong>Payroll Staff:</strong> <span id="corrStaff">—</span></div>
+                <div><strong>Project:</strong> <span id="corrProject">—</span></div>
+            </div>
+            <table class="corr-table">
+                <thead>
+                    <tr>
+                        <th>Employee Name</th>
+                        <th>Date</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th>Time In</th>
+                        <th>Time Out</th>
+                        <th>OT In</th>
+                        <th>OT Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="corrName">—</td>
+                        <td id="corrDate">—</td>
+                        <td id="corrIn1">—</td>
+                        <td id="corrOut1">—</td>
+                        <td id="corrIn2">—</td>
+                        <td id="corrOut2">—</td>
+                        <td id="corrOtIn">—</td>
+                        <td id="corrOtOut">—</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="corr-reason"><strong>Reason:</strong> <span id="corrReason">—</span></div>
+            <div class="corr-actions" id="corrActions">
+                <button type="button" class="btn-approve" id="corrApprove">Approve</button>
+                <button type="button" class="btn-return" id="corrReturn">Return for Correction</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
@@ -174,6 +217,7 @@
             new bootstrap.Toast(el).show();
         });
     </script>
+    <script src="~/js/notifications.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
     @await Html.PartialAsync("_ProfileCard")

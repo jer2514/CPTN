@@ -11,14 +11,16 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _attendance;
+        private readonly NotificationService _notifications;
 
         // TODO: replace with the signed-in user's FullName once auth/session is wired up
         private const string CurrentStaffName = "Patrick Bateman";
 
-        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance)
+        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance, NotificationService notifications)
         {
             _db = db;
             _attendance = attendance;
+            _notifications = notifications;
         }
 
         // GET /PayrollStaff  → "To do task" dashboard
@@ -689,7 +691,9 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitPayroll(int id)
         {
-             var payroll = await _db.Set<Payroll>().FindAsync(id);
+             var payroll = await _db.Set<Payroll>()
+                 .Include(p => p.Project)
+                 .FirstOrDefaultAsync(p => p.PayrollId == id);
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
@@ -701,6 +705,9 @@ namespace RSDSystem.Controllers
 
              payroll.Status = PayrollStatusOptions.Submitted;
              await _db.SaveChangesAsync();
+
+             if (payroll.Project != null)
+                 await _notifications.NotifyPayrollSubmittedAsync(payroll.Project, payroll.GeneratedBy, HttpContext.RequestAborted);
 
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }

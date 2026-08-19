@@ -129,6 +129,10 @@
             <label>Overtime In<input type="time" id="reOtIn" class="form-ctrl" /></label>
             <label>Overtime Out<input type="time" id="reOtOut" class="form-ctrl" /></label>
         </div>
+        <label id="reReasonWrap" class="form-lbl" style="display:block;margin-top:12px">
+            Reason
+            <input type="text" id="reReason" class="form-ctrl" placeholder="Incomplete Attendance" maxlength="250" />
+        </label>
         <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime</div>
         <div class="att-preview-footer">
             <div class="att-edit-actions">
@@ -463,6 +467,10 @@
 
         function openRecordEdit(row) {
             if (!row) return;
+            if (row.pendingCorrection) {
+                alert('This attendance row already has a correction request waiting for admin review.');
+                return;
+            }
             editingRecord = row;
             document.getElementById('recordEditTitle').textContent = row.actionLabel || 'Request Edit';
             document.getElementById('reDisplayId').textContent = row.displayId || '——';
@@ -474,6 +482,18 @@
             document.getElementById('reOut2').value = toHtmlTime(row.timeOut2);
             document.getElementById('reOtIn').value = toHtmlTime(row.overtimeIn);
             document.getElementById('reOtOut').value = toHtmlTime(row.overtimeOut);
+            const reasonWrap = document.getElementById('reReasonWrap');
+            const reasonInput = document.getElementById('reReason');
+            const saveBtn = document.getElementById('reSave');
+            if (row.requestEdit) {
+                reasonWrap.style.display = 'block';
+                reasonInput.value = 'Incomplete Attendance';
+                saveBtn.textContent = 'Submit Request';
+            } else {
+                reasonWrap.style.display = 'none';
+                reasonInput.value = '';
+                saveBtn.textContent = 'Save';
+            }
             refreshRecordEditMeta();
             document.getElementById('recordEditOverlay').hidden = false;
         }
@@ -513,6 +533,11 @@
         document.getElementById('reSave').addEventListener('click', async function () {
             if (!editingRecord) return;
             const draft = overlayDraft();
+            const requestEdit = !!editingRecord.requestEdit;
+            if (requestEdit && !document.getElementById('reReason').value.trim()) {
+                alert('Enter a reason for this correction request.');
+                return;
+            }
             const body = new FormData();
             body.set('recordId', editingRecord.recordId);
             body.set('timeIn1', toHtmlTime(draft.timeIn1));
@@ -521,9 +546,11 @@
             body.set('timeOut2', toHtmlTime(draft.timeOut2));
             body.set('overtimeIn', toHtmlTime(draft.overtimeIn));
             body.set('overtimeOut', toHtmlTime(draft.overtimeOut));
+            if (requestEdit) body.set('reason', document.getElementById('reReason').value.trim());
             if (token) body.set('__RequestVerificationToken', token);
 
-            const res = await fetch('/Attendance/UpdateRecord', {
+            const url = requestEdit ? '/Attendance/RequestCorrection' : '/Attendance/UpdateRecord';
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'RequestVerificationToken': token },
                 body
