@@ -88,6 +88,10 @@ namespace RSDSystem.Controllers
                     && p.PayPeriodEnd.Date == end.Date)
                 .ToListAsync();
 
+            var covering = PayrollPeriods.Covering(
+                await _db.Set<PayrollSchedule>().Where(s => s.ProjectId == projectId).ToListAsync(),
+                start.Date, end.Date);
+
             var daysWorked = Math.Max(1, DateRules.CountWeekdays(start.Date, end.Date));
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
@@ -96,12 +100,15 @@ namespace RSDSystem.Controllers
             {
                 if (existing.Any(p => p.EmployeeId == emp.EmployeeId))
                     continue;
+                if (covering != null && existing.Any(p => PayrollPeriods.BelongsTo(p, covering) && p.EmployeeId == emp.EmployeeId))
+                    continue;
 
                 var regularPay = emp.DailyRate * daysWorked;
                 _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
                     ProjectId = projectId,
+                    PayrollScheduleId = covering?.PayrollScheduleId,
                     PayPeriodStart = start.Date,
                     PayPeriodEnd = end.Date,
                     RegularDaysWorked = daysWorked,
@@ -600,7 +607,7 @@ namespace RSDSystem.Controllers
             _db.Set<PayrollSchedule>().Add(schedule);
             await _db.SaveChangesAsync();
 
-            TempData["Success"] = "Schedule added.";
+            TempData["Success"] = "Schedule added. Payroll staff can generate payroll for this period.";
             return RedirectToAction("Index", "Home");
         }
 

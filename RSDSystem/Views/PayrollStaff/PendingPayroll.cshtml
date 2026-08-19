@@ -49,6 +49,7 @@
                     <th>Employee ID</th>
                     <th>Employee Name</th>
                     <th>Job</th>
+                    <th>Period</th>
                     <th>Status</th>
                     <th>Action</th>
                 </tr>
@@ -181,6 +182,7 @@
                     <td>${p.displayId}</td>
                     <td>${p.employeeName}</td>
                     <td>${p.job}</td>
+                    <td>${p.period || '—'}</td>
                     <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">

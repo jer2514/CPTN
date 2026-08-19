@@ -154,6 +154,53 @@ END");
 
         try
         {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NULL
+BEGIN
+    ALTER TABLE dbo.Payrolls ADD PayrollScheduleId int NULL;
+
+    ALTER TABLE dbo.Payrolls ADD CONSTRAINT FK_Payrolls_PayrollSchedules_PayrollScheduleId
+        FOREIGN KEY (PayrollScheduleId) REFERENCES dbo.PayrollSchedules(PayrollScheduleId) ON DELETE SET NULL;
+
+    CREATE INDEX IX_Payrolls_PayrollScheduleId ON dbo.Payrolls(PayrollScheduleId);
+END
+
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'PayrollScheduleId') IS NOT NULL
+BEGIN
+    UPDATE p
+    SET PayrollScheduleId = s.PayrollScheduleId
+    FROM dbo.Payrolls p
+    CROSS APPLY (
+        SELECT TOP 1 sch.PayrollScheduleId
+        FROM dbo.PayrollSchedules sch
+        WHERE sch.ProjectId = p.ProjectId
+          AND CAST(p.PayPeriodStart AS date) >= CAST(sch.StartingDate AS date)
+          AND CAST(p.PayPeriodEnd AS date) <= CAST(sch.EndDate AS date)
+        ORDER BY sch.StartingDate DESC, sch.PayrollScheduleId DESC
+    ) s
+    WHERE p.PayrollScheduleId IS NULL;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_Payrolls_EmployeeId_PayrollScheduleId'
+          AND object_id = OBJECT_ID(N'dbo.Payrolls')
+    )
+    BEGIN
+        CREATE UNIQUE INDEX IX_Payrolls_EmployeeId_PayrollScheduleId
+            ON dbo.Payrolls(EmployeeId, PayrollScheduleId)
+            WHERE PayrollScheduleId IS NOT NULL;
+    END
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule link schema fix error: " + ex.Message);
+        }
+
+        try
+        {
             AttendanceSchema.Ensure(db);
         }
         catch (Exception ex)

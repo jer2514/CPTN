@@ -28,6 +28,7 @@
         </div>
         <button type="button" id="loadEmployeesBtn" class="btn-primary-blue-solid">Load</button>
     </div>
+    <div id="scheduleNote" class="genpay-fallback-note" style="display:none"></div>
 
     <div id="employeeSection" style="display:none">
         <div class="emp-card-head" style="margin-top:6px">
@@ -130,6 +131,14 @@
         // ── Load employees ───────────────────────────────────────────
         let currentEmployees = [];
         let currentProjectId = null;
+        let currentScheduleId = null;
+
+        function setScheduleNote(text, show) {
+            const note = document.getElementById('scheduleNote');
+            if (!note) return;
+            note.textContent = text || '';
+            note.style.display = show ? 'block' : 'none';
+        }
 
         document.getElementById('loadEmployeesBtn').addEventListener('click', async function () {
             if (!projectIdInput.value) {
@@ -137,6 +146,7 @@
                 return;
             }
             currentProjectId = projectIdInput.value;
+            currentScheduleId = null;
 
             const emptyBox = document.getElementById('employeeEmpty');
             const section  = document.getElementById('employeeSection');
@@ -144,6 +154,7 @@
             section.style.display = 'none';
             emptyBox.style.display = 'block';
             emptyBox.textContent = 'Loading employees...';
+            setScheduleNote('', false);
 
             try {
                 const res  = await fetch('/PayrollStaff/GetProjectEmployees?projectId=' + currentProjectId);
@@ -155,6 +166,14 @@
                 }
 
                 currentEmployees = data.employees;
+                currentScheduleId = data.scheduleId || null;
+
+                if (!data.hasSchedule) {
+                    emptyBox.textContent = data.message || 'Ask the admin to add a payroll schedule before generating payroll.';
+                    return;
+                }
+
+                setScheduleNote('Generating payroll for schedule: ' + (data.scheduleLabel || 'current period'), true);
 
                 if (currentEmployees.length === 0) {
                     emptyBox.textContent = 'No employees assigned to this project.';
@@ -178,7 +197,7 @@
                 const action = generated
                     ? `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`
                     : `<a class="btn-generate-pill"
-                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}">
+                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}${currentScheduleId ? '&scheduleId=' + currentScheduleId : ''}">
                             Generate
                        </a>`;
                 return `
