@@ -44,41 +44,94 @@ namespace RSDSystem.Services
                 .Where(p => p.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            var months = BuildHistory(payrolls);
+            var history = BuildHistory(payrolls);
+            var budgets = (project.MonthlyBudgets ?? new List<ProjectMonthlyBudget>())
+                .OrderBy(b => b.MonthDate)
+                .ToList();
 
-            if (months.Count < 2)
+            if (budgets.Count == 0)
             {
                 return new PayrollPredictionPage
                 {
                     ProjectId = project.ProjectId,
                     ProjectName = project.ProjectName ?? "—",
                     GeneratedAt = DateTime.Now,
-                    Error = HistoryError(payrolls, months)
+                    Error = "This project has no monthly allocated budget. Set monthly budgets on the project first."
                 };
             }
 
-            var threshold = AnomalyPercent();
-            var rows = new List<PayrollPredictionRow>();
-            for (var i = 0; i < months.Count - 1; i++)
+            if (history.Count < 2)
             {
-                var first = months[i];
-                var second = months[i + 1];
-                var predictMonth = second.Month.AddMonths(1);
-                var budget = AllocatedBudget(project, predictMonth);
-                var forecast = await ForecastAsync(first.Amount, second.Amount, budget, threshold, cancellationToken);
+                return new PayrollPredictionPage
+                {
+                    ProjectId = project.ProjectId,
+                    ProjectName = project.ProjectName ?? "—",
+                    GeneratedAt = DateTime.Now,
+                    Error = HistoryError(payrolls, history)
+                };
+            }
+
+            var culture = CultureInfo.GetCultureInfo("en-US");
+            var threshold = AnomalyPercent();
+            var actuals = new Dictionary<DateTime, decimal>();
+            var labels = new Dictionary<DateTime, string>();
+            foreach (var month in history)
+            {
+                var key = MonthKey(month.Month);
+                actuals[key] = actuals.TryGetValue(key, out var current)
+                    ? current + month.Amount
+                    : month.Amount;
+                if (!labels.ContainsKey(key) || string.IsNullOrWhiteSpace(labels[key]))
+                    labels[key] = month.Label;
+            }
+
+            if (actuals.Count < 2)
+            {
+                return new PayrollPredictionPage
+                {
+                    ProjectId = project.ProjectId,
+                    ProjectName = project.ProjectName ?? "—",
+                    GeneratedAt = DateTime.Now,
+                    Error = HistoryError(payrolls, history)
+                };
+            }
+
+            var series = new Dictionary<DateTime, decimal>(actuals);
+            var rows = new List<PayrollPredictionRow>();
+
+            foreach (var budgetRow in budgets)
+            {
+                var predictMonth = MonthKey(budgetRow.MonthDate);
+                var previous1 = predictMonth.AddMonths(-2);
+                var previous2 = predictMonth.AddMonths(-1);
+                if (!series.TryGetValue(previous1, out var amount1) ||
+                    !series.TryGetValue(previous2, out var amount2))
+                    continue;
+
+                var allocated = budgetRow.Amount;
+                var forecast = await ForecastAsync(amount1, amount2, allocated, threshold, cancellationToken);
+                var predictLabel = string.IsNullOrWhiteSpace(budgetRow.MonthYear)
+                    ? predictMonth.ToString("MMMM yyyy", culture)
+                    : budgetRow.MonthYear;
+
+                if (!actuals.ContainsKey(predictMonth))
+                {
+                    series[predictMonth] = forecast.PredictedPayroll;
+                    labels[predictMonth] = predictLabel;
+                }
 
                 rows.Add(new PayrollPredictionRow
                 {
-                    PreviousMonth1 = first.Month,
-                    PreviousLabel1 = first.Label,
-                    PreviousAmount1 = first.Amount,
-                    PreviousMonth2 = second.Month,
-                    PreviousLabel2 = second.Label,
-                    PreviousAmount2 = second.Amount,
+                    PreviousMonth1 = previous1,
+                    PreviousLabel1 = LabelFor(previous1, labels, culture),
+                    PreviousAmount1 = amount1,
+                    PreviousMonth2 = previous2,
+                    PreviousLabel2 = LabelFor(previous2, labels, culture),
+                    PreviousAmount2 = amount2,
                     PredictionMonth = predictMonth,
-                    PredictionLabel = predictMonth.ToString("MMMM yyyy", CultureInfo.GetCultureInfo("en-US")),
+                    PredictionLabel = predictLabel,
                     PredictedPayroll = forecast.PredictedPayroll,
-                    AllocatedBudget = forecast.AllocatedBudget,
+                    AllocatedBudget = allocated,
                     BudgetDifference = forecast.BudgetDifference,
                     ExceedsBudget = forecast.ExceedsBudget,
                     UnusualChange = forecast.UnusualChange,
@@ -88,7 +141,16 @@ namespace RSDSystem.Services
                 });
             }
 
-            rows.Reverse();
+            if (rows.Count == 0)
+            {
+                return new PayrollPredictionPage
+                {
+                    ProjectId = project.ProjectId,
+                    ProjectName = project.ProjectName ?? "—",
+                    GeneratedAt = DateTime.Now,
+                    Error = "Need payroll in two months before a project budget month. Generate payroll, then load prediction again."
+                };
+            }
 
             return new PayrollPredictionPage
             {
@@ -280,25 +342,24 @@ namespace RSDSystem.Services
             return "Need at least two months of payroll before a prediction can be made.";
         }
 
+        private static DateTime MonthKey(DateTime value) =>
+            new(value.Year, value.Month, 1);
+
+        private static string LabelFor(
+            DateTime month, Dictionary<DateTime, string> labels, CultureInfo culture)
+        {
+            var key = MonthKey(month);
+            if (labels.TryGetValue(key, out var label) && !string.IsNullOrWhiteSpace(label))
+                return label;
+            return key.ToString("MMMM yyyy", culture);
+        }
+
         private decimal AnomalyPercent()
         {
             var raw = _config["Prediction:AnomalyChangePercent"];
             if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) && value > 0)
                 return value;
             return PayrollPredictionEngine.DefaultAnomalyPercent;
-        }
-
-        private static decimal AllocatedBudget(Project project, DateTime month)
-        {
-            var match = project.MonthlyBudgets?
-                .FirstOrDefault(b => b.MonthDate.Year == month.Year && b.MonthDate.Month == month.Month);
-            if (match != null)
-                return match.Amount;
-
-            if (project.PayrollBudget.HasValue && project.PayrollBudget.Value > 0)
-                return project.PayrollBudget.Value;
-
-            return 0;
         }
 
         private static string Combine(string baseUrl, string path)
