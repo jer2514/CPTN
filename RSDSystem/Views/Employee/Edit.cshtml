@@ -12,6 +12,7 @@
     var maxDob = DateTime.Today.AddYears(-18).ToString("yyyy-MM-dd");
     var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
     var initials = $"{(string.IsNullOrEmpty(Model.FirstName) ? "" : Model.FirstName[..1])}{(string.IsNullOrEmpty(Model.LastName) ? "" : Model.LastName[..1])}";
+    var assignedProjectName = Model.Project?.ProjectName;
 }
 
 
@@ -58,7 +59,7 @@
                 @if (Model.IsActive)
                 {
                     <button type="button" class="status-toggle-btn status-toggle-inactive"
-                            onclick="toggleEmployeeStatus(@Model.EmployeeId)">
+                            onclick="confirmToggleStatus(@Model.EmployeeId)">
                         <i class="bi bi-toggle-on"></i> Active
                     </button>
                 }
@@ -136,12 +137,6 @@
                 <!-- Email | Contact Number -->
                 <div class="form-row form-row-2">
                     <div>
-<<<<<<< HEAD
-                        <label class="form-lbl">Email</label>
-                        <input type="email" name="Email" value="@Model.Email" maxlength="100"
-                               class="@Ctrl("Email")" data-validate="email" data-label="Email" />
-=======
->>>>>>> master
                         <label class="form-lbl">Email <span class="req-star">*</span></label>
                         <input type="email" name="Email" value="@Model.Email" maxlength="100"
                                class="@Ctrl("Email")" data-validate="required|email" data-label="Email" />
@@ -161,13 +156,18 @@
                 <div class="form-row form-row-1">
                     <div>
                         <label class="form-lbl">Assigned to Project</label>
-                        <select name="ProjectId" class="form-ctrl">
+                        <select name="ProjectId" id="projectSelect" class="form-ctrl">
                             <option value="">Select project</option>
                             @foreach (var p in projects)
                             {
                                 <option value="@p.ProjectId" @(p.ProjectId == Model.ProjectId ? "selected" : null)>@p.ProjectName</option>
                             }
                         </select>
+                        <div id="reactivateHint" class="slip-schedule-hint" style="display:none; margin-top:8px">
+                            <i class="bi bi-info-circle-fill"></i>
+                            This employee is currently Inactive. Assigning them to a project will
+                            automatically set their status back to Active when you save.
+                        </div>
                     </div>
                 </div>
 
@@ -211,8 +211,8 @@
                             <label class="file-choose-btn" for="photoInput">Choose File</label>
                             <span class="file-name-lbl" id="fileLabel">
                                 @(string.IsNullOrEmpty(Model.PhotoPath)
-                                    ? "No File Chosen"
-                                    : System.IO.Path.GetFileName(Model.PhotoPath))
+                                                                ? "No File Chosen"
+                                                                : System.IO.Path.GetFileName(Model.PhotoPath))
                             </span>
                         </div>
                         <span class="field-error" data-error-for="photo">@Err("photo")</span>
@@ -232,9 +232,31 @@
     </form>
 </div>
 
+<!-- Deactivate confirmation overlay (only shown when employee has an assigned project) -->
+<div class="del-overlay" id="deactivateEmpOverlay" onclick="closeDeactivateEmpModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Set as Inactive?</div>
+        <div class="del-msg">
+            <strong>@Model.FullName</strong> is currently assigned to
+            <strong>@assignedProjectName</strong>.
+            Marking them as inactive will automatically remove them from this project.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeDeactivateEmpModal()">Cancel</button>
+            <button class="del-btn-delete" onclick="toggleEmployeeStatus(@Model.EmployeeId)">Set Inactive</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
+        const hasAssignedProject = @(Model.ProjectId.HasValue ? "true" : "false");
+        const employeeIsActive = @(Model.IsActive ? "true" : "false");
+
         function previewPhoto(input) {
             document.getElementById('fileLabel').textContent =
                 input.files.length ? input.files[0].name : 'No File Chosen';
@@ -256,10 +278,41 @@
             }
         }
 
+        // Called when the employee is currently Active and the button is clicked.
+        // Shows a warning first if they're assigned to a project; otherwise toggles directly.
+        function confirmToggleStatus(employeeId) {
+            if (hasAssignedProject) {
+                document.getElementById('deactivateEmpOverlay').classList.add('open');
+            } else {
+                toggleEmployeeStatus(employeeId);
+            }
+        }
+
+        function closeDeactivateEmpModal(e) {
+            if (!e || e.target === document.getElementById('deactivateEmpOverlay'))
+                document.getElementById('deactivateEmpOverlay').classList.remove('open');
+        }
+
         function toggleEmployeeStatus(employeeId) {
             const form = document.getElementById('toggleStatusForm');
             form.action = '/Employee/ToggleStatus/' + employeeId;
             form.submit();
         }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeDeactivateEmpModal();
+        });
+
+        // ── Reactivation hint when assigning a project to an inactive employee ──
+        const projectSelect = document.getElementById('projectSelect');
+        const reactivateHint = document.getElementById('reactivateHint');
+
+        function updateReactivateHint() {
+            const hasProjectSelected = !!projectSelect.value;
+            reactivateHint.style.display = (!employeeIsActive && hasProjectSelected) ? 'block' : 'none';
+        }
+
+        projectSelect.addEventListener('change', updateReactivateHint);
+        updateReactivateHint(); // run once on load in case a project is already selected
     </script>
 }

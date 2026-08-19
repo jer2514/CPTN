@@ -143,7 +143,6 @@
                     <option value="">Select project</option>
                     @foreach (var p in projects)
                     {
-<<<<<<< HEAD
                         if (p.ProjectId == Model.ProjectId)
                         {
                             <option value="@p.ProjectId" selected>@p.ProjectName</option>
@@ -152,8 +151,6 @@
                         {
                             <option value="@p.ProjectId">@p.ProjectName</option>
                         }
-=======
->>>>>>> master
                         <option value="@p.ProjectId" @(Model.ProjectId == p.ProjectId ? "selected" : null)>@p.ProjectName</option>
                     }
                 </select>
@@ -169,7 +166,6 @@
                     <option value="">Select</option>
                     @foreach (var j in jobs)
                     {
-<<<<<<< HEAD
                         if (j == Model.JobClassification)
                         {
                             <option value="@j" selected>@j</option>
@@ -178,8 +174,6 @@
                         {
                             <option value="@j">@j</option>
                         }
-=======
->>>>>>> master
                         <option value="@j" @(Model.JobClassification == j ? "selected" : null)>@j</option>
                     }
                 </select>

@@ -1,9 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
-<<<<<<< HEAD
 using Microsoft.AspNetCore.Http;
-=======
->>>>>>> master
 
 namespace RSDSystem.Validation
 {
@@ -24,12 +21,9 @@ namespace RSDSystem.Validation
         public const string AddressPattern = @"^[A-Za-z0-9Ññ\s,.\-/#'()&]{5,250}$";
         public const string AddressMessage = "Enter a complete address (Barangay, Municipality/City, Province).";
 
-<<<<<<< HEAD
         public const string ProjectNamePattern = @"^[A-Za-z0-9Ññ][A-Za-z0-9Ññ\s.'\-/&#()]{1,149}$";
         public const string ProjectNameMessage = "Enter a valid project name.";
 
-=======
->>>>>>> master
         public const int MinWorkingAge = 18;
         public const int MaxWorkingAge = 80;
         public const long MaxPhotoBytes = 2 * 1024 * 1024;
@@ -91,7 +85,6 @@ namespace RSDSystem.Validation
             }
         }
 
-<<<<<<< HEAD
         public const int MinCalendarYear = DateRules.MinCalendarYear;
         public const int MaxCalendarYear = DateRules.MaxCalendarYear;
         public const string CalendarYearMessage = DateRules.CalendarYearMessage;
@@ -148,8 +141,6 @@ namespace RSDSystem.Validation
             return true;
         }
 
-=======
->>>>>>> master
         public static bool TryValidatePhoto(IFormFile? photo, out string? error)
         {
             error = null;
