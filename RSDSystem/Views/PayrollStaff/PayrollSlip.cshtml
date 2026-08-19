@@ -13,6 +13,7 @@
     var endMin = string.IsNullOrEmpty(defaultStart) ? minDate : defaultStart;
     var isEdit = ViewBag.IsEdit is true;
     var payrollId = ViewBag.PayrollId is int pid ? pid : 0;
+    var payrollScheduleId = ViewBag.PayrollScheduleId is int sid ? sid : 0;
     var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
     var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
     var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
@@ -70,6 +71,7 @@ else
         <input type="hidden" name="employeeId" value="@Model.EmployeeId" />
         <input type="hidden" name="projectId" value="@project?.ProjectId" />
         <input type="hidden" name="payrollId" value="@payrollId" />
+        <input type="hidden" name="payrollScheduleId" value="@payrollScheduleId" />
 
         <div class="slip-row3">
             <div>

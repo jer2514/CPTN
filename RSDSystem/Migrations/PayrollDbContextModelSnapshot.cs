@@ -156,6 +156,9 @@ namespace RSDSystem.Migrations
                     b.Property<int>("ProjectId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("PayrollScheduleId")
+                        .HasColumnType("int");
+
                     b.Property<int>("RegularDaysWorked")
                         .HasColumnType("int");
 
@@ -172,6 +175,12 @@ namespace RSDSystem.Migrations
                     b.HasIndex("EmployeeId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("PayrollScheduleId");
+
+                    b.HasIndex("EmployeeId", "PayrollScheduleId")
+                        .IsUnique()
+                        .HasFilter("[PayrollScheduleId] IS NOT NULL");
 
                     b.ToTable("Payrolls");
                 });
@@ -567,7 +576,14 @@ namespace RSDSystem.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("RSDSystem.Models.PayrollSchedule", "PayrollSchedule")
+                        .WithMany()
+                        .HasForeignKey("PayrollScheduleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Employee");
+
+                    b.Navigation("PayrollSchedule");
 
                     b.Navigation("Project");
                 });

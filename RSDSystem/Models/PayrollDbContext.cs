@@ -105,6 +105,17 @@ namespace RSDSystem.Models
                 .HasForeignKey(pr => pr.ProjectId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            modelBuilder.Entity<Payroll>()
+                .HasOne(pr => pr.PayrollSchedule)
+                .WithMany()
+                .HasForeignKey(pr => pr.PayrollScheduleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Payroll>()
+                .HasIndex(pr => new { pr.EmployeeId, pr.PayrollScheduleId })
+                .IsUnique()
+                .HasFilter("[PayrollScheduleId] IS NOT NULL");
+
             modelBuilder.Entity<AttendanceImport>()
                 .HasOne(i => i.Project)
                 .WithMany()
