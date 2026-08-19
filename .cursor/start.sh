@@ -49,5 +49,7 @@ fi
 echo "==> Applying EF Core migrations"
 dotnet ef database update --project "$REPO_ROOT/RSDSystem/RSDSystem.csproj"
 
-echo "==> Start complete. Launch the web app with:"
-echo "    source .cursor/env.sh && dotnet run --project RSDSystem/RSDSystem.csproj --no-launch-profile"
+echo "==> Starting the RSD Payroll web app on $ASPNETCORE_URLS"
+echo "    Demo logins: demo / Demo@123 (Admin), payroll / Payroll@123 (Payroll Staff)"
+cd "$REPO_ROOT"
+exec dotnet run --project RSDSystem/RSDSystem.csproj --no-launch-profile
