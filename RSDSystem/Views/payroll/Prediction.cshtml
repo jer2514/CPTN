@@ -182,6 +182,14 @@
 
         document.getElementById('loadPredictionBtn').addEventListener('click', async function () {
             if (!projectIdInput.value) {
+                const typed = projectInput.value.trim().toLowerCase();
+                const match = allProjects.find(p => (p.name || '').toLowerCase() === typed);
+                if (match) {
+                    projectIdInput.value = match.id;
+                    projectInput.value = match.name;
+                }
+            }
+            if (!projectIdInput.value) {
                 alert('Please select a project from the suggestion list.');
                 return;
             }
@@ -193,7 +201,9 @@
             empty.textContent = 'Loading payroll prediction...';
 
             try {
-                const res = await fetch('/Payroll/GetPrediction?projectId=' + projectIdInput.value, {
+                const url = '/Payroll/GetPrediction?projectId=' + projectIdInput.value
+                    + '&projectName=' + encodeURIComponent(projectInput.value.trim());
+                const res = await fetch(url, {
                     headers: { 'Accept': 'application/json' }
                 });
                 const data = await res.json();

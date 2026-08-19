@@ -148,11 +148,19 @@ namespace RSDSystem.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetPrediction(int projectId)
+        public async Task<IActionResult> GetPrediction(int projectId, string? projectName = null)
         {
             var blocked = RequireAdmin();
             if (blocked != null)
                 return Json(new { success = false, message = "Admin access is required." });
+
+            if (projectId <= 0 && !string.IsNullOrWhiteSpace(projectName))
+            {
+                var named = await _db.Projects.AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.ProjectName != null && p.ProjectName.ToLower() == projectName.Trim().ToLower());
+                if (named != null)
+                    projectId = named.ProjectId;
+            }
 
             var page = await _predictions.LoadAsync(projectId, HttpContext.RequestAborted);
             if (page.Error != null && page.Rows.Count == 0)
@@ -173,11 +181,17 @@ namespace RSDSystem.Controllers
                 generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
                 rows = page.Rows.Select(r => new
                 {
-                    previousMonth1 = r.PreviousMonth1.ToString("MMMM yyyy", DateCulture),
+                    previousMonth1 = string.IsNullOrWhiteSpace(r.PreviousLabel1)
+                        ? r.PreviousMonth1.ToString("MMMM yyyy", DateCulture)
+                        : r.PreviousLabel1,
                     previousAmount1 = r.PreviousAmount1,
-                    previousMonth2 = r.PreviousMonth2.ToString("MMMM yyyy", DateCulture),
+                    previousMonth2 = string.IsNullOrWhiteSpace(r.PreviousLabel2)
+                        ? r.PreviousMonth2.ToString("MMMM yyyy", DateCulture)
+                        : r.PreviousLabel2,
                     previousAmount2 = r.PreviousAmount2,
-                    predictionMonth = r.PredictionMonth.ToString("MMMM yyyy", DateCulture),
+                    predictionMonth = string.IsNullOrWhiteSpace(r.PredictionLabel)
+                        ? r.PredictionMonth.ToString("MMMM yyyy", DateCulture)
+                        : r.PredictionLabel,
                     predictedPayroll = r.PredictedPayroll,
                     allocatedBudget = r.AllocatedBudget,
                     budgetDifference = r.BudgetDifference,
