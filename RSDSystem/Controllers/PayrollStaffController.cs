@@ -604,9 +604,10 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Payroll record not found." });
 
             if (payroll.Status == PayrollStatusOptions.Submitted ||
-                payroll.Status == PayrollStatusOptions.Approved)
+                payroll.Status == PayrollStatusOptions.Approved ||
+                payroll.Status == PayrollStatusOptions.Correction)
             {
-                return Json(new { success = false, message = "Submitted or approved payroll cannot be deleted." });
+                return Json(new { success = false, message = "Submitted, approved, or correction payroll cannot be deleted." });
             }
 
             _db.Set<Payroll>().Remove(payroll);
