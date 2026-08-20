@@ -29,7 +29,7 @@ namespace RSDSystem.Services
                 RecipientName = null,
                 Kind = kind,
                 Title = title,
-                Message = message,
+                Message = ClipMessage(message),
                 ProjectId = projectId,
                 RelatedId = relatedId,
                 Url = url,
@@ -56,7 +56,7 @@ namespace RSDSystem.Services
                 RecipientName = name,
                 Kind = kind,
                 Title = title,
-                Message = message,
+                Message = ClipMessage(message),
                 ProjectId = projectId,
                 RelatedId = relatedId,
                 Url = url,
@@ -68,10 +68,11 @@ namespace RSDSystem.Services
         public async Task NotifyPayrollSubmittedAsync(Project project, string? submittedBy, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
+            var staff = PersonName(submittedBy, "Payroll staff");
             await NotifyAdminsAsync(
                 NotificationKinds.PayrollSubmitted,
-                "Payroll Submitted",
-                $"Payroll for {name} has been submitted for approval.",
+                "Payroll submitted for review",
+                $"{staff} submitted payroll for {name}. Open Review Payroll to approve or return it.",
                 project.ProjectId,
                 null,
                 "/Payroll/ReviewProject?projectId=" + project.ProjectId,
@@ -90,8 +91,8 @@ namespace RSDSystem.Services
                 {
                     await NotifyAdminsAsync(
                         NotificationKinds.PayrollPredictionAvailable,
-                        "Payroll Prediction Available",
-                        $"Payroll prediction for {name} is now available for review.",
+                        "Payroll prediction is ready",
+                        $"A payroll prediction for {name} is ready. Open Payroll Prediction to review the next-month estimate.",
                         project.ProjectId,
                         null,
                         "/Payroll/Prediction",
@@ -101,8 +102,8 @@ namespace RSDSystem.Services
                     {
                         await NotifyAdminsAsync(
                             NotificationKinds.PayrollAnomalyPattern,
-                            "Payroll Anomaly",
-                            "A significant increase in payroll was detected compared with the usual payroll pattern.",
+                            "Unusual payroll change",
+                            $"Payroll for {name} jumped compared with recent months. Open Payroll Prediction to review the change before approving.",
                             project.ProjectId,
                             null,
                             "/Payroll/Prediction",
@@ -137,8 +138,8 @@ namespace RSDSystem.Services
             {
                 await NotifyAdminsAsync(
                     NotificationKinds.PayrollAnomalyBudget,
-                    "Payroll Anomaly",
-                    $"Payroll for {name} may exceed the allocated project budget.",
+                    "Payroll may exceed budget",
+                    $"Payroll for {name} this period is {Peso(periodTotal)}, which is over the {Peso(budget)} payroll budget. Review the payroll before approving.",
                     project.ProjectId,
                     null,
                     "/Payroll/ReviewProject?projectId=" + project.ProjectId,
@@ -149,28 +150,33 @@ namespace RSDSystem.Services
         public async Task NotifyAttendanceImportedAsync(Project project, string? importedBy, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
-            var staff = string.IsNullOrWhiteSpace(importedBy) ? "Payroll Staff" : importedBy.Trim();
+            var staff = PersonName(importedBy, "Payroll staff");
             await NotifyAdminsAsync(
                 NotificationKinds.AttendanceImported,
-                "Attendance Imported",
-                $"Attendance records for {name} have been imported by {staff}.",
+                "Attendance imported",
+                $"{staff} imported attendance for {name}. Open Attendance Records to review or edit the punches.",
                 project.ProjectId,
                 null,
                 "/Attendance/Records",
                 cancellationToken);
         }
 
-        public async Task NotifyNewTaskAsync(Project project, CancellationToken cancellationToken = default)
+        public async Task NotifyNewTaskAsync(
+            Project project, DateTime? periodStart = null, DateTime? periodEnd = null,
+            CancellationToken cancellationToken = default)
         {
             var staff = project.AssignedPayrollStaff?.Trim();
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
+            var name = ProjectName(project);
+            var period = PeriodLabel(periodStart, periodEnd);
+            var when = string.IsNullOrEmpty(period) ? "" : $" ({period})";
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.NewTask,
-                "New Task",
-                "Admin assigned you a new task.",
+                "New payroll task",
+                $"Admin assigned you to generate payroll for {name}{when}. Open To do task, import attendance if needed, then generate payroll.",
                 project.ProjectId,
                 null,
                 "/PayrollStaff/Index",
@@ -180,12 +186,14 @@ namespace RSDSystem.Services
         public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, CancellationToken cancellationToken = default)
         {
             var staff = StaffFor(payroll, project);
-            var name = ProjectName(project) is var n && n != "the project" ? n : "payroll";
+            var name = ProjectName(project);
+            var employee = PersonName(payroll.Employee?.FullName, "an employee");
+            var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayrollApproved,
-                "Payroll Approved",
-                $"Payroll for {name} has been approved by the Admin.",
+                "Payroll approved",
+                $"Admin approved the payroll slip for {employee} on {name} ({period}).",
                 payroll.ProjectId,
                 payroll.PayrollId,
                 "/PayrollStaff/PendingPayroll?projectId=" + payroll.ProjectId,
@@ -195,14 +203,38 @@ namespace RSDSystem.Services
         public async Task NotifyPayrollReturnedAsync(Payroll payroll, Project? project, string reason, CancellationToken cancellationToken = default)
         {
             var staff = StaffFor(payroll, project);
+            var name = ProjectName(project);
+            var employee = PersonName(payroll.Employee?.FullName, "an employee");
+            var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
+            var note = string.IsNullOrWhiteSpace(reason) ? "No reason was given." : reason.Trim();
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayrollCorrection,
-                "Payroll Correction",
-                $"Payroll for {staff} has been returned by the Admin for correction.",
+                "Payroll returned for correction",
+                $"Admin returned the payroll slip for {employee} on {name} ({period}). Reason: {note}. Open Pending Payroll to correct and submit again.",
                 payroll.ProjectId,
                 payroll.PayrollId,
                 "/PayrollStaff/PendingPayroll?projectId=" + payroll.ProjectId,
+                cancellationToken);
+        }
+
+        public async Task NotifyAttendanceCorrectionRequestedAsync(
+            string? staffName, string? employeeName, string? projectName, DateTime? workDate,
+            int projectId, int requestId, CancellationToken cancellationToken = default)
+        {
+            var staff = PersonName(staffName, "Payroll staff");
+            var employee = PersonName(employeeName, "an employee");
+            var project = string.IsNullOrWhiteSpace(projectName) ? "the project" : projectName.Trim();
+            var date = workDate.HasValue
+                ? workDate.Value.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "an attendance date";
+            await NotifyAdminsAsync(
+                NotificationKinds.AttendanceCorrectionRequest,
+                "Attendance correction requested",
+                $"{staff} asked to correct {employee}'s attendance on {date} for {project}. Open the notification to approve or return the request.",
+                projectId,
+                requestId,
+                "/Notification/Index",
                 cancellationToken);
         }
 
@@ -324,8 +356,28 @@ namespace RSDSystem.Services
             return await query.AnyAsync(cancellationToken);
         }
 
+        private static string ClipMessage(string message)
+        {
+            var text = (message ?? "").Trim();
+            return text.Length <= 500 ? text : text[..497] + "...";
+        }
+
         private static string ProjectName(Project? project) =>
             string.IsNullOrWhiteSpace(project?.ProjectName) ? "the project" : project!.ProjectName!.Trim();
+
+        private static string PersonName(string? name, string fallback) =>
+            string.IsNullOrWhiteSpace(name) ? fallback : name.Trim();
+
+        private static string PeriodLabel(DateTime? start, DateTime? end)
+        {
+            if (!start.HasValue || !end.HasValue)
+                return "";
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            return start.Value.ToString("MMMM d, yyyy", culture) + " – " + end.Value.ToString("MMMM d, yyyy", culture);
+        }
+
+        private static string Peso(decimal amount) =>
+            "₱" + amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
 
         private static string StaffFor(Payroll payroll, Project? project)
         {
