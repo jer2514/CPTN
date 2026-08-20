@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Validation;
 using BCrypt.Net;
 
 namespace RSDSystem.Controllers
@@ -19,12 +20,12 @@ namespace RSDSystem.Controllers
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
 
         // GET /UserManagement
-        public async Task<IActionResult> Index(string? search, string? sortBy)
+        public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
+            const int pageSize = 10;
+
             var query = _db.Users
-                           .Where(u => u.FirstName != null &&
-                                        u.LastName != null &&
-                                        u.Role != null)
+                           .Where(u => u.FirstName != null && u.LastName != null && u.Role != null)
                            .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -43,14 +44,22 @@ namespace RSDSystem.Controllers
                 "role" => query.OrderBy(u => u.Role),
                 "email" => query.OrderBy(u => u.Email),
                 "status" => query.OrderByDescending(u => u.IsActive),
-                _ => query.OrderBy(u => u.UserId)
+                _ => query.OrderByDescending(u => u.CreatedAt)
             };
+
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             ViewBag.Search = search;
             ViewBag.SortBy = sortBy;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
             ViewBag.PageTitle = "User Management";
 
-            return View(await query.ToListAsync());
+            return View(items);
         }
 
         // GET /UserManagement/Create
@@ -70,9 +79,36 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
+
+            if (string.IsNullOrWhiteSpace(Password))
+                ModelState.AddModelError("Password", "Password is required.");
+            else if (Password.Length < 8)
+                ModelState.AddModelError("Password", "Password must be at least 8 characters.");
 
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
+                ModelState.AddModelError("photo", photoError);
+
+            var username = user.Username?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(username))
+            {
+                var usernameTaken = await _db.Users
+                    .AnyAsync(u => u.Username == username);
+                if (usernameTaken)
+                    ModelState.AddModelError("Username", "This username is already taken.");
+            }
+
+            var email = user.Email?.Trim();
+            if (!string.IsNullOrEmpty(email))
+            {
+                var emailTaken = await _db.Users
+                    .AnyAsync(u => u.Email == email);
+                if (emailTaken)
+                    ModelState.AddModelError("Email", "This email is already registered.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -81,19 +117,32 @@ namespace RSDSystem.Controllers
             }
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            user.FirstName = ti.ToTitleCase(user.FirstName.Trim().ToLower());
-            user.LastName = ti.ToTitleCase(user.LastName.Trim().ToLower());
-            user.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password);
+            user.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
+            user.LastName = ti.ToTitleCase((user.LastName ?? string.Empty).Trim().ToLower());
+            user.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
+                ? null
+                : user.MiddleInitial.Trim().ToUpperInvariant();
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password ?? string.Empty);
             user.UserId = 0;
+            user.UserCode = GenerateUserCode();
+            user.CreatedAt = DateTime.Now;
 
             if (photo != null && photo.Length > 0)
                 user.PhotoPath = await SavePhotoAsync(photo);
 
             _db.Users.Add(user);
+            user.UserCode = await GenerateUserCodeAsync();
             await _db.SaveChangesAsync();
             TempData["Success"] = "User added successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<string> GenerateUserCodeAsync()
+        {
+            var year = DateTime.Now.ToString("yy");
+            var count = await _db.Users.CountAsync(u => u.UserCode != null && u.UserCode.StartsWith(year));
+            var seq = (count + 1).ToString().PadLeft(4, '0');
+            return $"{year}{seq}";
         }
 
         // GET /UserManagement/Edit/{id}
@@ -115,9 +164,36 @@ namespace RSDSystem.Controllers
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
+            ModelState.Remove("UserCode");
 
-            if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
-                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+            if (!string.IsNullOrWhiteSpace(NewPassword))
+            {
+                if (NewPassword.Length < 8)
+                    ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+                if (NewPassword != ConfirmPassword)
+                    ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+            }
+
+            if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
+                ModelState.AddModelError("photo", photoError);
+
+            var username = user.Username?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(username))
+            {
+                var usernameTaken = await _db.Users
+                    .AnyAsync(u => u.Username == username && u.UserId != user.UserId);
+                if (usernameTaken)
+                    ModelState.AddModelError("Username", "This username is already taken.");
+            }
+
+            var email = user.Email?.Trim();
+            if (!string.IsNullOrEmpty(email))
+            {
+                var emailTaken = await _db.Users
+                    .AnyAsync(u => u.Email == email && u.UserId != user.UserId);
+                if (emailTaken)
+                    ModelState.AddModelError("Email", "This email is already registered.");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -129,15 +205,17 @@ namespace RSDSystem.Controllers
             if (existing == null) return NotFound();
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            existing.FirstName = ti.ToTitleCase(user.FirstName.Trim().ToLower());
-            existing.LastName = ti.ToTitleCase(user.LastName.Trim().ToLower());
-            existing.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
+            existing.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
+            existing.LastName = ti.ToTitleCase((user.LastName ?? string.Empty).Trim().ToLower());
+            existing.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
+                ? null
+                : user.MiddleInitial.Trim().ToUpperInvariant();
             existing.DateOfBirth = user.DateOfBirth;
             existing.Gender = user.Gender;
-            existing.Username = user.Username;
-            existing.Email = user.Email;
-            existing.ContactNumber = user.ContactNumber;
-            existing.Address = user.Address;
+            existing.Username = username;
+            existing.Email = email;
+            existing.ContactNumber = user.ContactNumber?.Trim();
+            existing.Address = user.Address?.Trim();
             existing.Role = user.Role;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
@@ -200,12 +278,13 @@ namespace RSDSystem.Controllers
             if (selectedIds == null || selectedIds.Count == 0)
                 return RedirectToAction(nameof(Index));
 
-            var employees = _db.Employees
-                               .Where(e => selectedIds.Contains(e.EmployeeId))
-                               .ToList();
+            var users = _db.Users
+                           .Where(u => selectedIds.Contains(u.UserId))
+                           .ToList();
 
-            _db.Employees.RemoveRange(employees);
+            _db.Users.RemoveRange(users);
             await _db.SaveChangesAsync();
+            TempData["Success"] = "Users deleted.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -220,6 +299,27 @@ namespace RSDSystem.Controllers
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
+        }
+
+        private string GenerateUserCode()
+        {
+            string yearPrefix = DateTime.Now.ToString("yy");
+
+            var lastCode = _db.Users
+                .Where(u => u.UserCode.StartsWith(yearPrefix))
+                .OrderByDescending(u => u.UserCode)
+                .Select(u => u.UserCode)
+                .FirstOrDefault();
+
+            int nextSeq = 1;
+            if (lastCode != null && lastCode.Length == 6)
+            {
+                var seqPart = lastCode.Substring(2);
+                if (int.TryParse(seqPart, out int lastSeq))
+                    nextSeq = lastSeq + 1;
+            }
+
+            return yearPrefix + nextSeq.ToString("D4");
         }
     }
 }

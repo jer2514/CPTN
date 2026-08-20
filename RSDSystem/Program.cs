@@ -1,13 +1,22 @@
-using System;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using RSDSystem.Filters;
 using RSDSystem.Models;
+using RSDSystem.Services;
+using System;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    options.Filters.Add<AuthCheckFilter>();
+});
 
 // Cookie authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -19,9 +28,19 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
 builder.Services.AddDbContext<PayrollDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<AttendanceImportService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddHttpClient("PayrollPrediction", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddScoped<PayrollPredictionService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -29,6 +48,8 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(60);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
 Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -53,6 +74,117 @@ using (var scope = app.Services.CreateScope())
         //    // ignore migration errors in local dev if DB unavailable
         //}
 
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Projects', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'Status' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN Status nvarchar(max) NULL;
+
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'ProjectName' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN ProjectName nvarchar(150) NULL;
+
+    UPDATE dbo.Projects SET Status = N'On Going' WHERE Status IS NULL OR LTRIM(RTRIM(Status)) = N'' OR Status = N'Active';
+    UPDATE dbo.Projects SET Status = N'Finished' WHERE Status = N'Completed';
+    UPDATE dbo.Projects SET Status = N'On Hold' WHERE Status = N'Cancelled';
+    UPDATE dbo.Projects SET ProjectName = N'' WHERE ProjectName IS NULL;
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Project null-column fix error: " + ex.Message);
+        }
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Employees', N'Email') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Employees')
+          AND name = N'Email'
+          AND is_nullable = 0
+    )
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE name = N'IX_Employees_Email'
+              AND object_id = OBJECT_ID(N'dbo.Employees')
+        )
+            DROP INDEX IX_Employees_Email ON dbo.Employees;
+
+        ALTER TABLE dbo.Employees ALTER COLUMN Email nvarchar(100) NULL;
+    END
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_Employees_Email'
+          AND object_id = OBJECT_ID(N'dbo.Employees')
+    )
+    BEGIN
+        CREATE UNIQUE INDEX IX_Employees_Email ON dbo.Employees(Email)
+        WHERE [Email] IS NOT NULL AND [Email] <> N'';
+    END
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Employee email schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.PayrollSchedules', N'TaskCompleted') IS NULL
+BEGIN
+    ALTER TABLE dbo.PayrollSchedules ADD TaskCompleted bit NOT NULL CONSTRAINT DF_PayrollSchedules_TaskCompleted DEFAULT(0);
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule task column fix error: " + ex.Message);
+        }
+
+        try
+        {
+            PayrollSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule link schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            AttendanceSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Attendance schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            NotificationSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Notification schema fix error: " + ex.Message);
+        }
+
         var toAdd = new List<User>();
 
         if (!db.Users.Any(u => u.Username == "demo"))
@@ -64,7 +196,7 @@ using (var scope = app.Services.CreateScope())
                 Username = "demo",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Demo@123"),
                 Email = "demo@example.com",
-                ContactNumber = "0000000000",
+                ContactNumber = "09123456789",
                 Address = "Demo account",
                 Role = "Admin",
                 IsActive = true,
@@ -81,7 +213,7 @@ using (var scope = app.Services.CreateScope())
                 Username = "payroll",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Payroll@123"),
                 Email = "payroll@example.com",
-                ContactNumber = "0000000000",
+                ContactNumber = "09987654321",
                 Address = "Payroll demo account",
                 Role = "PayrollStaff",
                 IsActive = true,
@@ -107,9 +239,8 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -122,5 +253,17 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");
+
+try
+{
+    Console.WriteLine("On this computer: http://localhost:5114");
+    var host = Dns.GetHostEntry(Dns.GetHostName());
+    foreach (var ip in host.AddressList.Where(a => a.AddressFamily == AddressFamily.InterNetwork))
+        Console.WriteLine("Other computers on this Wi-Fi/network: http://" + ip + ":5114");
+}
+catch
+{
+    // ignore address lookup failures
+}
 
 app.Run();

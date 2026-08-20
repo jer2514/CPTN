@@ -1,8 +1,344 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@using System.Text.Json
+@{
+    ViewData["Title"] = "Dashboard";
+    var fullName = Context.Session.GetString("FullName") ?? "Admin";
+    var activeProjects = ViewBag.ActiveProjectsList as List<RSDSystem.Models.Project> ?? new();
+    var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();
+    var projectTypeMap = ViewBag.ProjectTypeMap as Dictionary<int, string> ?? new();
+    var projectDateMap = ViewBag.ProjectDateMap as Dictionary<int, RSDSystem.Models.ProjectDateBounds>
+        ?? new Dictionary<int, RSDSystem.Models.ProjectDateBounds>();
+    var schedules = (ViewBag.PayrollSchedules as IEnumerable<RSDSystem.Models.PayrollSchedule>)?.ToList()
+        ?? new List<RSDSystem.Models.PayrollSchedule>();
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="dash-header">
+    <div class="dash-welcome">Welcome back, @fullName</div>
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
 </div>
+
+
+<!-- Stat cards -->
+<div class="dash-stats-row">
+    <div class="dash-stat-card">
+        <div class="dash-stat-icon"><i class="bi bi-buildings-fill"></i></div>
+        <div>
+            <div class="dash-stat-number">@ViewBag.ActiveProjects</div>
+            <div class="dash-stat-label">Active Projects</div>
+        </div>
+    </div>
+
+    <div class="dash-stat-card">
+        <div class="dash-stat-icon"><i class="bi bi-person-badge-fill"></i></div>
+        <div>
+            <div class="dash-stat-number">@ViewBag.ActiveEmployees</div>
+            <div class="dash-stat-label">Active Employees</div>
+        </div>
+    </div>
+
+    <div class="dash-stat-card">
+        <div class="dash-stat-icon"><i class="bi bi-person-lines-fill"></i></div>
+        <div>
+            <div class="dash-stat-number">@ViewBag.ActivePayrollStaff</div>
+            <div class="dash-stat-label">Active Payroll Staff</div>
+        </div>
+    </div>
+</div>
+
+<!-- Panels -->
+<div class="dash-panels-row">
+
+    <!-- Pending Payroll Approval -->
+    <div class="dash-panel">
+        <div class="dash-panel-head">
+            <span class="dash-panel-title">Pending Payroll Approval</span>
+        </div>
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Staff Name</th>
+                    <th>Project</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            @{
+                var pendingApprovals = ViewBag.PendingApprovals as IEnumerable<RSDSystem.Models.PendingApprovalRow>;
+            }
+            <tbody>
+                @if (pendingApprovals == null || !pendingApprovals.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            No pending approvals yet.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var p in pendingApprovals)
+                    {
+                        <tr>
+                            <td>@p.StaffName</td>
+                            <td>@p.ProjectName</td>
+                            <td>@p.Date.ToString("MM-dd-yy")</td>
+                            <td>
+                                <a href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })"
+                                   class="pill-btn pill-view">Review</a>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Payroll Schedules -->
+    <div class="dash-panel">
+        <div class="dash-panel-head">
+            <span class="dash-panel-title">Payroll Schedules</span>
+            <button type="button" class="btn-primary-blue dash-add-schedule-btn"
+                    onclick="openScheduleModal()">
+                Add Schedule
+            </button>
+        </div>
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Project Name</th>
+                    <th>Starting Date</th>
+                    <th>End Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!schedules.Any())
+                {
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">
+                            No schedules yet.
+                        </td>
+                    </tr>
+                }
+                @foreach (var s in schedules)
+                {
+                    <tr>
+                        <td>@(s.Project?.ProjectName ?? "—")</td>
+                        <td>@s.StartingDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        <td>@s.EndDate.ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                        <td>
+                            <div class="action-cell">
+                                <button type="button" class="action-btn action-edit" title="Edit"
+                                        onclick="openEditModal(@s.PayrollScheduleId, @s.ProjectId,
+                                                      '@Html.Raw((s.TypeOfService ?? "").Replace("'", "\\'"))',
+                                                      '@s.StartingDate.ToString("yyyy-MM-dd")',
+                                                      '@s.EndDate.ToString("yyyy-MM-dd")')">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <button type="button" class="action-btn action-delete" title="Delete"
+                                        onclick="openDeleteModal(@s.PayrollScheduleId, '@Html.Raw((s.Project?.ProjectName ?? "").Replace("'", "\\'"))')">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Add / Edit Schedule Modal -->
+<div class="del-overlay" id="scheduleOverlay" onclick="closeScheduleModal(arguments[0])">
+    <div class="del-modal dash-schedule-modal">
+        <div class="del-title mb-3" id="scheduleModalTitle">Payroll Schedule</div>
+
+        <form id="scheduleForm" asp-controller="Payroll" asp-action="AddSchedule" method="post" class="js-validate" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="PayrollScheduleId" id="schedulePayrollScheduleId" value="" />
+
+            <div class="form-row form-row-2">
+                <div>
+                    <label class="form-lbl">Project Name <span class="req-star">*</span></label>
+                    <select name="ProjectId" id="scheduleProjectSelect" class="form-ctrl"
+                            data-validate="required" data-label="Project"
+                            onchange="autoFillProjectType(this.value)">
+                        <option value="">Select project</option>
+                        @foreach (var p in activeProjects)
+                        {
+                            <option value="@p.ProjectId">@p.ProjectName</option>
+                        }
+                    </select>
+                    <span class="field-error" data-error-for="ProjectId"></span>
+                </div>
+                <div>
+                    <label class="form-lbl">Type of Project <span class="req-star">*</span></label>
+                    <select name="TypeOfService" id="scheduleTypeSelect" class="form-ctrl"
+                            data-validate="required" data-label="Type of project">
+                        <option value="">Select type</option>
+                        @foreach (var s in services)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                    <span class="field-error" data-error-for="TypeOfService"></span>
+                </div>
+            </div>
+
+            <div class="form-row form-row-2">
+                <div>
+                    <label class="form-lbl">Starting Date <span class="req-star">*</span></label>
+                    <input type="date" name="StartingDate" id="scheduleStartDate" class="form-ctrl"
+                           min="2000-01-01" max="2099-12-31"
+                           data-validate="required|dateYear|dateWithin" data-label="Starting date" />
+                    <span class="field-error" data-error-for="StartingDate"></span>
+                </div>
+                <div>
+                    <label class="form-lbl">End Date <span class="req-star">*</span></label>
+                    <input type="date" name="EndDate" id="scheduleEndDate" class="form-ctrl"
+                           min="2000-01-01" max="2099-12-31"
+                           data-validate="required|dateAfter|dateYear|dateWithin" data-after="scheduleStartDate"
+                           data-label="End date" />
+                    <span class="field-error" data-error-for="EndDate"></span>
+                </div>
+            </div>
+            <div class="slip-schedule-hint" id="scheduleProjectDateHint" style="display:none;margin-top:8px"></div>
+
+            <div class="del-actions mt-3">
+                <button type="button" class="del-btn-cancel" onclick="closeScheduleModal()">Cancel</button>
+                <button type="submit" class="btn-primary-blue-block" style="margin-top:0;width:auto;padding:10px 28px" id="scheduleSubmitBtn">
+                    Add Schedule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Are you sure?</div>
+        <div class="del-msg">
+            You are about to permanently delete the schedule for:
+            <strong id="deleteScheduleName"></strong>.
+            This action cannot be undone.
+        </div>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <form id="deleteForm" asp-controller="Payroll" asp-action="DeleteSchedule" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="deleteScheduleId" value="" />
+                <button type="submit" class="del-btn-delete">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_FormValidationScripts" />
+    <script>
+        const projectTypeMap = @Html.Raw(JsonSerializer.Serialize(projectTypeMap));
+        const projectDateMap = @Html.Raw(JsonSerializer.Serialize(projectDateMap, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+
+        function clearScheduleErrors() {
+            const form = document.getElementById('scheduleForm');
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+        }
+
+        function formatIsoDate(iso) {
+            if (!iso) return '';
+            const parts = String(iso).split('-');
+            if (parts.length !== 3) return iso;
+            return parts[1] + '/' + parts[2] + '/' + parts[0];
+        }
+
+        function applyProjectDateBounds(projectId) {
+            const range = projectDateMap[projectId] || {};
+            const calendarMin = '2000-01-01';
+            const calendarMax = '2099-12-31';
+            let rangeStart = range.start || calendarMin;
+            let rangeEnd = range.end || calendarMax;
+            if (rangeStart > rangeEnd) rangeEnd = rangeStart;
+            ['scheduleStartDate', 'scheduleEndDate'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (range.start) el.setAttribute('data-min', range.start);
+                else el.removeAttribute('data-min');
+                if (range.end) el.setAttribute('data-max', range.end);
+                else el.removeAttribute('data-max');
+                el.min = rangeStart;
+                el.max = rangeEnd;
+            });
+            const hint = document.getElementById('scheduleProjectDateHint');
+            if (hint) {
+                if (range.start || range.end) {
+                    hint.style.display = 'block';
+                    hint.textContent = 'Must fall within the project dates: '
+                        + (formatIsoDate(range.start) || 'project start')
+                        + ' – '
+                        + (formatIsoDate(range.end) || 'project end');
+                } else {
+                    hint.style.display = 'none';
+                    hint.textContent = '';
+                }
+            }
+        }
+
+        function autoFillProjectType(projectId) {
+            const typeSelect = document.getElementById('scheduleTypeSelect');
+            const type = projectTypeMap[projectId];
+            typeSelect.value = type ? type : "";
+            applyProjectDateBounds(projectId);
+        }
+
+        function openScheduleModal() {
+            document.getElementById('scheduleModalTitle').textContent = 'Payroll Schedule';
+            document.getElementById('scheduleForm').action = '/Payroll/AddSchedule';
+            document.getElementById('scheduleSubmitBtn').textContent = 'Add Schedule';
+            document.getElementById('schedulePayrollScheduleId').value = '';
+            document.getElementById('scheduleProjectSelect').value = '';
+            document.getElementById('scheduleTypeSelect').value = '';
+            document.getElementById('scheduleStartDate').value = '';
+            document.getElementById('scheduleEndDate').value = '';
+            applyProjectDateBounds('');
+            clearScheduleErrors();
+            document.getElementById('scheduleOverlay').classList.add('open');
+        }
+
+        function openEditModal(id, projectId, typeOfService, startDate, endDate) {
+            document.getElementById('scheduleModalTitle').textContent = 'Edit Payroll Schedule';
+            document.getElementById('scheduleForm').action = '/Payroll/EditSchedule';
+            document.getElementById('scheduleSubmitBtn').textContent = 'Save Changes';
+            document.getElementById('schedulePayrollScheduleId').value = id;
+            document.getElementById('scheduleProjectSelect').value = projectId;
+            document.getElementById('scheduleTypeSelect').value = typeOfService;
+            document.getElementById('scheduleStartDate').value = startDate;
+            document.getElementById('scheduleEndDate').value = endDate;
+            applyProjectDateBounds(String(projectId));
+            clearScheduleErrors();
+            document.getElementById('scheduleOverlay').classList.add('open');
+        }
+
+        function closeScheduleModal(e) {
+            if (!e || e.target === document.getElementById('scheduleOverlay'))
+                document.getElementById('scheduleOverlay').classList.remove('open');
+        }
+
+        function openDeleteModal(id, name) {
+            document.getElementById('deleteScheduleName').textContent = name;
+            document.getElementById('deleteScheduleId').value = id;
+            document.getElementById('deleteOverlay').classList.add('open');
+        }
+        function closeDeleteModal(e) {
+            if (!e || e.target === document.getElementById('deleteOverlay'))
+                document.getElementById('deleteOverlay').classList.remove('open');
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { closeScheduleModal(); closeDeleteModal(); }
+        });
+    </script>
+}

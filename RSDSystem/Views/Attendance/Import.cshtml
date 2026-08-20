@@ -1,0 +1,676 @@
+@model List<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "Import Attendance";
+    Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="att-page-title">Import Attendance</div>
+
+    @if (ViewBag.ShowingAllProjects == true)
+    {
+        <div class="genpay-fallback-note">
+            Showing all active projects — none are currently assigned to your account specifically.
+        </div>
+    }
+
+    <div class="att-import-row">
+        <div class="att-field">
+            <label class="form-lbl">Project Name</label>
+            <div class="att-field-controls">
+                <div class="genpay-autocomplete att-grow">
+                    <input type="text" id="projectInput" class="form-ctrl"
+                           placeholder="Type to search project..." autocomplete="off" />
+                    <input type="hidden" id="projectIdInput" />
+                    <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+                </div>
+                <button type="button" id="loadProjectBtn" class="btn-primary-blue-solid">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="att-import-row">
+        <div class="att-field">
+            <label class="form-lbl">Attendance File</label>
+            <div class="att-field-controls">
+                <input type="text" id="fileNameInput" class="form-ctrl att-grow" readonly
+                       placeholder="No file chosen" />
+                <input type="file" id="fileInput" accept=".xls,.xlsx,.csv,.txt" hidden />
+                <button type="button" id="chooseFileBtn" class="btn-choose-file">Choose File</button>
+                <button type="button" id="loadFileBtn" class="btn-primary-blue-solid">Load File</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewSection" class="att-preview" style="display:none">
+        <div class="emp-card-head" style="margin-top:6px">
+            <div id="previewMeta" class="att-preview-meta"></div>
+            <div class="emp-controls">
+                <div class="dropdown">
+                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Unmatched">Unmatched</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Incomplete">Incomplete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
+                    </ul>
+                </div>
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="rowSearch" placeholder="Search User" />
+                </div>
+            </div>
+        </div>
+
+        <div id="unmatchedBanner" class="genpay-fallback-note" style="display:none">
+            Some rows could not be automatically matched to an employee. Use the dropdown in the
+            <strong>Matched Employee</strong> column to select the correct employee for each highlighted row before importing.
+        </div>
+
+        <div class="att-table-wrap">
+            <table class="emp-table att-table">
+                <thead id="previewHead"></thead>
+                <tbody id="previewBody"></tbody>
+            </table>
+        </div>
+
+        <div class="att-preview-footer">
+            <div id="previewPager" class="att-pager"></div>
+            <button type="button" id="importBtn" class="btn-import-attendance">Import Attendance</button>
+        </div>
+    </div>
+
+    <div id="previewEmpty" class="text-center text-muted py-5">
+        Select a project, choose the Employee Attendance Table Excel file, then click Load File to preview daily time cards.
+    </div>
+</div>
+
+<div id="previewEditOverlay" class="att-edit-overlay" hidden>
+    <div class="page-card att-edit-panel">
+        <div class="att-page-title">Edit Attendance</div>
+        <div class="att-edit-sub">Morning 8:00–12:00 · Afternoon 13:00–17:00 · Overtime from 17:00. Late after 8:30. Early out before 16:45.</div>
+        <div class="att-edit-meta">
+            <div>
+                <div class="form-lbl">Employee ID</div>
+                <div class="slip-value" id="peDisplayId"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Employee Name</div>
+                <div class="slip-value" id="peName"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Date</div>
+                <div class="slip-value" id="peDate"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Status</div>
+                <span class="status-pill" id="peStatus">Absent</span>
+            </div>
+        </div>
+        <div class="att-edit-grid">
+            <label>Before Noon In<input type="time" id="peIn1" class="form-ctrl" /></label>
+            <label>Before Noon Out<input type="time" id="peOut1" class="form-ctrl" /></label>
+            <label>After Noon In<input type="time" id="peIn2" class="form-ctrl" /></label>
+            <label>After Noon Out<input type="time" id="peOut2" class="form-ctrl" /></label>
+            <label>Overtime In<input type="time" id="peOtIn" class="form-ctrl" /></label>
+            <label>Overtime Out<input type="time" id="peOtOut" class="form-ctrl" /></label>
+        </div>
+        <div class="att-edit-live" id="peHours">0.00 regular hours · 0.00 overtime</div>
+        <div class="att-preview-footer">
+            <div class="att-edit-actions">
+                <button type="button" class="att-quick-btn" id="peStandard">8–5</button>
+                <button type="button" class="att-quick-btn" id="peClear">Clear</button>
+            </div>
+            <div class="att-edit-actions">
+                <button type="button" class="btn-outline-blue" id="peCancel">Cancel</button>
+                <button type="button" class="btn-primary-blue-solid" id="peApply">Apply to Preview</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
+    <partial name="_ProjectListData" model="Model" />
+    <script>
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
+
+        const projectInput = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList = document.getElementById('projectSuggestions');
+        const fileInput = document.getElementById('fileInput');
+        const fileNameInput = document.getElementById('fileNameInput');
+        const tokenInput = document.querySelector('#__afToken input[name="__RequestVerificationToken"]');
+        const token = tokenInput ? tokenInput.value : '';
+
+        let previewRows = [];
+        let candidateEmployees = [];
+        let lastFileName = '';
+        let lastPeriodText = '';
+        let previewFormat = 'Statistic';
+        let statusFilter = 'all';
+        let currentPage = 1;
+        const pageSize = 10;
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = '';
+            const q = projectInput.value.trim().toLowerCase();
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+        });
+
+        projectInput.addEventListener('focus', function () {
+            const q = projectInput.value.trim().toLowerCase();
+            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+        });
+
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
+        });
+
+        document.getElementById('loadProjectBtn').addEventListener('click', function () {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+            document.getElementById('previewEmpty').textContent =
+                'Project loaded. Choose the attendance file and click Load File.';
+        });
+
+        document.getElementById('chooseFileBtn').addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', function () {
+            fileNameInput.value = this.files[0] ? this.files[0].name : '';
+        });
+
+        document.querySelectorAll('.filter-menu [data-status]').forEach(el => {
+            el.addEventListener('click', function (e) {
+                e.preventDefault();
+                statusFilter = this.dataset.status;
+                currentPage = 1;
+                renderPreview();
+            });
+        });
+
+        document.getElementById('rowSearch').addEventListener('input', function () {
+            currentPage = 1;
+            renderPreview();
+        });
+
+        function filteredRows() {
+            const q = document.getElementById('rowSearch').value.trim().toLowerCase();
+            return previewRows.filter(r => {
+                const statusOk = statusFilter === 'all'
+                    ? true
+                    : statusFilter === 'Unmatched'
+                        ? !r.matched
+                        : statusFilter === 'Late'
+                            ? (r.status === 'Late' || r.status === 'Late + Early Off')
+                            : statusFilter === 'Early Off'
+                                ? (r.status === 'Early Off' || r.status === 'Late + Early Off')
+                                : r.status === statusFilter;
+                const text = `${r.displayId} ${r.employeeName} ${r.externalUserId}`.toLowerCase();
+                return statusOk && (!q || text.includes(q));
+            });
+        }
+
+        function dash(v) {
+            return v == null || v === '' || v === '—' ? '——' : v;
+        }
+
+        function timeCell(v) {
+            const text = dash(v);
+            return text === '——' ? `<span class="att-empty">${text}</span>` : text;
+        }
+
+        function matchOptionsHtml(selectedId) {
+            return candidateEmployees.map(c =>
+                `<option value="${c.id}" ${String(c.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+            ).join('');
+        }
+
+        function matchCellHtml(row, index) {
+            if (row.matched) {
+                const name = escapeHtml(row.matchedEmployeeName || 'Matched');
+                if (row.manuallyMatched) {
+                    return `<span class="badge-active">${name}</span>
+                            <button type="button" class="att-action-link js-change-match" data-row-index="${index}">Change</button>`;
+                }
+                return `<span class="badge-active">${name}</span>`;
+            }
+
+            return `<select class="form-ctrl att-match-select" data-row-index="${index}">
+                        <option value="">Select employee…</option>
+                        ${matchOptionsHtml('')}
+                    </select>`;
+        }
+
+        function updateMatchSummary() {
+            const matched = previewRows.filter(r => r.matched).length;
+            const unmatched = previewRows.length - matched;
+
+            document.getElementById('previewMeta').textContent =
+                `${lastFileName} · ${lastPeriodText} · ${matched} matched, ${unmatched} unmatched`;
+
+            const banner = document.getElementById('unmatchedBanner');
+            if (banner) banner.style.display = unmatched > 0 ? 'block' : 'none';
+        }
+
+        function renderPreview() {
+            const rows = filteredRows();
+            const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+            document.getElementById('previewHead').innerHTML = `<tr>
+                    <th>Employee ID</th><th>Employee Name</th><th>Date</th>
+                    <th>Time In</th><th>Time Out</th><th>Time In</th><th>Time Out</th>
+                    <th>Overtime In</th><th>Overtime Out</th><th>Status</th>
+                    <th>Matched Employee</th><th>Action</th>
+                   </tr>`;
+
+            document.getElementById('previewBody').innerHTML = pageRows.map(r => {
+                const index = previewRows.indexOf(r);
+                const status = `<span class="status-pill ${statusClass[r.status] || r.statusClass || ''}">${r.status}</span>`;
+                const action = `<button type="button" class="att-action-link" data-edit-index="${index}">${r.edited ? 'Edited' : (r.actionLabel || 'Edit')}</button>`;
+                const rowClass = [r.matched ? '' : 'att-row-unmatched', r.edited ? 'att-row-edited' : ''].filter(Boolean).join(' ');
+                return `<tr class="${rowClass}">
+                    <td>${escapeHtml(r.displayId) || '——'}</td>
+                    <td>${escapeHtml(r.employeeName) || '——'}</td>
+                    <td>${dash(r.workDate)}</td>
+                    <td>${timeCell(r.timeIn1)}</td><td>${timeCell(r.timeOut1)}</td>
+                    <td>${timeCell(r.timeIn2)}</td><td>${timeCell(r.timeOut2)}</td>
+                    <td>${timeCell(r.overtimeIn)}</td><td>${timeCell(r.overtimeOut)}</td>
+                    <td>${status}</td>
+                    <td>${matchCellHtml(r, index)}</td>
+                    <td>${action}</td></tr>`;
+            }).join('');
+
+            document.getElementById('previewPager').innerHTML =
+                `<span>Page ${currentPage} of ${totalPages}</span>
+                 <button type="button" class="att-page-btn" ${currentPage <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
+                 <button type="button" class="att-page-btn" ${currentPage >= totalPages ? 'disabled' : ''} data-dir="1">&rsaquo;</button>`;
+        }
+
+        document.getElementById('previewPager').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-dir]');
+            if (!btn || btn.disabled) return;
+            currentPage += Number(btn.dataset.dir);
+            renderPreview();
+        });
+
+        // Manual matching: pick an employee for an unmatched row.
+        document.getElementById('previewBody').addEventListener('change', function (e) {
+            const sel = e.target.closest('.att-match-select');
+            if (!sel) return;
+            const index = Number(sel.dataset.rowIndex);
+            const row = previewRows[index];
+            if (!row || !sel.value) return;
+
+            const candidate = candidateEmployees.find(c => String(c.id) === sel.value);
+            if (!candidate) return;
+
+            row.employeeId = candidate.id;
+            row.matched = true;
+            row.matchedEmployeeName = candidate.name;
+            row.manuallyMatched = true;
+
+            updateMatchSummary();
+            renderPreview();
+        });
+
+        // Undo a manual match so the row goes back to "Select employee…".
+        document.getElementById('previewBody').addEventListener('click', function (e) {
+            const changeBtn = e.target.closest('.js-change-match');
+            if (!changeBtn) return;
+            const index = Number(changeBtn.dataset.rowIndex);
+            const row = previewRows[index];
+            if (!row) return;
+
+            row.matched = false;
+            row.matchedEmployeeName = null;
+            row.manuallyMatched = false;
+            row.employeeId = null;
+
+            updateMatchSummary();
+            renderPreview();
+        });
+
+        async function postFile(url) {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list, then click Load.');
+                return null;
+            }
+            if (!fileInput.files[0]) {
+                alert('Choose an attendance file first.');
+                return null;
+            }
+
+            const form = new FormData();
+            form.append('projectId', projectIdInput.value);
+            form.append('projectName', projectInput.value);
+            form.append('file', fileInput.files[0]);
+
+            const edits = previewRows.filter(r => r.edited).map(r => ({
+                externalUserId: r.externalUserId,
+                employeeName: r.employeeName,
+                workDate: r.workDateIso,
+                timeIn1: toHtmlTime(r.timeIn1),
+                timeOut1: toHtmlTime(r.timeOut1),
+                timeIn2: toHtmlTime(r.timeIn2),
+                timeOut2: toHtmlTime(r.timeOut2),
+                overtimeIn: toHtmlTime(r.overtimeIn),
+                overtimeOut: toHtmlTime(r.overtimeOut)
+            }));
+            if (edits.length) form.append('overridesJson', JSON.stringify(edits));
+
+            const manualMatches = previewRows.filter(r => r.manuallyMatched && r.employeeId).map(r => ({
+                externalUserId: r.externalUserId,
+                employeeName: r.employeeName,
+                workDate: r.workDateIso,
+                employeeId: r.employeeId
+            }));
+            if (manualMatches.length) form.append('manualMatchesJson', JSON.stringify(manualMatches));
+
+            if (token) form.append('__RequestVerificationToken', token);
+
+            const res = await fetch(url, {
+                method: 'POST',
+                body: form,
+                headers: { 'Accept': 'application/json' }
+            });
+            const text = await res.text();
+            let data = null;
+            try { data = JSON.parse(text); } catch (err) { data = null; }
+            if (data) return data;
+            if (res.status === 401 || res.status === 302)
+                throw new Error('Your session expired. Refresh the page and sign in again.');
+            throw new Error('Could not save the attendance file. Restart the app and try Import again.');
+        }
+
+        document.getElementById('loadFileBtn').addEventListener('click', async function () {
+            const empty = document.getElementById('previewEmpty');
+            const section = document.getElementById('previewSection');
+            empty.style.display = 'block';
+            section.style.display = 'none';
+            empty.textContent = 'Reading attendance file...';
+
+            try {
+                const data = await postFile('/Attendance/Preview');
+                if (!data) { empty.textContent = 'Select a project and file first.'; return; }
+                if (!data.success) { empty.textContent = data.message; return; }
+
+                previewRows = data.rows || [];
+                candidateEmployees = data.candidates || [];
+                previewFormat = data.format || 'Statistic';
+                currentPage = 1;
+                statusFilter = 'all';
+
+                lastFileName = data.fileName || '';
+                lastPeriodText = (data.periodStart && data.periodEnd)
+                    ? `${data.periodStart} – ${data.periodEnd}`
+                    : 'Period not found in file';
+
+                empty.style.display = 'none';
+                section.style.display = 'block';
+                updateMatchSummary();
+                renderPreview();
+            } catch (err) {
+                empty.textContent = 'Could not read the attendance file.';
+            }
+        });
+
+        document.getElementById('importBtn').addEventListener('click', async function () {
+            if (!previewRows.length) {
+                alert('Load a file before importing.');
+                return;
+            }
+
+            const unmatched = previewRows.filter(r => !r.matched).length;
+            const confirmMsg = unmatched > 0
+                ? `${unmatched} row(s) are still unmatched and will be saved without a linked employee. Continue importing?`
+                : 'Import these attendance rows? If this project already has attendance for the same dates, those rows will be replaced.';
+            if (!confirm(confirmMsg)) return;
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+            try {
+                const data = await postFile('/Attendance/ImportFile');
+                if (!data) return;
+                if (!data.success) {
+                    alert(data.message || 'Import failed.');
+                    return;
+                }
+                alert(data.message);
+                window.location = '/Attendance/Records';
+            } catch (err) {
+                alert((err && err.message) ? err.message : 'Could not import the attendance file.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Import Attendance';
+            }
+        });
+
+        const statusClass = {
+            Complete: 'att-status-complete',
+            Incomplete: 'att-status-incomplete',
+            Late: 'att-status-late',
+            'Early Off': 'att-status-early',
+            'Late + Early Off': 'att-status-late',
+            Absent: 'att-status-absent'
+        };
+
+        let previewEditIndex = -1;
+
+        function toHtmlTime(value) {
+            if (!value) return '';
+            const text = String(value).trim();
+            const ampm = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            if (ampm) {
+                let hour = parseInt(ampm[1], 10);
+                const minute = ampm[2];
+                const period = ampm[3].toUpperCase();
+                if (period === 'AM' && hour === 12) hour = 0;
+                if (period === 'PM' && hour < 12) hour += 12;
+                return String(hour).padStart(2, '0') + ':' + minute;
+            }
+            const military = text.match(/^(\d{1,2}):(\d{2})/);
+            return military ? String(military[1]).padStart(2, '0') + ':' + military[2] : '';
+        }
+
+        function fromHtmlTime(value) {
+            if (!value) return '';
+            const parts = String(value).split(':');
+            const hour = parseInt(parts[0], 10);
+            const minute = parts[1] || '00';
+            const period = hour >= 12 ? 'PM' : 'AM';
+            let display = hour % 12;
+            if (display === 0) display = 12;
+            return display + ':' + minute + ' ' + period;
+        }
+
+        function minutesOf(value) {
+            const html = toHtmlTime(value);
+            if (!html) return null;
+            const parts = html.split(':');
+            return (parseInt(parts[0], 10) * 60) + parseInt(parts[1], 10);
+        }
+
+        function overlapHours(timeIn, timeOut, winStart, winEnd) {
+            const start = minutesOf(timeIn);
+            const end = minutesOf(timeOut);
+            if (start === null || end === null) return 0;
+            let to = end < start ? end + 24 * 60 : end;
+            const from = Math.max(start, winStart);
+            const until = Math.min(to, winEnd);
+            if (until <= from) return 0;
+            return Math.round(((until - from) / 60) * 100) / 100;
+        }
+
+        function previewHours(row) {
+            const morning = overlapHours(row.timeIn1, row.timeOut1, 8 * 60, 12 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 8 * 60, 12 * 60);
+            const afternoon = overlapHours(row.timeIn1, row.timeOut1, 13 * 60, 17 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 13 * 60, 17 * 60);
+            const punchedOt = overlapHours(row.overtimeIn, row.overtimeOut, 17 * 60, 24 * 60);
+            const shiftOt = overlapHours(row.timeIn1, row.timeOut1, 17 * 60, 24 * 60)
+                + overlapHours(row.timeIn2, row.timeOut2, 17 * 60, 24 * 60);
+            return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt > 0 ? punchedOt : shiftOt };
+        }
+
+        function previewStatus(row) {
+            const hasIn1 = !!row.timeIn1;
+            const hasOut1 = !!row.timeOut1;
+            const hasIn2 = !!row.timeIn2;
+            const hasOut2 = !!row.timeOut2;
+            const hasOtIn = !!row.overtimeIn;
+            const hasOtOut = !!row.overtimeOut;
+            if (!hasIn1 && !hasOut1 && !hasIn2 && !hasOut2 && !hasOtIn && !hasOtOut) return 'Absent';
+            if ((hasIn1 !== hasOut1) || (hasIn2 !== hasOut2) || (hasOtIn && !hasOtOut)) return 'Incomplete';
+            const firstIn = minutesOf(row.timeIn1);
+            const late = firstIn !== null && firstIn > (8 * 60) + 30;
+            const lastOut = minutesOf(row.timeOut2) ?? (minutesOf(row.timeOut1) !== null && minutesOf(row.timeOut1) >= 13 * 60
+                ? minutesOf(row.timeOut1) : null);
+            const early = lastOut !== null && lastOut < (17 * 60) - 15;
+            if (late && early) return 'Late + Early Off';
+            if (late) return 'Late';
+            if (early) return 'Early Off';
+            return 'Complete';
+        }
+
+        function overlayDraft() {
+            return {
+                timeIn1: fromHtmlTime(document.getElementById('peIn1').value),
+                timeOut1: fromHtmlTime(document.getElementById('peOut1').value),
+                timeIn2: fromHtmlTime(document.getElementById('peIn2').value),
+                timeOut2: fromHtmlTime(document.getElementById('peOut2').value),
+                overtimeIn: fromHtmlTime(document.getElementById('peOtIn').value),
+                overtimeOut: fromHtmlTime(document.getElementById('peOtOut').value)
+            };
+        }
+
+        function refreshPreviewEditMeta() {
+            const draft = overlayDraft();
+            const status = previewStatus(draft);
+            const pill = document.getElementById('peStatus');
+            pill.textContent = status;
+            pill.className = 'status-pill ' + (statusClass[status] || 'att-status-incomplete');
+            const hours = previewHours(draft);
+            document.getElementById('peHours').textContent =
+                hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime';
+        }
+
+        function openPreviewEdit(index) {
+            const row = previewRows[index];
+            if (!row) return;
+            previewEditIndex = index;
+            document.getElementById('peDisplayId').textContent = row.displayId || row.externalUserId || '——';
+            document.getElementById('peName').textContent = row.employeeName || 'Unmatched';
+            document.getElementById('peDate').textContent = row.workDate || '——';
+            document.getElementById('peIn1').value = toHtmlTime(row.timeIn1);
+            document.getElementById('peOut1').value = toHtmlTime(row.timeOut1);
+            document.getElementById('peIn2').value = toHtmlTime(row.timeIn2);
+            document.getElementById('peOut2').value = toHtmlTime(row.timeOut2);
+            document.getElementById('peOtIn').value = toHtmlTime(row.overtimeIn);
+            document.getElementById('peOtOut').value = toHtmlTime(row.overtimeOut);
+            refreshPreviewEditMeta();
+            document.getElementById('previewEditOverlay').hidden = false;
+        }
+
+        function closePreviewEdit() {
+            document.getElementById('previewEditOverlay').hidden = true;
+            previewEditIndex = -1;
+        }
+
+        document.getElementById('previewBody').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-edit-index]');
+            if (!btn) return;
+            openPreviewEdit(Number(btn.dataset.editIndex));
+        });
+
+        document.getElementById('peCancel').addEventListener('click', closePreviewEdit);
+        document.getElementById('previewEditOverlay').addEventListener('click', function (e) {
+            if (e.target.id === 'previewEditOverlay') closePreviewEdit();
+        });
+
+        document.getElementById('peStandard').addEventListener('click', function () {
+            document.getElementById('peIn1').value = '08:00';
+            document.getElementById('peOut1').value = '12:00';
+            document.getElementById('peIn2').value = '13:00';
+            document.getElementById('peOut2').value = '17:00';
+            refreshPreviewEditMeta();
+        });
+
+        document.getElementById('peClear').addEventListener('click', function () {
+            ['peIn1', 'peOut1', 'peIn2', 'peOut2', 'peOtIn', 'peOtOut'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            refreshPreviewEditMeta();
+        });
+
+        ['peIn1', 'peOut1', 'peIn2', 'peOut2', 'peOtIn', 'peOtOut'].forEach(id => {
+            document.getElementById(id).addEventListener('input', refreshPreviewEditMeta);
+        });
+
+        document.getElementById('peApply').addEventListener('click', function () {
+            const row = previewRows[previewEditIndex];
+            if (!row) return;
+            const draft = overlayDraft();
+            row.timeIn1 = draft.timeIn1;
+            row.timeOut1 = draft.timeOut1;
+            row.timeIn2 = draft.timeIn2;
+            row.timeOut2 = draft.timeOut2;
+            row.overtimeIn = draft.overtimeIn;
+            row.overtimeOut = draft.overtimeOut;
+            row.status = previewStatus(row);
+            row.statusClass = statusClass[row.status] || row.statusClass;
+            row.edited = true;
+            closePreviewEdit();
+            renderPreview();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !document.getElementById('previewEditOverlay').hidden) {
+                closePreviewEdit();
+            }
+        });
+    </script>
+}

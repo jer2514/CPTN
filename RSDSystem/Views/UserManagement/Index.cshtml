@@ -1,4 +1,5 @@
-﻿@model IEnumerable<RSDSystem.Models.User>
+﻿@using RSDSystem.Helpers
+@model IEnumerable<RSDSystem.Models.User>
 @{
     ViewData["Title"] = "User Management";
     var sortBy = ViewBag.SortBy as string;
@@ -11,9 +12,16 @@
 
 
 <div class="page-card">
-    <div class="emp-card-head">
-        <div class="emp-title">All Users</div>
-        <div class="emp-controls">
+    <div class="emp-title mb-3">All Users</div>
+
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+        </form>
+
+        <div class="list-controls-actions">
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -43,12 +51,6 @@
                 </ul>
             </div>
 
-            <form asp-action="Index" method="get" class="search-wrap">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
-                <input type="hidden" name="sortBy" value="@sortBy" />
-            </form>
-
             <a asp-action="Create" class="btn-primary-blue">Add User</a>
         </div>
     </div>
@@ -59,9 +61,11 @@
                 <th style="width:40px">
                     <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
                 </th>
+                <th>Staff ID</th>
                 <th>User</th>
                 <th>Role</th>
                 <th>Email</th>
+                <th>Date Added</th>
                 <th>Status</th>
                 <th>
                     <div>
@@ -85,13 +89,14 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">No users found.</td>
+                    <td colspan="8" class="text-center text-muted py-4">No users found.</td>
                 </tr>
             }
             @foreach (var u in Model)
             {
                 <tr>
                     <td><input type="checkbox" class="tbl-check row-cb" /></td>
+                    <td>@IdFormatter.Format(u.UserCode)</td>
                     <td>
                         <div class="emp-name-cell">
                             @if (!string.IsNullOrEmpty(u.PhotoPath))
@@ -109,6 +114,7 @@
                     </td>
                     <td>@(u.Role == "PayrollStaff" ? "Payroll Staff" : u.Role)</td>
                     <td>@u.Email</td>
+                    <td>@u.CreatedAt.ToString("MMM d, yyyy")</td>
                     <td>
                         @if (u.IsActive)
                         {
@@ -131,11 +137,12 @@
                             </button>
                         </div>
                     </td>
-                    
                 </tr>
             }
         </tbody>
     </table>
+
+    @await Html.PartialAsync("_Pagination")
 </div>
 
 <!-- Delete Overlay -->

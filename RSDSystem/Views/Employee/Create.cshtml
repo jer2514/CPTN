@@ -2,6 +2,15 @@
 @{
     ViewData["Title"] = "Add Employee";
     var jobs = ViewBag.JobClassifications as string[] ?? Array.Empty<string>();
+    var projects = ViewBag.Projects as List<RSDSystem.Models.Project> ?? new();
+    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
+    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
+    var generalErrors = ViewData.ModelState
+        .Where(kv => string.IsNullOrEmpty(kv.Key))
+        .SelectMany(kv => kv.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
+        .ToList();
+    var maxDob = DateTime.Today.AddYears(-18).ToString("yyyy-MM-dd");
+    var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
 }
 
 
@@ -14,52 +23,73 @@
 </a>
 
 <div class="form-card">
-    <form asp-action="Create" method="post" enctype="multipart/form-data">
+    <form asp-action="Create" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
+        @if (generalErrors.Count > 0)
+        {
+            <div class="form-error-box">
+                @foreach (var err in generalErrors)
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
 
         <!-- First Name | Last Name | M.I. -->
         <div class="form-row form-row-3">
             <div>
-                <label class="form-lbl">First Name</label>
-                <input type="text" name="FirstName" class="form-ctrl" required />
+                <label class="form-lbl">First Name <span class="req-star">*</span></label>
+                <input type="text" name="FirstName" value="@Model.FirstName" maxlength="80"
+                       class="@Ctrl("FirstName")" data-validate="required|name" data-label="First name" />
+                <span class="field-error" data-error-for="FirstName">@Err("FirstName")</span>
             </div>
             <div>
-                <label class="form-lbl">Last Name</label>
-                <input type="text" name="LastName" class="form-ctrl" required />
+                <label class="form-lbl">Last Name <span class="req-star">*</span></label>
+                <input type="text" name="LastName" value="@Model.LastName" maxlength="80"
+                       class="@Ctrl("LastName")" data-validate="required|name" data-label="Last name" />
+                <span class="field-error" data-error-for="LastName">@Err("LastName")</span>
             </div>
             <div>
                 <label class="form-lbl">M.I</label>
-                <input type="text" name="MiddleInitial" maxlength="5" class="form-ctrl" />
+                <input type="text" name="MiddleInitial" value="@Model.MiddleInitial" maxlength="2"
+                       class="@Ctrl("MiddleInitial")" data-validate="mi" data-label="Middle initial" />
+                <span class="field-error" data-error-for="MiddleInitial">@Err("MiddleInitial")</span>
             </div>
         </div>
 
         <!-- Date of Birth | Age | Gender -->
         <div class="form-row form-row-3b">
             <div>
-                <label class="form-lbl">Date of Birth</label>
+                <label class="form-lbl">Date of Birth <span class="req-star">*</span></label>
                 <input type="date" name="DateOfBirth" id="dobInput"
-                       class="form-ctrl" onchange="calcAge()" />
+                       value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")"
+                       min="@minDob" max="@maxDob"
+                       class="@Ctrl("DateOfBirth")" data-validate="required|dob" data-label="Date of birth" />
+                <span class="field-error" data-error-for="DateOfBirth">@Err("DateOfBirth")</span>
             </div>
             <div>
                 <label class="form-lbl">Age</label>
-                <input type="text" id="ageInput" class="form-ctrl" readonly placeholder="—" />
+                <input type="text" id="ageInput" class="form-ctrl" readonly placeholder="—" value="@Model.Age" />
             </div>
             <div>
-                <label class="form-lbl">Gender</label>
-                <select name="Gender" class="form-ctrl">
+                <label class="form-lbl">Gender <span class="req-star">*</span></label>
+                <select name="Gender" class="@Ctrl("Gender")" data-validate="required" data-label="Gender">
                     <option value="">Select</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="Male" selected="@(Model.Gender == "Male")">Male</option>
+                    <option value="Female" selected="@(Model.Gender == "Female")">Female</option>
                 </select>
+                <span class="field-error" data-error-for="Gender">@Err("Gender")</span>
             </div>
         </div>
 
         <!-- Address -->
         <div class="form-row form-row-1">
             <div>
-                <label class="form-lbl">Address</label>
-                <input type="text" name="Address" class="form-ctrl"
+                <label class="form-lbl">Address <span class="req-star">*</span></label>
+                <input type="text" name="Address" value="@Model.Address" maxlength="250"
+                       class="@Ctrl("Address")" data-validate="required|address" data-label="Address"
                        placeholder="Barangay, Municipality/City, Province" />
+                <span class="field-error" data-error-for="Address">@Err("Address")</span>
             </div>
         </div>
 
@@ -67,11 +97,17 @@
         <div class="form-row form-row-2">
             <div>
                 <label class="form-lbl">Email</label>
-                <input type="email" name="Email" class="form-ctrl" />
+                <input type="email" name="Email" value="@Model.Email" maxlength="100"
+                       class="@Ctrl("Email")" data-validate="email" data-label="Email" />
+                <span class="field-error" data-error-for="Email">@Err("Email")</span>
             </div>
             <div>
-                <label class="form-lbl">Contact Number</label>
-                <input type="text" name="ContactNumber" class="form-ctrl" placeholder="09XXXXXXXXX" />
+                <label class="form-lbl">Contact Number <span class="req-star">*</span></label>
+                <input type="text" name="ContactNumber" value="@Model.ContactNumber" maxlength="11"
+                       inputmode="numeric" class="@Ctrl("ContactNumber")"
+                       data-validate="required|phone" data-label="Contact number"
+                       placeholder="09XXXXXXXXX" />
+                <span class="field-error" data-error-for="ContactNumber">@Err("ContactNumber")</span>
             </div>
         </div>
 
@@ -81,35 +117,59 @@
                 <label class="form-lbl">Assigned to Project</label>
                 <select name="ProjectId" class="form-ctrl">
                     <option value="">Select project</option>
-                    @foreach (var p in (ViewBag.Projects as List<RSDSystem.Models.Project> ?? new()))
+                    @foreach (var p in projects)
                     {
-                        <option value="@p.ProjectId">@p.ProjectName</option>
+                        <option value="@p.ProjectId" selected="@(Model.ProjectId == p.ProjectId)">@p.ProjectName</option>
                     }
                 </select>
             </div>
         </div>
 
-        <!-- Photo | Job Classification -->
-        <div class="form-row form-row-2">
+        <!-- Job Classification | Rate per Day | Rate per Hour -->
+        <div class="form-row form-row-eq3">
+            <div>
+                <label class="form-lbl">Job Classification <span class="req-star">*</span></label>
+                <select name="JobClassification" class="@Ctrl("JobClassification")"
+                        data-validate="required" data-label="Job classification">
+                    <option value="">Select</option>
+                    @foreach (var j in jobs)
+                    {
+                        <option value="@j" selected="@(Model.JobClassification == j)">@j</option>
+                    }
+                </select>
+                <span class="field-error" data-error-for="JobClassification">@Err("JobClassification")</span>
+            </div>
+            <div>
+                <label class="form-lbl">Rate per Day <span class="req-star">*</span></label>
+                <input type="number" name="DailyRate" class="@Ctrl("DailyRate")"
+                       step="0.01" min="0.01" placeholder="0.00"
+                       value="@(Model.DailyRate > 0 ? Model.DailyRate.ToString("0.00") : "")"
+                       data-validate="money" data-label="Rate per day" />
+                <span class="field-error" data-error-for="DailyRate">@Err("DailyRate")</span>
+            </div>
+            <div>
+                <label class="form-lbl">Rate per Hour <span class="req-star">*</span></label>
+                <input type="number" name="RatePerHour" class="@Ctrl("RatePerHour")"
+                       step="0.01" min="0.01" placeholder="0.00"
+                       value="@(Model.RatePerHour > 0 ? Model.RatePerHour.ToString("0.00") : "")"
+                       data-validate="money" data-label="Rate per hour" />
+                <span class="field-error" data-error-for="RatePerHour">@Err("RatePerHour")</span>
+            </div>
+        </div>
+
+        <!-- Photo -->
+        <div class="form-row form-row-1">
             <div>
                 <label class="form-lbl">Photo</label>
                 <div class="file-row">
                     <label class="file-choose-btn" for="photoInput">Choose File</label>
                     <span class="file-name-lbl" id="fileLabel">No File Chosen</span>
                 </div>
-                <input type="file" id="photoInput" name="photo" accept="image/*" class="d-none"
+                <input type="file" id="photoInput" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                       class="d-none" data-validate="fileImage"
                        onchange="document.getElementById('fileLabel').textContent =
                            this.files.length ? this.files[0].name : 'No File Chosen'" />
-            </div>
-            <div>
-                <label class="form-lbl">Job Classification</label>
-                <select name="JobClassification" class="form-ctrl" required>
-                    <option value="">Select</option>
-                    @foreach (var j in jobs)
-                    {
-                        <option value="@j">@j</option>
-                    }
-                </select>
+                <span class="field-error" data-error-for="photo">@Err("photo")</span>
             </div>
         </div>
 
@@ -118,16 +178,5 @@
 </div>
 
 @section Scripts {
-    <script>
-        function calcAge() {
-            const dob = document.getElementById('dobInput').value;
-            if (!dob) { document.getElementById('ageInput').value = ''; return; }
-            const birth = new Date(dob);
-            const today = new Date();
-            let age = today.getFullYear() - birth.getFullYear();
-            const m = today.getMonth() - birth.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-            document.getElementById('ageInput').value = age >= 0 ? age : '';
-        }
-    </script>
+    <partial name="_FormValidationScripts" />
 }

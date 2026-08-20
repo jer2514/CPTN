@@ -10,12 +10,28 @@
 
 <div class="login-page">
     <div class="login-card">
+
         <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
+
             @Html.AntiForgeryToken()
 
             <div class="logo-wrap">
                 <img src="~/Uploads/Images/RSDLogo.png" alt="RSD Logo" class="login-logo" />
             </div>
+
+            @if (!string.IsNullOrEmpty(ViewBag.Error))
+            {
+                <div class="alert alert-danger" role="alert" style="
+                            background:#fde8e8;
+                            color:#c0392b;
+                            border:1.5px solid #fecaca;
+                            border-radius:8px;
+                            padding:10px 16px;
+                            font-size:13px;
+                            margin-bottom:16px;">
+                    @ViewBag.Error
+                </div>
+            }
 
             <div class="form-group">
                 <label for="Username" class="form-label">Username</label>
@@ -40,21 +56,6 @@
             <div class="form-group mt-1">
                 <button type="submit" class="btn-primary-blue-block">Login</button>
             </div>
-
-            @if (!ViewData.ModelState.IsValid)
-            {
-                <div class="validation-summary">
-                    @foreach (var err in ViewData.ModelState.Values.SelectMany(v => v.Errors))
-                    {
-                        <div class="text-danger">@err.ErrorMessage</div>
-                    }
-                </div>
-            }
-
-            @if (TempData["Error"] != null)
-            {
-                <div class="text-danger">@TempData["Error"]</div>
-            }
         </form>
     </div>
 </div>

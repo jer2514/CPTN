@@ -1,0 +1,127 @@
+﻿@model RSDSystem.Models.Payroll
+@using RSDSystem.Helpers
+@{
+    ViewData["Title"] = "View Payroll";
+    var fromPayslips = string.Equals(Context.Request.Query["from"], "payslips", StringComparison.OrdinalIgnoreCase);
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+@if (fromPayslips)
+{
+    <a asp-action="GeneratedPayslips"
+       asp-route-projectId="@Model.ProjectId"
+       asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
+       asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
+       class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+else
+{
+    <a asp-action="Period"
+       asp-route-projectId="@Model.ProjectId"
+       asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
+       asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
+       class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+
+<partial name="_PayslipCard" model="Model" />
+
+@if (Model.Status == RSDSystem.Models.PayrollStatusOptions.Submitted)
+{
+    <div class="payslip-approve-row">
+        <button type="button" class="btn-approve" onclick="approvePayroll()">Approve</button>
+        <button type="button" class="btn-return" onclick="openCorrectionModal()">Return for Correction</button>
+    </div>
+}
+else
+{
+    <div class="payslip-approve-row">
+        <span class="status-pill status-@Model.Status.ToLower()">@Model.Status</span>
+    </div>
+}
+
+<!-- Reason for Correction Modal -->
+<div class="del-overlay" id="correctionOverlay">
+    <div class="del-modal correction-modal">
+        <div class="del-title">Reason for Correction</div>
+        <textarea id="correctionReasonInput" class="form-ctrl correction-textarea"
+                  placeholder="Enter the reason for correction..."></textarea>
+        <div class="del-actions">
+            <button class="del-btn-cancel" onclick="closeCorrectionModal()">Cancel</button>
+            <button class="del-btn-delete" style="background:#E1962B" onclick="submitCorrection()">Return Payroll</button>
+        </div>
+    </div>
+</div>
+
+<!-- Result Confirmation Modal -->
+<div class="del-overlay" id="actionResultOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap" style="background:#d4f7e0">
+            <i class="bi bi-check-circle-fill" style="color:#0d7a3e;font-size:28px"></i>
+        </div>
+        <div class="del-title">Done</div>
+        <div class="del-msg" id="actionResultMsg"></div>
+        <div class="del-actions">
+            <button class="del-btn-delete" style="background:#266DF1"
+                    onclick="window.location.href='@Url.Action("Index", "Payroll")'">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+
+<form id="__afToken" style="display:none">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        const payrollId = @Model.PayrollId;
+        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]').value;
+
+        async function approvePayroll() {
+            const form = new FormData();
+            form.append('id', payrollId);
+            form.append('__RequestVerificationToken', token);
+
+            const res  = await fetch('/Payroll/Approve/' + payrollId, { method: 'POST', body: form });
+            const data = await res.json();
+            showResult(data);
+        }
+
+        function openCorrectionModal() {
+            document.getElementById('correctionOverlay').classList.add('open');
+        }
+        function closeCorrectionModal() {
+            document.getElementById('correctionOverlay').classList.remove('open');
+        }
+
+        async function submitCorrection() {
+            const reason = document.getElementById('correctionReasonInput').value.trim();
+            if (!reason) { alert('Please enter a reason for correction.'); return; }
+
+            const form = new FormData();
+            form.append('id', payrollId);
+            form.append('reason', reason);
+            form.append('__RequestVerificationToken', token);
+
+            const res  = await fetch('/Payroll/ReturnForCorrection/' + payrollId, { method: 'POST', body: form });
+            const data = await res.json();
+            closeCorrectionModal();
+            showResult(data);
+        }
+
+        function showResult(data) {
+            if (!data.success) { alert(data.message || 'Something went wrong.'); return; }
+            document.getElementById('actionResultMsg').textContent = data.message;
+            document.getElementById('actionResultOverlay').classList.add('open');
+        }
+    </script>
+}

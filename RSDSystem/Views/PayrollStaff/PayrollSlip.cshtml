@@ -1,0 +1,208 @@
+﻿@model RSDSystem.Models.Employee
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Generate Payroll Slip";
+    Layout = "_PayrollStaffLayout";
+    var project = ViewBag.Project as RSDSystem.Models.Project;
+    var schedules = (ViewBag.Schedules as IEnumerable<RSDSystem.Models.PayrollSchedule>)?.ToList()
+        ?? new List<RSDSystem.Models.PayrollSchedule>();
+    var minDate = ViewBag.MinDate as string ?? "";
+    var maxDate = ViewBag.MaxDate as string ?? "";
+    var defaultStart = ViewBag.DefaultStart as string ?? "";
+    var defaultEnd = ViewBag.DefaultEnd as string ?? "";
+    var endMin = string.IsNullOrEmpty(defaultStart) ? minDate : defaultStart;
+    var isEdit = ViewBag.IsEdit is true;
+    var payrollId = ViewBag.PayrollId is int pid ? pid : 0;
+    var payrollScheduleId = ViewBag.PayrollScheduleId is int sid ? sid : 0;
+    var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
+    var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
+    var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
+    var cashAdvance = ViewBag.CashAdvance is decimal ca ? ca : 0m;
+    var returnUrl = ViewBag.ReturnUrl as string ?? "";
+    var slipConfig = JsonSerializer.Serialize(new
+    {
+        employeeId = Model.EmployeeId,
+        projectId = project?.ProjectId ?? 0,
+        dailyRate = Model.DailyRate,
+        hourlyRate = Model.RatePerHour,
+        boundMin = minDate,
+        boundMax = maxDate,
+        hasSchedule = ViewBag.HasPayrollSchedule is true,
+        isEdit,
+        payrollId,
+        returnUrl,
+        schedules = schedules.Select(s => new
+        {
+            start = s.StartingDate.ToString("yyyy-MM-dd"),
+            end = s.EndDate.ToString("yyyy-MM-dd")
+        })
+    });
+}
+
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+@if (!string.IsNullOrEmpty(returnUrl))
+{
+    <a href="@returnUrl" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+else if (isEdit)
+{
+    <a asp-action="ViewPayroll" asp-route-id="@payrollId" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+else
+{
+    <a asp-action="GeneratePayroll" asp-route-projectId="@project?.ProjectId" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+}
+
+<div class="slip-card">
+    <div class="slip-title">@(isEdit ? "Edit Payroll Slip" : "Generate Payroll Slip")</div>
+
+    <form id="payrollSlipForm" class="js-validate" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="employeeId" value="@Model.EmployeeId" />
+        <input type="hidden" name="projectId" value="@project?.ProjectId" />
+        <input type="hidden" name="payrollId" value="@payrollId" />
+        <input type="hidden" name="payrollScheduleId" value="@payrollScheduleId" />
+
+        <div class="slip-row3">
+            <div>
+                <div class="form-lbl">Employee ID</div>
+                <div class="slip-value">@ViewBag.DisplayId</div>
+            </div>
+            <div>
+                <div class="form-lbl">Employee Name</div>
+                <div class="slip-value">@Model.FullName</div>
+            </div>
+            <div>
+                <div class="form-lbl">Project Assigned</div>
+                <div class="slip-value">@(project?.ProjectName ?? "—")</div>
+            </div>
+        </div>
+
+        <div class="slip-row3">
+            <div>
+                <div class="form-lbl">Job Classification</div>
+                <div class="slip-value">@Model.JobClassification</div>
+            </div>
+            <div>
+                <div class="form-lbl">Rate per day</div>
+                <div class="slip-value">₱@Model.DailyRate.ToString("N2")</div>
+            </div>
+            <div>
+                <div class="form-lbl">Rate per hour</div>
+                <div class="slip-value">₱@Model.RatePerHour.ToString("N2")</div>
+            </div>
+        </div>
+
+        @if (ViewBag.HasPayrollSchedule is true && (!string.IsNullOrEmpty(minDate) || !string.IsNullOrEmpty(maxDate)))
+        {
+            var scheduleStartLabel = !string.IsNullOrEmpty(minDate)
+                ? DateTime.Parse(minDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "the schedule start";
+            var scheduleEndLabel = !string.IsNullOrEmpty(maxDate)
+                ? DateTime.Parse(maxDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+                : "the schedule end";
+            <div class="slip-schedule-hint" id="payPeriodScheduleHint">
+                Pay period must fall within the payroll schedule:
+                @scheduleStartLabel – @scheduleEndLabel
+            </div>
+        }
+        else
+        {
+            <div class="slip-schedule-hint slip-schedule-hint-warn" id="payPeriodScheduleHint">
+                A payroll schedule must be added by the admin before generating payroll.
+            </div>
+        }
+
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Pay Period Starting Date <span class="req-star">*</span></label>
+                <input type="date" name="payPeriodStart" id="payPeriodStart" class="form-ctrl"
+                       value="@defaultStart"
+                       min="@(string.IsNullOrEmpty(minDate) ? "2000-01-01" : minDate)"
+                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
+                       data-validate="required|dateYear|dateWithin" data-label="Pay period starting date"
+                       data-min="@minDate" data-max="@maxDate" />
+                <span class="field-error" data-error-for="payPeriodStart"></span>
+            </div>
+            <div>
+                <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
+                <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
+                       value="@defaultEnd"
+                       min="@(string.IsNullOrEmpty(endMin) ? "2000-01-01" : endMin)"
+                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
+                       data-validate="required|dateAfter|dateYear|dateWithin" data-after="payPeriodStart"
+                       data-label="Pay period ending date"
+                       data-min="@endMin" data-max="@maxDate" />
+                <span class="field-error" data-error-for="payPeriodEnd"></span>
+            </div>
+        </div>
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Regular Days Worked <span class="req-star">*</span></label>
+                <input type="number" name="regularDaysWorked" id="regularDaysWorked" class="form-ctrl"
+                       step="1" min="0" value="@daysWorked"
+                       data-validate="nonNegInt" data-label="Regular days worked" />
+                <span class="field-error" data-error-for="regularDaysWorked"></span>
+            </div>
+            <div>
+                <label class="form-lbl">Absent Days</label>
+                <input type="number" name="absentDays" id="absentDays" class="form-ctrl"
+                       step="1" min="0" value="@absentDays"
+                       data-validate="nonNegInt" data-label="Absent days" />
+                <span class="field-error" data-error-for="absentDays"></span>
+            </div>
+        </div>
+
+        <div class="form-row form-row-2">
+            <div>
+                <label class="form-lbl">Overtime (Hours)</label>
+                <input type="number" name="overtimeHours" id="overtimeHours" class="form-ctrl"
+                       step="0.5" min="0" value="@overtimeHours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                       data-validate="nonNeg" data-label="Overtime hours" />
+                <span class="field-error" data-error-for="overtimeHours"></span>
+            </div>
+            <div>
+                <label class="form-lbl">Cash Advance</label>
+                <input type="number" name="cashAdvance" id="cashAdvance" class="form-ctrl"
+                       step="0.01" min="0" value="@cashAdvance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)"
+                       data-validate="nonNeg" data-label="Cash advance" />
+                <span class="field-error" data-error-for="cashAdvance"></span>
+            </div>
+        </div>
+
+        <button type="submit" id="generateBtn" class="btn-primary-blue-block"
+                @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
+            @(isEdit ? "Save Changes" : "Generate Payroll")
+        </button>
+    </form>
+</div>
+
+<!-- Success Confirmation Modal -->
+<div class="del-overlay" id="successOverlay">
+    <div class="del-modal">
+        <div class="del-icon-wrap" style="background:#d4f7e0">
+            <i class="bi bi-check-circle-fill" style="color:#0d7a3e;font-size:28px"></i>
+        </div>
+        <div class="del-title">Saved</div>
+        <div class="del-msg" id="successMsg">Payroll has been saved.</div>
+        <div class="del-actions">
+            <button class="del-btn-delete" style="background:#266DF1" id="successOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_FormValidationScripts" />
+    <script type="application/json" id="slip-config">@Html.Raw(slipConfig)</script>
+    <script src="~/js/payroll-slip.js" asp-append-version="true"></script>
+}

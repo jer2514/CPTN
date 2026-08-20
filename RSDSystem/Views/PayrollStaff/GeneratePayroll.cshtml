@@ -1,0 +1,276 @@
+﻿@model List<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "Generate Payroll";
+    Layout = "_PayrollStaffLayout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="emp-title mb-3">Generate Payroll</div>
+    @if (ViewBag.ShowingAllProjects == true)
+    {
+        <div class="genpay-fallback-note">
+            Showing all active projects — none are currently assigned to your account specifically.
+        </div>
+    }
+    <div class="genpay-controls">
+        <div class="genpay-select-wrap">
+            <label class="form-lbl">Project Name</label>
+            <div class="genpay-autocomplete">
+                <input type="text" id="projectInput" class="form-ctrl"
+                       placeholder="Type to search project..." autocomplete="off" />
+                <input type="hidden" id="projectIdInput" />
+                <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+            </div>
+        </div>
+        <button type="button" id="loadEmployeesBtn" class="btn-primary-blue-solid">Load</button>
+    </div>
+    <div id="scheduleNote" class="genpay-fallback-note" style="display:none"></div>
+
+    <div id="employeeSection" style="display:none">
+        <div class="emp-card-head" style="margin-top:6px">
+            <div></div>
+            <div class="emp-controls">
+                <div class="dropdown">
+                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li><a class="dropdown-item" href="#" onclick="sortEmployees('name');return false;">Employee Name</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="sortEmployees('job');return false;">Job</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="sortEmployees('rate');return false;">Rate</a></li>
+                    </ul>
+                </div>
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="employeeSearch" placeholder="Search Employee" oninput="filterEmployees()" />
+                </div>
+            </div>
+        </div>
+
+        <table class="emp-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Employee Name</th>
+                    <th>Job</th>
+                    <th>Rate</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="employeeTableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="employeeEmpty" class="text-center text-muted py-5">
+        Select a project and click Load to view its employees.
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ProjectListData" model="Model" />
+    <script>
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
+
+        const projectInput   = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList    = document.getElementById('projectSuggestions');
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = ''; // typing invalidates previous selection
+            const q = projectInput.value.trim().toLowerCase();
+
+            if (!q) {
+                suggestList.style.display = 'none';
+                return;
+            }
+
+            const matches = allProjects.filter(p => p.name.toLowerCase().includes(q));
+            renderSuggestions(matches);
+        });
+
+        projectInput.addEventListener('focus', function () {
+            if (projectInput.value.trim()) {
+                const q = projectInput.value.trim().toLowerCase();
+                renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+            } else {
+                renderSuggestions(allProjects);
+            }
+        });
+
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) {
+                suggestList.style.display = 'none';
+            }
+        });
+
+        // ── Load employees ───────────────────────────────────────────
+        let currentEmployees = [];
+        let currentProjectId = null;
+        let currentScheduleId = null;
+
+        function setScheduleNote(text, show) {
+            const note = document.getElementById('scheduleNote');
+            if (!note) return;
+            note.textContent = text || '';
+            note.style.display = show ? 'block' : 'none';
+        }
+
+        document.getElementById('loadEmployeesBtn').addEventListener('click', async function () {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+            currentProjectId = projectIdInput.value;
+            currentScheduleId = null;
+
+            const emptyBox = document.getElementById('employeeEmpty');
+            const section  = document.getElementById('employeeSection');
+
+            section.style.display = 'none';
+            emptyBox.style.display = 'block';
+            emptyBox.textContent = 'Loading employees...';
+            setScheduleNote('', false);
+
+            try {
+                const res  = await fetch('/PayrollStaff/GetProjectEmployees?projectId=' + currentProjectId);
+                const data = await res.json();
+
+                if (!data.success) {
+                    emptyBox.textContent = data.message || 'Could not load employees for this project.';
+                    return;
+                }
+
+                currentEmployees = data.employees || [];
+                currentScheduleId = data.scheduleId || null;
+
+                if (!data.hasSchedule) {
+                    emptyBox.textContent = data.message || 'Ask the admin to add a payroll schedule before generating payroll.';
+                    return;
+                }
+
+                setScheduleNote('Generating payroll for schedule: ' + (data.scheduleLabel || 'current period'), true);
+
+                if (currentEmployees.length === 0) {
+                    emptyBox.textContent = 'No employees assigned to this project.';
+                    return;
+                }
+
+                emptyBox.style.display = 'none';
+                section.style.display = 'block';
+                renderEmployees(currentEmployees);
+            } catch (err) {
+                emptyBox.textContent = 'Could not load employees. Refresh the page after the latest update, then try Load again.';
+            }
+        });
+
+               function renderEmployees(list) {
+            const tbody = document.getElementById('employeeTableBody');
+            const fmt = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            tbody.innerHTML = list.map(e => {
+                const generated = e.alreadyGenerated === true;
+                const action = generated
+                    ? `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`
+                    : `<a class="btn-generate-pill"
+                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}${currentScheduleId ? '&scheduleId=' + currentScheduleId : ''}">
+                            Generate
+                       </a>`;
+                return `
+                <tr class="${generated ? 'row-generated' : ''}">
+                    <td>${e.displayId}</td>
+                    <td>${e.name}</td>
+                    <td>${e.jobClassification}</td>
+                    <td>${fmt(e.dailyRate)}</td>
+                    <td>${action}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterEmployees() {
+            const q = document.getElementById('employeeSearch').value.toLowerCase();
+            const filtered = currentEmployees.filter(e =>
+                e.name.toLowerCase().includes(q) || e.jobClassification.toLowerCase().includes(q));
+            renderEmployees(filtered);
+        }
+
+        function sortEmployees(by) {
+            const sorted = [...currentEmployees].sort((a, b) => {
+                if (by === 'name') return a.name.localeCompare(b.name);
+                if (by === 'job')  return a.jobClassification.localeCompare(b.jobClassification);
+                if (by === 'rate') return b.dailyRate - a.dailyRate;
+                return 0;
+            });
+            renderEmployees(sorted);
+        }
+
+        async function generatePayroll(employeeId, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
+            const form = new FormData();
+            form.append('employeeId', employeeId);
+            form.append('projectId', currentProjectId);
+            if (token) form.append('__RequestVerificationToken', token);
+
+            try {
+                const res  = await fetch('/PayrollStaff/GeneratePayrollForEmployee', { method: 'POST', body: form });
+                const data = await res.json();
+
+                if (data.success) {
+                    btn.textContent = 'Generated';
+                    btn.classList.add('btn-generate-done');
+                } else {
+                    alert(data.message || 'Failed to generate payroll.');
+                    btn.disabled = false;
+                    btn.textContent = 'Generate';
+                }
+            } catch (err) {
+                alert('Something went wrong.');
+                btn.disabled = false;
+                btn.textContent = 'Generate';
+            }
+        }
+                // ── Restore previously selected project on Back navigation ────
+        const preselectId = @(ViewBag.PreselectProjectId != null ? ViewBag.PreselectProjectId : "null");
+
+        if (preselectId) {
+            const match = allProjects.find(p => p.id === preselectId);
+            if (match) {
+                projectInput.value = match.name;
+                projectIdInput.value = match.id;
+                document.getElementById('loadEmployeesBtn').click();
+            }
+        }
+    </script>
+
+    <form id="__afToken" style="display:none">
+        @Html.AntiForgeryToken()
+    </form>
+}
