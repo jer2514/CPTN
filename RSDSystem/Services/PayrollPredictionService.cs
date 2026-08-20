@@ -60,17 +60,62 @@ namespace RSDSystem.Services
                 };
             }
 
-            var previous1 = budgets[^2];
-            var previous2 = budgets[^1];
+            var byMonth = new Dictionary<DateTime, ProjectMonthlyBudget>();
+            foreach (var row in budgets)
+                byMonth[MonthKey(row.MonthDate)] = row;
+
+            var nextMonth = MonthKey(DateTime.Today).AddMonths(1);
+            DateTime predictMonth;
+            ProjectMonthlyBudget previous1;
+            ProjectMonthlyBudget previous2;
+            if (TryPreviousPair(byMonth, nextMonth, out previous1, out previous2))
+            {
+                predictMonth = nextMonth;
+            }
+            else
+            {
+                var upcoming = byMonth.Keys
+                    .Where(month => month >= nextMonth && TryPreviousPair(byMonth, month, out _, out _))
+                    .OrderBy(month => month)
+                    .FirstOrDefault();
+                if (upcoming != default)
+                {
+                    predictMonth = upcoming;
+                    TryPreviousPair(byMonth, predictMonth, out previous1, out previous2);
+                }
+                else
+                {
+                    previous1 = budgets[^2];
+                    previous2 = budgets[^1];
+                    predictMonth = MonthKey(previous2.MonthDate).AddMonths(1);
+                }
+            }
+
             var amount1 = previous1.Amount;
             var amount2 = previous2.Amount;
-            var predictMonth = MonthKey(previous2.MonthDate).AddMonths(1);
+            var hasAllocated = byMonth.TryGetValue(predictMonth, out var allocatedRow);
+            var allocated = hasAllocated ? allocatedRow!.Amount : (decimal?)null;
             var forecast = await ForecastAsync(
-                amount1, amount2, amount2, AnomalyPercent(), cancellationToken);
+                amount1, amount2, allocated ?? 0, AnomalyPercent(), cancellationToken);
+
+            var predicted = forecast.PredictedPayroll;
+            var exceeds = hasAllocated && predicted > allocatedRow!.Amount;
+            var difference = hasAllocated
+                ? predicted - allocatedRow!.Amount
+                : predicted - amount2;
+            var predictLabel = hasAllocated
+                ? BudgetLabel(allocatedRow!, culture)
+                : predictMonth.ToString("MMMM yyyy", culture);
 
             string? riskTitle = null;
             string? riskDetail = null;
-            if (forecast.UnusualChange)
+            if (exceeds)
+            {
+                riskTitle = "Budget Exceeding Risk";
+                riskDetail = "The predicted amount for " + predictLabel
+                    + " exceeds the allocated budget of ₱" + allocatedRow!.Amount.ToString("N2", culture) + ".";
+            }
+            else if (forecast.UnusualChange)
             {
                 riskTitle = "Unusual Budget Change";
                 riskDetail = amount2 > amount1
@@ -94,11 +139,12 @@ namespace RSDSystem.Services
                         PreviousLabel2 = BudgetLabel(previous2, culture),
                         PreviousAmount2 = amount2,
                         PredictionMonth = predictMonth,
-                        PredictionLabel = predictMonth.ToString("MMMM yyyy", culture),
-                        PredictedPayroll = forecast.PredictedPayroll,
-                        AllocatedBudget = amount2,
-                        BudgetDifference = forecast.BudgetDifference,
-                        ExceedsBudget = false,
+                        PredictionLabel = predictLabel,
+                        PredictedPayroll = predicted,
+                        AllocatedBudget = allocated ?? 0,
+                        HasAllocatedBudget = hasAllocated,
+                        BudgetDifference = Math.Round(difference, 2, MidpointRounding.AwayFromZero),
+                        ExceedsBudget = exceeds,
                         UnusualChange = forecast.UnusualChange,
                         ChangePercent = forecast.ChangePercent,
                         RiskTitle = riskTitle,
@@ -182,6 +228,21 @@ namespace RSDSystem.Services
                 Console.WriteLine("Prediction API fallback: " + ex.Message);
                 return null;
             }
+        }
+
+        private static bool TryPreviousPair(
+            IReadOnlyDictionary<DateTime, ProjectMonthlyBudget> byMonth,
+            DateTime predictMonth,
+            out ProjectMonthlyBudget previous1,
+            out ProjectMonthlyBudget previous2)
+        {
+            if (byMonth.TryGetValue(predictMonth.AddMonths(-2), out previous1!)
+                && byMonth.TryGetValue(predictMonth.AddMonths(-1), out previous2!))
+                return true;
+
+            previous1 = null!;
+            previous2 = null!;
+            return false;
         }
 
         private static string BudgetLabel(ProjectMonthlyBudget row, CultureInfo culture)
@@ -304,6 +365,7 @@ namespace RSDSystem.Services
         public string PredictionLabel { get; set; } = "";
         public decimal PredictedPayroll { get; set; }
         public decimal AllocatedBudget { get; set; }
+        public bool HasAllocatedBudget { get; set; }
         public decimal BudgetDifference { get; set; }
         public bool ExceedsBudget { get; set; }
         public bool UnusualChange { get; set; }

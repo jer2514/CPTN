@@ -59,7 +59,7 @@ def forecast(payload: dict) -> dict:
     risk_detail = None
     if exceeds:
         risk_title = "Budget Exceeding Risk"
-        risk_detail = "Predicted payroll exceeds the allocated budget."
+        risk_detail = "The predicted amount for next month exceeds the allocated budget."
     elif unusual:
         risk_title = "Unusual Payroll Change"
         risk_detail = (

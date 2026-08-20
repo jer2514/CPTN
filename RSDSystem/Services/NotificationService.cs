@@ -98,6 +98,19 @@ namespace RSDSystem.Services
                         "/Payroll/Prediction",
                         cancellationToken);
 
+                    if (page.Rows.Any(r => r.ExceedsBudget))
+                    {
+                        var over = page.Rows.First(r => r.ExceedsBudget);
+                        await NotifyAdminsAsync(
+                            NotificationKinds.PayrollAnomalyBudget,
+                            "Next month may exceed budget",
+                            $"The predicted amount for {over.PredictionLabel} on {name} is {Peso(over.PredictedPayroll)}, which exceeds the allocated budget of {Peso(over.AllocatedBudget)}. Open Payroll Prediction to review.",
+                            project.ProjectId,
+                            null,
+                            "/Payroll/Prediction",
+                            cancellationToken);
+                    }
+
                     if (page.Rows.Any(r => r.UnusualChange))
                     {
                         await NotifyAdminsAsync(

@@ -58,15 +58,19 @@
             <strong id="prPredicted">—</strong>
         </div>
         <div class="pred-result-hint">Predicted from this project’s previous two monthly budgets.</div>
+        <div class="pred-result-row" id="prAllocatedRow" hidden>
+            <span id="prAllocatedLabel">Allocated Budget</span>
+            <strong id="prAllocated">—</strong>
+        </div>
         <div class="pred-result-row">
-            <span>Change from last month</span>
+            <span id="prDifferenceLabel">Change from last month</span>
             <strong id="prDifference">—</strong>
         </div>
         <div id="prRisk" class="pred-risk" hidden>
             <i class="bi bi-exclamation-triangle-fill"></i>
             <div>
                 <div class="pred-risk-title" id="prRiskTitle">Budget Exceeding Risk</div>
-                <div class="pred-risk-detail" id="prRiskDetail">Predicted payroll exceeds the allocated budget.</div>
+                <div class="pred-risk-detail" id="prRiskDetail">The predicted amount for next month exceeds the allocated budget.</div>
             </div>
         </div>
         <div class="pred-result-footer">
@@ -136,7 +140,10 @@
                     <div class="pred-forecast-body">
                         <span>${peso(row.previousAmount1)}</span>
                         <span>${peso(row.previousAmount2)}</span>
-                        <span>${peso(row.predictedBudget ?? row.predictedPayroll)}</span>
+                        <span>
+                            ${peso(row.predictedBudget ?? row.predictedPayroll)}
+                            ${row.exceedsBudget ? '<span class="pred-anomaly-flag">Anomaly</span>' : ''}
+                        </span>
                         <span>
                             <button type="button" class="pill-btn pill-view" data-row-index="${index}">
                                 <i class="bi bi-eye-fill"></i> View
@@ -159,6 +166,20 @@
             document.getElementById('prPrevious1').textContent = peso(row.previousAmount1);
             document.getElementById('prPrevious2').textContent = peso(row.previousAmount2);
             document.getElementById('prPredicted').textContent = peso(row.predictedBudget ?? row.predictedPayroll);
+            const allocatedRow = document.getElementById('prAllocatedRow');
+            if (row.hasAllocatedBudget) {
+                document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
+                    ? ('Allocated Budget ' + row.predictionMonth)
+                    : 'Allocated Budget';
+                document.getElementById('prAllocated').textContent = peso(row.allocatedBudget);
+                allocatedRow.hidden = false;
+                document.getElementById('prDifferenceLabel').textContent = row.exceedsBudget
+                    ? 'Over allocated budget'
+                    : 'Vs allocated budget';
+            } else {
+                allocatedRow.hidden = true;
+                document.getElementById('prDifferenceLabel').textContent = 'Change from last month';
+            }
             document.getElementById('prDifference').textContent = peso(row.budgetDifference);
             const risk = document.getElementById('prRisk');
             if (row.riskTitle) {
