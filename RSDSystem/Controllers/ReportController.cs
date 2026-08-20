@@ -187,7 +187,7 @@ namespace RSDSystem.Controllers
             html.Append($"<span>OT hours: {summary.OvertimeHours:0.00}</span>");
             html.Append("</div>");
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Days Worked</th><th>Absent</th><th>Late</th><th>Incomplete</th><th>Regular</th><th>OT</th>");
+            html.Append("<th>Employee</th><th>Days Worked</th><th>Absent</th><th>Late</th><th>Half-day</th><th>Regular</th><th>OT</th>");
             html.Append("</tr></thead><tbody>");
             if (summary.Rows.Count == 0)
             {

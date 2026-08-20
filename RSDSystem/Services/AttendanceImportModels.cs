@@ -36,7 +36,7 @@ namespace RSDSystem.Services
         public int EarlyMinutes { get; set; }
         public decimal OvertimeHours { get; set; }
         public decimal AbsenceDays { get; set; }
-        public string Status { get; set; } = AttendanceStatuses.Incomplete;
+        public string Status { get; set; } = AttendanceStatuses.HalfDay;
         public bool Matched { get; set; }
         public string? Note { get; set; }
     }

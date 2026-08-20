@@ -53,7 +53,7 @@
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
-                        <li><button type="button" class="dropdown-item" data-status="Incomplete">Incomplete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Half-day">Half-day</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
@@ -131,7 +131,7 @@
         </div>
         <label id="reReasonWrap" class="form-lbl" style="display:block;margin-top:12px">
             Reason
-            <input type="text" id="reReason" class="form-ctrl" placeholder="Incomplete Attendance" maxlength="250" />
+            <input type="text" id="reReason" class="form-ctrl" placeholder="Half-day attendance" maxlength="250" />
         </label>
         <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime</div>
         <div class="att-preview-footer">
@@ -201,7 +201,8 @@
         const filterBtn = document.querySelector('.emp-controls .dropdown-toggle');
         const statusClass = {
             Complete: 'att-status-complete',
-            Incomplete: 'att-status-incomplete',
+            Incomplete: 'att-status-halfday',
+            'Half-day': 'att-status-halfday',
             Late: 'att-status-late',
             'Early Off': 'att-status-early',
             'Late + Early Off': 'att-status-late',
@@ -251,7 +252,7 @@
 
         async function loadPeriods(autoLoadRecords) {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
 
@@ -287,7 +288,7 @@
 
         async function loadRecords() {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
 
@@ -431,7 +432,10 @@
             const hasOtIn = !!draft.overtimeIn;
             const hasOtOut = !!draft.overtimeOut;
             if (!hasIn1 && !hasOut1 && !hasIn2 && !hasOut2 && !hasOtIn && !hasOtOut) return 'Absent';
-            if ((hasIn1 !== hasOut1) || (hasIn2 !== hasOut2) || (hasOtIn && !hasOtOut)) return 'Incomplete';
+            const morningComplete = hasIn1 && hasOut1;
+            const afternoonComplete = hasIn2 && hasOut2;
+            if ((hasIn1 !== hasOut1) || (hasIn2 !== hasOut2) || (hasOtIn && !hasOtOut) || (morningComplete !== afternoonComplete))
+                return 'Half-day';
             const firstIn = minutesOf(draft.timeIn1);
             const late = firstIn !== null && firstIn > (8 * 60) + 30;
             const lastOut = minutesOf(draft.timeOut2) ?? (minutesOf(draft.timeOut1) !== null && minutesOf(draft.timeOut1) >= 13 * 60
@@ -459,7 +463,7 @@
             const status = draftStatus(draft);
             const pill = document.getElementById('reStatus');
             pill.textContent = status;
-            pill.className = 'status-pill ' + (statusClass[status] || 'att-status-incomplete');
+            pill.className = 'status-pill ' + (statusClass[status] || 'att-status-halfday');
             const hours = draftHours(draft);
             document.getElementById('reHours').textContent =
                 hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime';
@@ -468,7 +472,7 @@
         function openRecordEdit(row) {
             if (!row) return;
             if (row.pendingCorrection) {
-                alert('This attendance row already has a correction request waiting for admin review.');
+                showToast('This attendance row already has a correction request waiting for admin review.');
                 return;
             }
             editingRecord = row;
@@ -487,7 +491,7 @@
             const saveBtn = document.getElementById('reSave');
             if (row.requestEdit) {
                 reasonWrap.style.display = 'block';
-                reasonInput.value = 'Incomplete Attendance';
+                reasonInput.value = 'Half-day attendance';
                 saveBtn.textContent = 'Submit Request';
             } else {
                 reasonWrap.style.display = 'none';
@@ -535,7 +539,7 @@
             const draft = overlayDraft();
             const requestEdit = !!editingRecord.requestEdit;
             if (requestEdit && !document.getElementById('reReason').value.trim()) {
-                alert('Enter a reason for this correction request.');
+                showToast('Enter a reason for this correction request.');
                 return;
             }
             const body = new FormData();
@@ -557,7 +561,7 @@
             });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Could not save the attendance row.');
+                showToast(data.message || 'Could not save the attendance row.');
                 return;
             }
             closeRecordEdit();

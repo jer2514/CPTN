@@ -108,7 +108,7 @@ namespace RSDSystem.Controllers
                 timeOut2 = AttendanceDisplay.Clock(request.TimeOut2) ?? "—",
                 overtimeIn = AttendanceDisplay.Clock(request.OvertimeIn) ?? "—",
                 overtimeOut = AttendanceDisplay.Clock(request.OvertimeOut) ?? "—",
-                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Incomplete Attendance" : request.Reason,
+                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Half-day attendance" : request.Reason,
                 pending = request.Status == CorrectionRequestStatuses.Pending
             });
         }

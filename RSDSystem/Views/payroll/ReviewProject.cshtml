@@ -111,7 +111,7 @@
 
         async function submitCorrection() {
             const reason = document.getElementById('correctionReasonInput').value.trim();
-            if (!reason) { alert('Please enter a reason for correction.'); return; }
+            if (!reason) { showToast('Please enter a reason for correction.'); return; }
 
             const form = new FormData();
             form.append('id', pendingPayrollId);
@@ -125,7 +125,7 @@
         }
 
         function showResult(data) {
-            if (!data.success) { alert(data.message || 'Something went wrong.'); return; }
+            if (!data.success) { showToast(data.message || 'Something went wrong.'); return; }
             lastRemaining = Number(data.remaining || 0);
             document.getElementById('actionResultMsg').textContent = data.message;
             document.getElementById('actionResultOverlay').classList.add('open');

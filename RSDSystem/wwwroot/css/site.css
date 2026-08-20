@@ -3035,9 +3035,10 @@ button.badge-btn {
     color: #0d7a3e;
 }
 
+.att-status-halfday,
 .att-status-incomplete {
-    background: #ffd4a8;
-    color: #a15c00;
+    background: #cfe2ff;
+    color: #1b52bd;
 }
 
 .att-status-late {
@@ -3071,34 +3072,57 @@ button.badge-btn {
 }
 
 .att-preview-footer {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
     gap: 16px;
     margin-top: 18px;
-    flex-wrap: wrap;
 }
 
 .att-pager {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    gap: 12px;
     font-size: 13px;
+    font-weight: 600;
     color: #163F8B;
+    grid-column: 2;
+    justify-self: center;
+    min-height: 32px;
+}
+
+.att-preview-footer > .att-pager:first-child {
+    grid-column: 2;
+}
+
+.att-preview-footer > :last-child:not(.att-pager) {
+    grid-column: 3;
+    justify-self: end;
 }
 
 .att-page-btn {
-    border: 1px solid #C9DAFF;
-    background: #fff;
-    color: #266DF1;
+    border: 0;
+    background: transparent;
+    color: #163F8B;
     border-radius: 6px;
-    width: 32px;
+    min-width: 28px;
     height: 32px;
+    padding: 0 4px;
+    font-size: 18px;
+    line-height: 1;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.att-page-btn:hover:not(:disabled) {
+    color: #266DF1;
 }
 
 .att-page-btn:disabled {
-    opacity: .4;
+    opacity: .35;
     cursor: default;
 }
 

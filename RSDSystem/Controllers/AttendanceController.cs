@@ -496,7 +496,19 @@ namespace RSDSystem.Controllers
 
         private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
         {
-            var requestEdit = AttendanceStatuses.CountsAsWorked(row.Status) && row.Status == AttendanceStatuses.Complete;
+            var computed = new AttendanceRecord
+            {
+                TimeIn1 = row.TimeIn1,
+                TimeOut1 = row.TimeOut1,
+                TimeIn2 = row.TimeIn2,
+                TimeOut2 = row.TimeOut2,
+                OvertimeIn = row.OvertimeIn,
+                OvertimeOut = row.OvertimeOut,
+                WorkHoursActual = row.WorkHoursActual
+            };
+            AttendanceRules.Apply(computed);
+            var status = AttendanceStatuses.Display(computed.Status);
+            var requestEdit = AttendanceStatuses.CountsAsWorked(status) && status == AttendanceStatuses.Complete;
             string actionLabel;
             if (pendingCorrection)
                 actionLabel = "Pending Review";
@@ -527,8 +539,8 @@ namespace RSDSystem.Controllers
                 row.EarlyMinutes,
                 row.OvertimeHours,
                 row.AbsenceDays,
-                row.Status,
-                statusClass = AttendanceStatuses.CssClass(row.Status),
+                Status = status,
+                statusClass = AttendanceStatuses.CssClass(status),
                 row.Matched,
                 row.Note,
                 format,

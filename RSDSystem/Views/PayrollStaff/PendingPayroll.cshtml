@@ -116,7 +116,7 @@
 
         async function loadPayrolls() {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
             currentProjectId = projectIdInput.value;
@@ -231,11 +231,11 @@
                 if (data.success) {
                     loadPayrolls(); // refresh list so status/order updates
                 } else {
-                    alert(data.message || 'Failed to submit payroll.');
+                    showToast(data.message || 'Failed to submit payroll.');
                 }
             } catch (err) {
                 document.getElementById('submitOverlay').classList.remove('open');
-                alert('Something went wrong.');
+                showToast('Something went wrong.');
             }
 
             pendingSubmitId = null;
@@ -275,11 +275,11 @@
                 if (data.success) {
                     loadPayrolls();
                 } else {
-                    alert(data.message || 'Failed to delete payroll.');
+                    showToast(data.message || 'Failed to delete payroll.');
                 }
             } catch (err) {
                 document.getElementById('deleteOverlay').classList.remove('open');
-                alert('Something went wrong.');
+                showToast('Something went wrong.');
             }
 
             pendingDeleteId = null;
