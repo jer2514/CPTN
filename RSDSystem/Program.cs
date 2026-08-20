@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RSDSystem.Filters;
@@ -8,6 +9,13 @@ using System;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddControllersWithViews(options =>
@@ -45,11 +53,14 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(60);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
-Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration.GetConnectionString("DefaultConnection"));
+if (builder.Environment.IsDevelopment())
+    Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration.GetConnectionString("DefaultConnection"));
 
 var app = builder.Build();
+app.UseForwardedHeaders();
 
 // Seed demo users so you can login from any device
 using (var scope = app.Services.CreateScope())
@@ -59,15 +70,14 @@ using (var scope = app.Services.CreateScope())
     {
         var db = services.GetRequiredService<PayrollDbContext>();
 
-        // Optional: apply migrations automatically in development - remove for production deployments
-        //try
-        //{
-        //    db.Database.Migrate();
-        //}
-        //catch
-        //{
-        //    // ignore migration errors in local dev if DB unavailable
-        //}
+        try
+        {
+            db.Database.Migrate();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Database migrate error: " + ex.Message);
+        }
 
         try
         {
