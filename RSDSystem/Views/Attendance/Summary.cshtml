@@ -51,7 +51,7 @@
                         <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Absent">Has absences</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Late">Has late days</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Has incomplete days</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Has half-day</a></li>
                     </ul>
                 </div>
                 <div class="search-wrap">
@@ -70,7 +70,7 @@
                         <th>Days Worked</th>
                         <th>Absent</th>
                         <th>Late</th>
-                        <th>Incomplete</th>
+                        <th>Half-day</th>
                         <th>Regular Hours</th>
                         <th>Overtime Hours</th>
                     </tr>
@@ -234,7 +234,7 @@
                     chip('Days worked', t.daysWorked) +
                     chip('Absent', t.daysAbsent) +
                     chip('Late', t.daysLate) +
-                    chip('Incomplete', t.daysIncomplete) +
+                    chip('Half-day', t.daysIncomplete) +
                     chip('Regular hours', Number(t.regularHours).toFixed(2)) +
                     chip('Overtime hours', Number(t.overtimeHours).toFixed(2)) +
                     chip('Unmatched', t.unmatched);

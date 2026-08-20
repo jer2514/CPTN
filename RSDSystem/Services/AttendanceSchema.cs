@@ -17,6 +17,11 @@ namespace RSDSystem.Services
                 db.Database.ExecuteSqlRaw(CreateRecordsWithoutEmployeeFkSql);
             }
 
+            // ProjectId must be patched in its own batches. SQL Server cannot ADD a
+            // column and UPDATE it in the same batch, and a failed combined patch
+            // would leave hosted databases (Somee) without ProjectId.
+            ApplyOptionalSql(db, ProjectIdPatchSqls);
+
             try
             {
                 db.Database.ExecuteSqlRaw(PatchColumnsSql);
@@ -26,6 +31,7 @@ namespace RSDSystem.Services
                 // Tables are already usable; skip optional column patches.
             }
 
+            ApplyOptionalSql(db, ProjectIdPatchSqls);
             PatchUniqueDateIndex(db);
         }
 
@@ -42,6 +48,8 @@ namespace RSDSystem.Services
                 await db.Database.ExecuteSqlRawAsync(CreateRecordsWithoutEmployeeFkSql);
             }
 
+            await ApplyOptionalSqlAsync(db, ProjectIdPatchSqls);
+
             try
             {
                 await db.Database.ExecuteSqlRawAsync(PatchColumnsSql);
@@ -51,12 +59,13 @@ namespace RSDSystem.Services
                 // Tables are already usable; skip optional column patches.
             }
 
+            await ApplyOptionalSqlAsync(db, ProjectIdPatchSqls);
             await PatchUniqueDateIndexAsync(db);
         }
 
-        private static void PatchUniqueDateIndex(PayrollDbContext db)
+        private static void ApplyOptionalSql(PayrollDbContext db, IEnumerable<string> batches)
         {
-            foreach (var sql in UniqueDateIndexSqls)
+            foreach (var sql in batches)
             {
                 try
                 {
@@ -64,14 +73,14 @@ namespace RSDSystem.Services
                 }
                 catch
                 {
-                    // Unique-date index is optional; import still deduplicates in memory.
+                    // Optional schema patches must not block import or startup.
                 }
             }
         }
 
-        private static async Task PatchUniqueDateIndexAsync(PayrollDbContext db)
+        private static async Task ApplyOptionalSqlAsync(PayrollDbContext db, IEnumerable<string> batches)
         {
-            foreach (var sql in UniqueDateIndexSqls)
+            foreach (var sql in batches)
             {
                 try
                 {
@@ -79,10 +88,16 @@ namespace RSDSystem.Services
                 }
                 catch
                 {
-                    // Unique-date index is optional; import still deduplicates in memory.
+                    // Optional schema patches must not block import or startup.
                 }
             }
         }
+
+        private static void PatchUniqueDateIndex(PayrollDbContext db) =>
+            ApplyOptionalSql(db, UniqueDateIndexSqls);
+
+        private static Task PatchUniqueDateIndexAsync(PayrollDbContext db) =>
+            ApplyOptionalSqlAsync(db, UniqueDateIndexSqls);
 
         private const string CreateImportsSql = @"
 IF OBJECT_ID(N'dbo.AttendanceImports', N'U') IS NULL
@@ -239,22 +254,6 @@ BEGIN
         ALTER TABLE [dbo].[AttendanceRecords] ADD [Matched] bit NOT NULL CONSTRAINT [DF_AttendanceRecords_Matched] DEFAULT(0);
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'EmployeeId') IS NULL
         ALTER TABLE [dbo].[AttendanceRecords] ADD [EmployeeId] int NULL;
-    IF COL_LENGTH(N'dbo.AttendanceRecords', N'ProjectId') IS NULL
-    BEGIN
-        ALTER TABLE [dbo].[AttendanceRecords] ADD [ProjectId] int NULL;
-        UPDATE r SET r.[ProjectId] = i.[ProjectId]
-        FROM [dbo].[AttendanceRecords] r
-        INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId];
-        IF NOT EXISTS (SELECT 1 FROM [dbo].[AttendanceRecords] WHERE [ProjectId] IS NULL)
-            ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [ProjectId] int NOT NULL;
-    END
-    ELSE
-    BEGIN
-        UPDATE r SET r.[ProjectId] = i.[ProjectId]
-        FROM [dbo].[AttendanceRecords] r
-        INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId]
-        WHERE r.[ProjectId] IS NULL;
-    END
 
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') IS NOT NULL AND COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') < 80
         ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [TimeIn1] nvarchar(40) NULL;
@@ -269,6 +268,33 @@ BEGIN
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeOut') IS NOT NULL AND COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeOut') < 80
         ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [OvertimeOut] nvarchar(40) NULL;
 END";
+
+        // Each statement is its own batch so ADD ProjectId is visible to the later UPDATE.
+        private static readonly string[] ProjectIdPatchSqls =
+        {
+            @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.AttendanceRecords', N'ProjectId') IS NULL
+    ALTER TABLE [dbo].[AttendanceRecords] ADD [ProjectId] int NULL;",
+            @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.AttendanceRecords', N'ProjectId') IS NOT NULL
+AND OBJECT_ID(N'dbo.AttendanceImports', N'U') IS NOT NULL
+    UPDATE r SET r.[ProjectId] = i.[ProjectId]
+    FROM [dbo].[AttendanceRecords] r
+    INNER JOIN [dbo].[AttendanceImports] i ON i.[AttendanceImportId] = r.[AttendanceImportId]
+    WHERE r.[ProjectId] IS NULL;",
+            @"
+IF OBJECT_ID(N'dbo.AttendanceRecords', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.AttendanceRecords', N'ProjectId') IS NOT NULL
+AND NOT EXISTS (SELECT 1 FROM [dbo].[AttendanceRecords] WHERE [ProjectId] IS NULL)
+AND EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.AttendanceRecords')
+      AND name = N'ProjectId'
+      AND is_nullable = 1)
+    ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [ProjectId] int NOT NULL;"
+        };
 
         // Each statement runs in its own batch so ALTER COLUMN is visible to later UPDATEs.
         private static readonly string[] UniqueDateIndexSqls =

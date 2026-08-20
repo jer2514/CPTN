@@ -60,7 +60,7 @@ namespace RSDSystem.Controllers
                                      .ToListAsync();
 
             var unassignedEmployees = await _db.Employees
-                                     .Where(e => e.ProjectId == null)
+                                     .Where(e => e.ProjectId == null && e.IsActive)
                                      .OrderBy(e => e.FirstName)
                                      .ToListAsync();
 
@@ -291,6 +291,7 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Employee not found." });
 
             emp.ProjectId = projectId;
+            emp.IsActive = true;
             await _db.SaveChangesAsync();
 
             return Json(new
