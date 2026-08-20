@@ -1,4 +1,5 @@
-﻿@{
+﻿@model List<RSDSystem.Models.Project>
+@{
     ViewData["Title"] = "Pending Payroll";
     Layout = "_PayrollStaffLayout";
 }
@@ -48,6 +49,7 @@
                     <th>Employee ID</th>
                     <th>Employee Name</th>
                     <th>Job</th>
+                    <th>Period</th>
                     <th>Status</th>
                     <th>Action</th>
                 </tr>
@@ -62,13 +64,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput   = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -157,17 +156,21 @@
             return '';
         }
 
-        // Draft / Correction -> Submit, View, Delete
-        // Submitted / Approved / other -> View, Delete
+        // Draft -> Submit, View, Delete
+        // Correction -> Submit, View
+        // Submitted / Approved -> View only
         function actionButtons(p) {
+            const status = (p.status || '').trim();
             let btns = '';
 
-            if (p.status === 'Draft' || p.status === 'Correction') {
+            if (status === 'Draft' || status === 'Correction') {
                 btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
             }
 
             btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-            btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            if (status === 'Draft') {
+                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            }
             return btns;
         }
 
@@ -179,6 +182,7 @@
                     <td>${p.displayId}</td>
                     <td>${p.employeeName}</td>
                     <td>${p.job}</td>
+                    <td>${p.period || '—'}</td>
                     <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">
@@ -242,8 +246,8 @@
         function confirmDelete(payrollId) {
             pendingDeleteId = payrollId;
             const row = currentPayrolls.find(p => p.payrollId === payrollId);
-            const name = row?.employeeName || 'this employee';
-            const status = (row?.status || 'payroll').toLowerCase();
+            const name = (row && row.employeeName) || 'this employee';
+            const status = ((row && row.status) || 'payroll').toLowerCase();
             document.getElementById('deleteTitle').textContent = 'Delete Payroll?';
             document.getElementById('deleteMsg').textContent =
                 `This will permanently remove ${name}'s ${status} payroll record. This action cannot be undone.`;

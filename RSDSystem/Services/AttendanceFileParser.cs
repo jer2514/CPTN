@@ -69,35 +69,8 @@ namespace RSDSystem.Services
 
         public static string DeriveStatus(AttendanceRecord row)
         {
-            var hasIn1 = !string.IsNullOrWhiteSpace(row.TimeIn1);
-            var hasOut1 = !string.IsNullOrWhiteSpace(row.TimeOut1);
-            var hasIn2 = !string.IsNullOrWhiteSpace(row.TimeIn2);
-            var hasOut2 = !string.IsNullOrWhiteSpace(row.TimeOut2);
-            var hasOtIn = !string.IsNullOrWhiteSpace(row.OvertimeIn);
-            var hasOtOut = !string.IsNullOrWhiteSpace(row.OvertimeOut);
-            var anyPunch = hasIn1 || hasOut1 || hasIn2 || hasOut2 || hasOtIn || hasOtOut;
-
-            if (!anyPunch && row.WorkHoursActual <= 0)
-                return AttendanceStatuses.Absent;
-
-            if (row.LateMinutes > 0)
-                return AttendanceStatuses.Late;
-
-            // 8:01 AM stays Complete in the staff table; 8:20 AM is Late.
-            if (AttendanceDisplay.TryParseTime(row.TimeIn1, out var firstIn)
-                && firstIn > new TimeSpan(8, 15, 0))
-                return AttendanceStatuses.Late;
-
-            if ((hasIn1 ^ hasOut1) || (hasIn2 ^ hasOut2) || (hasOtIn && !hasOtOut))
-                return AttendanceStatuses.Incomplete;
-
-            if (row.WorkHoursNormal > 0 && row.WorkHoursActual < row.WorkHoursNormal * 0.9m)
-                return AttendanceStatuses.Incomplete;
-
-            if (row.WorkHoursActual > 0 || (hasIn1 && hasOut1) || (hasIn2 && hasOut2))
-                return AttendanceStatuses.Complete;
-
-            return AttendanceStatuses.Incomplete;
+            AttendanceRules.Apply(row);
+            return row.Status;
         }
 
         public static int? MatchEmployeeId(IEnumerable<Employee> employees, string externalUserId, string name)
@@ -179,6 +152,8 @@ namespace RSDSystem.Services
         public static void ExpandToDateRange(AttendanceParseResult result, DateTime start, DateTime end)
         {
             if (result.Rows.Count == 0)
+                return;
+            if (start.Year < 1900 || end.Year < 1900)
                 return;
 
             var rangeStart = start.Date;
@@ -1108,13 +1083,18 @@ namespace RSDSystem.Services
             if (Regex.IsMatch(text, @"^\d{1,2}:\d{2}"))
                 return null;
             if (text.Contains(' ') && DateTime.TryParse(text.Split(' ')[0], CultureInfo.InvariantCulture, DateTimeStyles.None, out var iso)
-                && Regex.IsMatch(text.Split(' ')[0], @"^\d{4}-\d{2}-\d{2}$"))
+                && Regex.IsMatch(text.Split(' ')[0], @"^\d{4}-\d{2}-\d{2}$")
+                && iso.Year >= 1900)
                 return iso.Date;
 
             var formats = new[] { "yyyy-MM-dd", "MM/dd/yyyy", "M/d/yyyy", "MMMM d, yyyy", "MMM d, yyyy" };
-            if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+            if (DateTime.TryParseExact(text, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                && dt.Year >= 1900)
                 return dt.Date;
-            return DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt) ? dt.Date : null;
+            if (DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out dt)
+                && dt.Year >= 1900)
+                return dt.Date;
+            return null;
         }
 
         private sealed class EmployeeBlock

@@ -23,7 +23,7 @@ n8n (folder / Drive / email watch)
 POST /api/attendance/import
         │
         ▼
-AttendanceFileParser  →  match employees  →  AttendanceImports / AttendanceRecords
+AttendanceFileParser  →  match project employees  →  drop others  →  AttendanceImports / AttendanceRecords
         │
         ▼
 Attendance → Attendance Records (staff / admin review and edit)
@@ -78,9 +78,13 @@ Examples that all resolve to employee `00001`:
 
 If the ID does not match, the parser tries the **Name** column against the employee full name or first name.
 
-Matching is limited to employees assigned to the selected project (`Employee.ProjectId`). If the project has no assigned employees, the importer falls back to the full employee list.
+Matching is limited to employees assigned to the selected project (`Employee.ProjectId`). There is no fallback to the full employee list.
 
-Unmatched rows are still imported and highlighted so staff can fix them.
+1. The file is extracted as-is (every person-day on the biometric dump).
+2. User ID / name is matched to that project’s roster.
+3. People who are not assigned to the loaded project are **filtered out** and are not previewed or imported.
+
+If the project has no assigned employees, import stops with an error. If nobody in the file matches the project, nothing is saved.
 
 ## How status is derived
 
@@ -101,7 +105,7 @@ Staff can change punches and status later from **Attendance Records**.
 2. Open **Attendance → Import Attendance**.
 3. Type the project name (same autocomplete as Generate Payroll) and click **Load**.
 4. **Choose File** → biometric Excel → **Load File**.
-5. Review pills (Complete / Incomplete / Late / Absent) and unmatched rows.
+5. Review the extract summary and the filtered preview (only project employees). Check status pills (Complete / Incomplete / Late / Absent).
 6. Click **Import Attendance**.
 7. Open **Attendance Records** to search, filter, and edit.
 
@@ -147,9 +151,10 @@ Success (200):
   "projectName": "Mandani Bay",
   "fileName": "1_(August)Attendance Report.xls",
   "format": "Daily",
-  "rowCount": 48,
-  "matchedCount": 3,
-  "unmatchedCount": 1
+  "rowCount": 32,
+  "matchedCount": 32,
+  "unmatchedCount": 16,
+  "filteredOutCount": 3
 }
 ```
 
@@ -227,7 +232,7 @@ If the device writes one file per cut-off, run the workflow after that time inst
 | Project not found | `projectName` must match the project record. Staff spelling and extra spaces matter. |
 | Could not find employee time cards | File should be the **Employee Attendance Table** with Name, User ID, and a Time Card (Before Noon / After Noon). |
 | Could not read the attendance file | `.xls` needs `System.Text.Encoding.CodePages` (already registered at startup). Confirm the file is not password-protected. |
-| Every row unmatched | Employee codes in RSD should be the biometric sequence (`00001`). Device prefixes such as `26000001` are stripped to that sequence. Assign the employee to the project. |
+| Every row unmatched / filtered out | Employee codes in RSD should be the biometric sequence (`00001`). Device prefixes such as `26000001` are stripped to that sequence. Assign the employee to the selected project — people on other projects are dropped. |
 | Tables missing | Restart the app so `Program.cs` can create `AttendanceImports` / `AttendanceRecords`, or apply the EF migration. |
 
 ## Code map

@@ -70,9 +70,7 @@ namespace RSDSystem.Controllers
                 return Ok(new
                 {
                     success = true,
-                    message = result.ReplacedPrevious
-                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message = ImportMessage(result),
                     importId = result.ImportId,
                     projectId = result.ProjectId,
                     projectName = result.ProjectName,
@@ -93,6 +91,20 @@ namespace RSDSystem.Controllers
                     message = "Could not import the attendance file. " + ex.GetBaseException().Message
                 });
             }
+        }
+
+        private static string ImportMessage(AttendanceImportResult result)
+        {
+            var message = result.ReplacedPrevious
+                ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
+
+            if (result.UnmatchedCount > 0)
+            {
+                message += $" {result.UnmatchedCount} row(s) did not match an employee.";
+            }
+
+            return message;
         }
 
         private bool HasValidApiKey()

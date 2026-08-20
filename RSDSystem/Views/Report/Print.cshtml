@@ -1,0 +1,42 @@
+@{
+    Layout = null;
+    var title = ViewBag.Title as string ?? "Report";
+    var error = ViewBag.Error as string;
+    var html = ViewBag.Html as string ?? "";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@title</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; color: #111; padding: 24px; }
+        .no-print { margin-bottom: 16px; }
+        .report-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; font-weight: 700; color: #163F8B; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .report-table th, .report-table td { border: 1px solid #222; padding: 6px 8px; text-align: left; font-size: 13px; }
+        .report-table th { background: #EEF3FF; }
+        .report-kpis { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 12px; font-size: 13px; }
+        .report-total { margin-top: 12px; font-weight: 700; }
+        .report-slip { margin: 16px 0; page-break-inside: avoid; }
+        .report-slip-name { font-weight: 700; margin-bottom: 6px; }
+        .report-flags { padding-left: 18px; }
+        @@media print { .no-print { display: none; } body { padding: 0; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Print / Save as PDF</button>
+        <strong>@title</strong>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <p>@error</p>
+    }
+    else
+    {
+        @Html.Raw(html)
+    }
+    <script>window.addEventListener('load', function () { window.print(); });</script>
+</body>
+</html>

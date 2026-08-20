@@ -44,7 +44,7 @@ namespace RSDSystem.Controllers
                     (e.EmployeeCode != null && e.EmployeeCode.Contains(s)) ||
                     (e.EmployeeCode != null && e.EmployeeCode.Contains(s.Replace("-", ""))) ||
                     (e.Email != null && e.Email.Contains(s)) ||
-                    (e.Project != null && e.Project.ProjectName.Contains(s)));
+                    (e.Project != null && e.Project.ProjectName != null && e.Project.ProjectName.Contains(s)));
             }
 
             query = sortBy switch
@@ -92,13 +92,9 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
-<<<<<<< HEAD
-
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
 
-=======
->>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -139,7 +135,9 @@ namespace RSDSystem.Controllers
         // GET /Employee/Edit/{id}
         public async Task<IActionResult> Edit(int id)
         {
-            var emp = await _db.Employees.FindAsync(id);
+            var emp = await _db.Employees.Include(e => e.Project)
+                       .FirstOrDefaultAsync(e => e.EmployeeId == id);
+
             if (emp == null) return View("EmployeeNotFound");
 
             ViewBag.JobClassifications = JobClassifications;
@@ -161,13 +159,10 @@ namespace RSDSystem.Controllers
             ModelState.Remove("EmployeeCode");
 
             NormalizeEmployee(emp);
-<<<<<<< HEAD
 
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
 
-=======
->>>>>>> master
             ClarifyNumericErrors(ModelState);
             ValidatePhoto(photo);
 
@@ -202,7 +197,12 @@ namespace RSDSystem.Controllers
             existing.DailyRate = emp.DailyRate;
             existing.RatePerHour = emp.RatePerHour;
             existing.ProjectId = emp.ProjectId;
-            // existing.EmployeeCode intentionally untouched — never re-generated on edit
+
+            // Assigning an inactive employee to a project automatically reactivates them.
+            if (emp.ProjectId.HasValue && !existing.IsActive)
+            {
+                existing.IsActive = true;
+            }
 
             if (photo != null && photo.Length > 0)
                 existing.PhotoPath = await SavePhotoAsync(photo);
@@ -220,7 +220,6 @@ namespace RSDSystem.Controllers
             emp.MiddleInitial = string.IsNullOrWhiteSpace(emp.MiddleInitial)
                 ? null
                 : emp.MiddleInitial.Trim().ToUpperInvariant();
-<<<<<<< HEAD
 
             emp.Email = string.IsNullOrWhiteSpace(emp.Email) ? null : emp.Email.Trim();
             emp.ContactNumber = emp.ContactNumber?.Trim();
@@ -229,34 +228,12 @@ namespace RSDSystem.Controllers
             emp.JobClassification = string.IsNullOrWhiteSpace(emp.JobClassification)
                 ? string.Empty
                 : emp.JobClassification.Trim();
-
-=======
->>>>>>> master
-            emp.Email = emp.Email?.Trim();
-            emp.ContactNumber = emp.ContactNumber?.Trim();
-            emp.Address = emp.Address?.Trim();
-            emp.Gender = string.IsNullOrWhiteSpace(emp.Gender) ? null : emp.Gender.Trim();
-            emp.JobClassification = emp.JobClassification?.Trim() ?? string.Empty;
-<<<<<<< HEAD
-
-=======
->>>>>>> master
         }
 
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
-<<<<<<< HEAD
-
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             return ti.ToTitleCase(value.Trim().ToLowerInvariant());
-
-            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
-            return ti.ToTitleCase(value.Trim().ToLower());
-
-=======
-            if (string.IsNullOrWhiteSpace(value)) return value ?? string.Empty;
-            return ti.ToTitleCase(value.Trim().ToLower());
->>>>>>> master
         }
 
         private void ValidatePhoto(IFormFile? photo)
@@ -405,7 +382,7 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /UserManagement/ToggleStatus/{id}
+        // POST /Employee/ToggleStatus/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleStatus(int id)
@@ -414,9 +391,16 @@ namespace RSDSystem.Controllers
             if (emp != null)
             {
                 emp.IsActive = !emp.IsActive;
+                if (!emp.IsActive)
+                {
+                    emp.ProjectId = null;
+                }
+
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
         }
+
+
     }
 }

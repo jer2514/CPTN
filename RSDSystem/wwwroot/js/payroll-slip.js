@@ -8,11 +8,14 @@
     const successOkBtn = document.getElementById('successOkBtn');
     const configEl = document.getElementById('slip-config');
     const config = configEl ? JSON.parse(configEl.textContent || '{}') : {};
+    const employeeId = Number(config.employeeId || 0);
+    const projectId = Number(config.projectId || 0);
     const dailyRate = Number(config.dailyRate || 0);
     const hourlyRate = Number(config.hourlyRate || 0);
     const schedules = Array.isArray(config.schedules) ? config.schedules : [];
     const boundMin = config.boundMin || '';
     const boundMax = config.boundMax || '';
+    const hasSchedule = !!config.hasSchedule;
     const isEdit = !!config.isEdit;
     const existingPayrollId = Number(config.payrollId || 0);
     const returnUrl = config.returnUrl || '';
@@ -47,6 +50,32 @@
         }) || null;
     }
 
+    function coveringScheduleForRange(startIso, endIso) {
+        if (!startIso || !endIso) return null;
+        return schedules.find(function (s) {
+            return s.start.localeCompare(startIso) <= 0 && endIso.localeCompare(s.end) <= 0;
+        }) || null;
+    }
+
+    function formatHintDate(iso) {
+        if (!iso) return '';
+        const date = new Date(iso + 'T00:00:00');
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function updateScheduleHint(cover) {
+        const hint = document.getElementById('payPeriodScheduleHint');
+        if (!hint || !hasSchedule) return;
+        const startIso = cover ? cover.start : boundMin;
+        const endIso = cover ? cover.end : boundMax;
+        if (!startIso && !endIso) return;
+        hint.textContent = 'Pay period must fall within the payroll schedule: '
+            + (formatHintDate(startIso) || 'the schedule start')
+            + ' – '
+            + (formatHintDate(endIso) || 'the schedule end');
+    }
+
     function clampBounds(min, max) {
         const calendarMin = '2000-01-01';
         const calendarMax = '2099-12-31';
@@ -73,6 +102,7 @@
         const rawMax = earlierDate(cover ? cover.end : boundMax, boundMax);
         const rawMin = laterDate(boundMin, cover ? cover.start : boundMin) || boundMin;
         const range = clampBounds(rawMin, rawMax);
+        updateScheduleHint(cover);
 
         startEl.min = range.min;
         let startMax = earlierDate(range.max, endEl.value) || range.max;
@@ -116,7 +146,7 @@
 
     function weekdayCount(startIso, endIso) {
         const total = inclusiveDays(startIso, endIso);
-        if (total === null) return 1;
+        if (total === null) return 0;
         const start = new Date(startIso + 'T00:00:00');
         let days = 0;
         for (let i = 0; i < total; i++) {
@@ -125,18 +155,41 @@
             const weekday = day.getDay();
             if (weekday !== 0 && weekday !== 6) days++;
         }
-        return days > 0 ? days : 1;
+        return days;
     }
 
-    function fillDaysFromPeriod() {
+    function setNumberValue(id, value) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.value = value;
+        el.classList.remove('is-invalid');
+        const dest = slipForm.querySelector('[data-error-for="' + id + '"]');
+        if (dest) dest.textContent = '';
+    }
+
+    async function fillAttendanceFromPeriod() {
         const start = document.getElementById('payPeriodStart').value;
         const end = document.getElementById('payPeriodEnd').value;
-        const daysEl = document.getElementById('regularDaysWorked');
-        if (!daysEl || !start || !end) return;
-        daysEl.value = String(weekdayCount(start, end));
-        daysEl.classList.remove('is-invalid');
-        const dest = slipForm.querySelector('[data-error-for="regularDaysWorked"]');
-        if (dest) dest.textContent = '';
+        if (!employeeId || !projectId || !start || !end) return;
+
+        try {
+            const url = '/PayrollStaff/GetAttendanceTotals?employeeId=' + encodeURIComponent(employeeId)
+                + '&projectId=' + encodeURIComponent(projectId)
+                + '&periodStart=' + encodeURIComponent(start)
+                + '&periodEnd=' + encodeURIComponent(end);
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.success) return;
+
+            setNumberValue('regularDaysWorked', String(data.daysWorked ?? 0));
+            setNumberValue('absentDays', String(data.daysAbsent ?? 0));
+            const ot = Number(data.overtimeHours || 0);
+            setNumberValue('overtimeHours', ot.toFixed(ot % 1 === 0 ? 0 : 2));
+        } catch (err) {
+            setNumberValue('regularDaysWorked', String(weekdayCount(start, end)));
+            setNumberValue('absentDays', '0');
+            setNumberValue('overtimeHours', '0');
+        }
     }
 
     function validateSlipExtras() {
@@ -157,6 +210,9 @@
         if (daysWorked > 0 && ot > daysWorked * 24) {
             showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
             ok = false;
+        } else if (daysWorked === 0 && ot > 24) {
+            showFieldError('overtimeHours', 'Overtime hours cannot exceed 24 hours per day worked.');
+            ok = false;
         }
 
         const gross = (dailyRate * daysWorked) + (hourlyRate * ot);
@@ -165,12 +221,24 @@
             ok = false;
         }
 
+        if (!hasSchedule) {
+            showFieldError('payPeriodStart', 'A payroll schedule must be added by the admin before generating payroll.');
+            return false;
+        }
+
         if (boundMin && start && start.localeCompare(boundMin) < 0) {
-            showFieldError('payPeriodStart', 'Pay period starting date must be on or after ' + formatIsoDate(boundMin) + '.');
+            showFieldError('payPeriodStart', 'Pay period starting date must be on or after the payroll schedule start (' + formatIsoDate(boundMin) + ').');
             ok = false;
         }
         if (boundMax && end && end.localeCompare(boundMax) > 0) {
-            showFieldError('payPeriodEnd', 'Pay period ending date must be on or before ' + formatIsoDate(boundMax) + '.');
+            showFieldError('payPeriodEnd', 'Pay period ending date must be on or before the payroll schedule end (' + formatIsoDate(boundMax) + ').');
+            ok = false;
+        }
+        if (ok && start && end && !coveringScheduleForRange(start, end)) {
+            const cover = coveringSchedule(start);
+            const startLabel = formatHintDate(cover ? cover.start : boundMin);
+            const endLabel = formatHintDate(cover ? cover.end : boundMax);
+            showFieldError('payPeriodStart', 'Pay period must fall within the payroll schedule: ' + startLabel + ' – ' + endLabel + '.');
             ok = false;
         }
 
@@ -179,16 +247,13 @@
 
     document.getElementById('payPeriodStart').addEventListener('change', function () {
         syncPeriodBounds();
-        if (!isEdit) fillDaysFromPeriod();
+        fillAttendanceFromPeriod();
     });
     document.getElementById('payPeriodEnd').addEventListener('change', function () {
         syncPeriodBounds();
-        if (!isEdit) fillDaysFromPeriod();
+        fillAttendanceFromPeriod();
     });
     syncPeriodBounds();
-    if (!isEdit && !parseInt(document.getElementById('regularDaysWorked').value, 10)) {
-        fillDaysFromPeriod();
-    }
 
     slipForm.addEventListener('submit', async function (e) {
         e.preventDefault();

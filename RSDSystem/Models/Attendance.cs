@@ -43,6 +43,8 @@ namespace RSDSystem.Models
         public int AttendanceImportId { get; set; }
         public AttendanceImport? Import { get; set; }
 
+        public int ProjectId { get; set; }
+
         public int? EmployeeId { get; set; }
         public Employee? Employee { get; set; }
 
@@ -107,15 +109,43 @@ namespace RSDSystem.Models
         public const string Complete = "Complete";
         public const string Incomplete = "Incomplete";
         public const string Late = "Late";
+        public const string EarlyOff = "Early Off";
+        public const string LateEarlyOff = "Late + Early Off";
         public const string Absent = "Absent";
 
-        public static readonly string[] All = { Complete, Incomplete, Late, Absent };
+        public static readonly string[] All = { Complete, Incomplete, Late, EarlyOff, LateEarlyOff, Absent };
+
+        public static bool CountsAsWorked(string? status) =>
+            status is Complete or Late or EarlyOff or LateEarlyOff;
+
+        public static bool CountsAsLate(string? status) =>
+            status is Late or LateEarlyOff;
+
+        public static bool CountsAsEarly(string? status) =>
+            status is EarlyOff or LateEarlyOff;
+
+        public static bool MatchesFilter(string? status, string? filter)
+        {
+            if (string.IsNullOrWhiteSpace(filter) ||
+                string.Equals(filter, "all", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (string.Equals(filter, Late, StringComparison.OrdinalIgnoreCase))
+                return CountsAsLate(status);
+
+            if (string.Equals(filter, EarlyOff, StringComparison.OrdinalIgnoreCase))
+                return CountsAsEarly(status);
+
+            return string.Equals(status, filter, StringComparison.OrdinalIgnoreCase);
+        }
 
         public static string CssClass(string? status) => (status ?? "").Trim() switch
         {
             Complete => "att-status-complete",
             Incomplete => "att-status-incomplete",
             Late => "att-status-late",
+            EarlyOff => "att-status-early",
+            LateEarlyOff => "att-status-late",
             Absent => "att-status-absent",
             _ => "att-status-incomplete"
         };

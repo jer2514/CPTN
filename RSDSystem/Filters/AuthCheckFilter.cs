@@ -36,7 +36,7 @@ namespace RSDSystem.Filters
             }
 
             // Keep PayrollStaff out of Admin-only areas
-            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project" };
+            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
                 context.Result = new RedirectToActionResult("Index", "PayrollStaff", null);
@@ -58,7 +58,29 @@ namespace RSDSystem.Filters
                 && (string.Equals(action, "Preview", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "ImportFile", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(action, "UpdateRecord", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase));
+                    || string.Equals(action, "RequestCorrection", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetRecords", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetPeriods", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "GetSummary", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(action, "DeletePeriod", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(action, "GetAttendanceTotals", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "Payroll", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(action, "GetPrediction", StringComparison.OrdinalIgnoreCase))
+                || (string.Equals(controller, "PayrollPredictionApi", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(action, "Predict", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "Health", StringComparison.OrdinalIgnoreCase)))
+                || (string.Equals(controller, "Notification", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(action, "Recent", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "UnreadCount", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "MarkRead", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "MarkAllRead", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "GetCorrection", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "ApproveCorrection", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "ReturnCorrection", StringComparison.OrdinalIgnoreCase)))
+                || (string.Equals(controller, "Report", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(action, "Periods", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "Generate", StringComparison.OrdinalIgnoreCase)));
         }
     }
 }

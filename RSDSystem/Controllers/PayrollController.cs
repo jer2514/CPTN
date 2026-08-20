@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
 using RSDSystem.Models;
+using RSDSystem.Services;
 using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
@@ -11,11 +12,15 @@ namespace RSDSystem.Controllers
     public class PayrollController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly PayrollPredictionService _predictions;
+        private readonly NotificationService _notifications;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
-        public PayrollController(PayrollDbContext db)
+        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions, NotificationService notifications)
         {
             _db = db;
+            _predictions = predictions;
+            _notifications = notifications;
         }
 
         private IActionResult? RequireAdmin()
@@ -85,6 +90,10 @@ namespace RSDSystem.Controllers
                     && p.PayPeriodEnd.Date == end.Date)
                 .ToListAsync();
 
+            var covering = PayrollPeriods.Covering(
+                await _db.Set<PayrollSchedule>().Where(s => s.ProjectId == projectId).ToListAsync(),
+                start.Date, end.Date);
+
             var daysWorked = Math.Max(1, DateRules.CountWeekdays(start.Date, end.Date));
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
@@ -93,12 +102,15 @@ namespace RSDSystem.Controllers
             {
                 if (existing.Any(p => p.EmployeeId == emp.EmployeeId))
                     continue;
+                if (covering != null && existing.Any(p => PayrollPeriods.BelongsTo(p, covering) && p.EmployeeId == emp.EmployeeId))
+                    continue;
 
                 var regularPay = emp.DailyRate * daysWorked;
                 _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
                     ProjectId = projectId,
+                    PayrollScheduleId = covering?.PayrollScheduleId,
                     PayPeriodStart = start.Date,
                     PayPeriodEnd = end.Date,
                     RegularDaysWorked = daysWorked,
@@ -131,13 +143,75 @@ namespace RSDSystem.Controllers
             });
         }
 
-        public IActionResult Prediction()
+        public async Task<IActionResult> Prediction()
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
             ViewBag.PageTitle = "Payroll Prediction";
-            return View();
+            var projects = await _db.Projects
+                .AsNoTracking()
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+            return View(projects);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetPrediction(int projectId, string? projectName = null)
+        {
+            var blocked = RequireAdmin();
+            if (blocked != null)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            if (projectId <= 0 && !string.IsNullOrWhiteSpace(projectName))
+            {
+                var named = await _db.Projects.AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.ProjectName != null && p.ProjectName.ToLower() == projectName.Trim().ToLower());
+                if (named != null)
+                    projectId = named.ProjectId;
+            }
+
+            var page = await _predictions.LoadAsync(projectId, HttpContext.RequestAborted);
+            if (page.Error != null && page.Rows.Count == 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    projectName = page.ProjectName,
+                    message = page.Error
+                });
+            }
+
+            return Json(new
+            {
+                success = true,
+                projectId = page.ProjectId,
+                projectName = page.ProjectName,
+                generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
+                rows = page.Rows.Select(r => new
+                {
+                    previousMonth1 = string.IsNullOrWhiteSpace(r.PreviousLabel1)
+                        ? r.PreviousMonth1.ToString("MMMM yyyy", DateCulture)
+                        : r.PreviousLabel1,
+                    previousAmount1 = r.PreviousAmount1,
+                    previousMonth2 = string.IsNullOrWhiteSpace(r.PreviousLabel2)
+                        ? r.PreviousMonth2.ToString("MMMM yyyy", DateCulture)
+                        : r.PreviousLabel2,
+                    previousAmount2 = r.PreviousAmount2,
+                    predictionMonth = string.IsNullOrWhiteSpace(r.PredictionLabel)
+                        ? r.PredictionMonth.ToString("MMMM yyyy", DateCulture)
+                        : r.PredictionLabel,
+                    predictedBudget = r.PredictedPayroll,
+                    predictedPayroll = r.PredictedPayroll,
+                    allocatedBudget = r.AllocatedBudget,
+                    budgetDifference = r.BudgetDifference,
+                    exceedsBudget = r.ExceedsBudget,
+                    unusualChange = r.UnusualChange,
+                    changePercent = r.ChangePercent,
+                    riskTitle = r.RiskTitle,
+                    riskDetail = r.RiskDetail
+                })
+            });
         }
 
         public async Task<IActionResult> GeneratedPayslips(int projectId, DateTime start, DateTime end, int page = 1)
@@ -462,13 +536,17 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
         {
-            var payroll = await _db.Set<Payroll>().FindAsync(id);
+            var payroll = await _db.Set<Payroll>()
+                .Include(p => p.Project)
+                .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
+
+            await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -490,13 +568,17 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(reason))
                 return Json(new { success = false, message = "Please provide a reason for correction." });
 
-            var payroll = await _db.Set<Payroll>().FindAsync(id);
+            var payroll = await _db.Set<Payroll>()
+                .Include(p => p.Project)
+                .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
             payroll.Status = PayrollStatusOptions.Correction;
             payroll.CorrectionReason = reason.Trim();
             await _db.SaveChangesAsync();
+
+            await _notifications.NotifyPayrollReturnedAsync(payroll, payroll.Project, reason.Trim(), HttpContext.RequestAborted);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -535,7 +617,12 @@ namespace RSDSystem.Controllers
             _db.Set<PayrollSchedule>().Add(schedule);
             await _db.SaveChangesAsync();
 
-            TempData["Success"] = "Schedule added.";
+            var assigned = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == ProjectId);
+            if (assigned != null)
+                await _notifications.NotifyNewTaskAsync(assigned, HttpContext.RequestAborted);
+
+            TempData["Success"] = "Schedule added. Payroll staff can generate payroll for this period.";
             return RedirectToAction("Index", "Home");
         }
 
