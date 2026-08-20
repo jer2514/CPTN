@@ -151,7 +151,7 @@ namespace RSDSystem.Services
                     EarlyMinutes = row.EarlyMinutes,
                     OvertimeHours = row.OvertimeHours,
                     AbsenceDays = row.AbsenceDays,
-                    Status = Clip(row.Status, 20) ?? AttendanceStatuses.Incomplete,
+                    Status = Clip(AttendanceStatuses.Display(row.Status), 20) ?? AttendanceStatuses.HalfDay,
                     Matched = row.Matched
                 });
             }
@@ -320,6 +320,7 @@ namespace RSDSystem.Services
                     "Absent" => groups.Where(r => r.DaysAbsent > 0).ToList(),
                     "Late" => groups.Where(r => r.DaysLate > 0).ToList(),
                     "Incomplete" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
+                    "Half-day" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
                     _ => groups
                 };
             }
@@ -451,6 +452,9 @@ namespace RSDSystem.Services
             {
                 if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
                     query = query.Where(r => !r.Matched);
+                else if (AttendanceStatuses.IsHalfDay(status))
+                    query = query.Where(r => r.Status == AttendanceStatuses.HalfDay
+                        || r.Status == AttendanceStatuses.Incomplete);
                 else
                     query = query.Where(r => r.Status == status);
             }
@@ -491,7 +495,7 @@ namespace RSDSystem.Services
                 DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
-                DaysIncomplete = rows.Count(r => r.Status == AttendanceStatuses.Incomplete),
+                DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),
                 RegularHours = rows.Sum(DayRegularHours),
                 OvertimeHours = rows.Sum(DayOvertimeHours)
             };
@@ -726,7 +730,9 @@ namespace RSDSystem.Services
                     TimeOut2 = AttendanceDisplay.HtmlTime(row?.TimeOut2),
                     OvertimeIn = AttendanceDisplay.HtmlTime(row?.OvertimeIn),
                     OvertimeOut = AttendanceDisplay.HtmlTime(row?.OvertimeOut),
-                    Status = row?.Status ?? AttendanceStatuses.Absent,
+                    Status = row == null
+                        ? AttendanceStatuses.Absent
+                        : AttendanceStatuses.Display(row.Status),
                     RegularHours = AttendanceRules.RegularHours(row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2),
                     OvertimeHours = AttendanceRules.OvertimeHours(
                         row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2, row?.OvertimeIn, row?.OvertimeOut)
@@ -736,7 +742,7 @@ namespace RSDSystem.Services
             edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsWorked(d.Status));
             edit.DaysAbsent = edit.Days.Count(d => d.Status == AttendanceStatuses.Absent);
             edit.DaysLate = edit.Days.Count(d => AttendanceStatuses.CountsAsLate(d.Status));
-            edit.DaysIncomplete = edit.Days.Count(d => d.Status == AttendanceStatuses.Incomplete);
+            edit.DaysIncomplete = edit.Days.Count(d => AttendanceStatuses.IsHalfDay(d.Status));
             edit.RegularHours = edit.Days.Sum(d => d.RegularHours);
             edit.OvertimeHours = edit.Days.Sum(d => d.OvertimeHours);
             return edit;

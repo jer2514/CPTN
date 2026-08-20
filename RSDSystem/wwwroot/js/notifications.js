@@ -142,7 +142,7 @@
             });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Could not load the correction request.');
+                showToast(data.message || 'Could not load the correction request.');
                 overlay.classList.remove('open');
                 return;
             }
@@ -160,7 +160,7 @@
             const actions = document.getElementById('corrActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
         } catch (err) {
-            alert('Could not load the correction request.');
+            showToast('Could not load the correction request.');
             overlay.classList.remove('open');
         }
     }
@@ -213,7 +213,7 @@
             approveBtn.addEventListener('click', async function () {
                 const id = overlay.dataset.id;
                 const data = await postForm('/Notification/ApproveCorrection', { id: id });
-                if (!data.success) { alert(data.message || 'Could not approve.'); return; }
+                if (!data.success) { showToast(data.message || 'Could not approve.'); return; }
                 overlay.classList.remove('open');
                 window.location.reload();
             });
@@ -224,7 +224,7 @@
                 const reason = window.prompt('Reason for returning this correction:', 'The submitted correction could not be verified.');
                 if (reason == null) return;
                 const data = await postForm('/Notification/ReturnCorrection', { id: id, reason: reason });
-                if (!data.success) { alert(data.message || 'Could not return the request.'); return; }
+                if (!data.success) { showToast(data.message || 'Could not return the request.'); return; }
                 overlay.classList.remove('open');
                 window.location.reload();
             });

@@ -142,7 +142,7 @@
 
         document.getElementById('loadEmployeesBtn').addEventListener('click', async function () {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
             currentProjectId = projectIdInput.value;
@@ -252,12 +252,12 @@
                     btn.textContent = 'Generated';
                     btn.classList.add('btn-generate-done');
                 } else {
-                    alert(data.message || 'Failed to generate payroll.');
+                    showToast(data.message || 'Failed to generate payroll.');
                     btn.disabled = false;
                     btn.textContent = 'Generate';
                 }
             } catch (err) {
-                alert('Something went wrong.');
+                showToast('Something went wrong.');
                 btn.disabled = false;
                 btn.textContent = 'Generate';
             }

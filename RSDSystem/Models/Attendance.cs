@@ -87,7 +87,7 @@ namespace RSDSystem.Models
         public decimal AbsenceDays { get; set; }
 
         [MaxLength(20)]
-        public string Status { get; set; } = AttendanceStatuses.Incomplete;
+        public string Status { get; set; } = AttendanceStatuses.HalfDay;
 
         public bool Matched { get; set; }
     }
@@ -107,16 +107,26 @@ namespace RSDSystem.Models
     public static class AttendanceStatuses
     {
         public const string Complete = "Complete";
+        public const string HalfDay = "Half-day";
         public const string Incomplete = "Incomplete";
         public const string Late = "Late";
         public const string EarlyOff = "Early Off";
         public const string LateEarlyOff = "Late + Early Off";
         public const string Absent = "Absent";
 
-        public static readonly string[] All = { Complete, Incomplete, Late, EarlyOff, LateEarlyOff, Absent };
+        public static readonly string[] All = { Complete, HalfDay, Late, EarlyOff, LateEarlyOff, Absent };
+
+        public static bool IsHalfDay(string? status) =>
+            string.Equals(status, HalfDay, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, Incomplete, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Half Day", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Half-Day", StringComparison.OrdinalIgnoreCase);
+
+        public static string Display(string? status) =>
+            IsHalfDay(status) ? HalfDay : (status ?? "");
 
         public static bool CountsAsWorked(string? status) =>
-            status is Complete or Late or EarlyOff or LateEarlyOff;
+            status is Complete or Late or EarlyOff or LateEarlyOff || IsHalfDay(status);
 
         public static bool CountsAsLate(string? status) =>
             status is Late or LateEarlyOff;
@@ -136,18 +146,25 @@ namespace RSDSystem.Models
             if (string.Equals(filter, EarlyOff, StringComparison.OrdinalIgnoreCase))
                 return CountsAsEarly(status);
 
+            if (IsHalfDay(filter))
+                return IsHalfDay(status);
+
             return string.Equals(status, filter, StringComparison.OrdinalIgnoreCase);
         }
 
-        public static string CssClass(string? status) => (status ?? "").Trim() switch
+        public static string CssClass(string? status)
         {
-            Complete => "att-status-complete",
-            Incomplete => "att-status-incomplete",
-            Late => "att-status-late",
-            EarlyOff => "att-status-early",
-            LateEarlyOff => "att-status-late",
-            Absent => "att-status-absent",
-            _ => "att-status-incomplete"
-        };
+            var value = Display(status);
+            return value switch
+            {
+                Complete => "att-status-complete",
+                HalfDay => "att-status-halfday",
+                Late => "att-status-late",
+                EarlyOff => "att-status-early",
+                LateEarlyOff => "att-status-late",
+                Absent => "att-status-absent",
+                _ => "att-status-halfday"
+            };
+        }
     }
 }

@@ -58,7 +58,7 @@
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Unmatched">Unmatched</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
-                        <li><button type="button" class="dropdown-item" data-status="Incomplete">Incomplete</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Half-day">Half-day</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
@@ -120,7 +120,8 @@
         const pageSize = 10;
         const statusClass = {
             Complete: 'att-status-complete',
-            Incomplete: 'att-status-incomplete',
+            Incomplete: 'att-status-halfday',
+            'Half-day': 'att-status-halfday',
             Late: 'att-status-late',
             'Early Off': 'att-status-early',
             'Late + Early Off': 'att-status-late',
@@ -173,7 +174,7 @@
 
         document.getElementById('loadProjectBtn').addEventListener('click', function () {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
             document.getElementById('previewEmpty').textContent =
@@ -210,7 +211,9 @@
                             ? (r.status === 'Late' || r.status === 'Late + Early Off')
                             : statusFilter === 'Early Off'
                                 ? (r.status === 'Early Off' || r.status === 'Late + Early Off')
-                                : r.status === statusFilter;
+                                : statusFilter === 'Half-day'
+                                    ? (r.status === 'Half-day' || r.status === 'Incomplete')
+                                    : r.status === statusFilter;
                 const text = `${r.displayId} ${r.employeeName} ${r.externalUserId}`.toLowerCase();
                 return statusOk && (!q || text.includes(q));
             });
@@ -287,8 +290,8 @@
             }).join('');
 
             document.getElementById('previewPager').innerHTML =
-                `<span>Page ${currentPage} of ${totalPages}</span>
-                 <button type="button" class="att-page-btn" ${currentPage <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
+                `<button type="button" class="att-page-btn" ${currentPage <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
+                 <span>Page ${currentPage} of ${totalPages}</span>
                  <button type="button" class="att-page-btn" ${currentPage >= totalPages ? 'disabled' : ''} data-dir="1">&rsaquo;</button>`;
         }
 
@@ -338,11 +341,11 @@
 
         async function postFile(url) {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list, then click Load.');
+                showToast('Please select a project from the suggestion list, then click Load.');
                 return null;
             }
             if (!fileInput.files[0]) {
-                alert('Choose an attendance file first.');
+                showToast('Choose an attendance file first.');
                 return null;
             }
 
@@ -409,7 +412,7 @@
 
         document.getElementById('importBtn').addEventListener('click', async function () {
             if (!previewRows.length) {
-                alert('Load a file before importing.');
+                showToast('Load a file before importing.');
                 return;
             }
 
@@ -426,13 +429,13 @@
                 const data = await postFile('/Attendance/ImportFile');
                 if (!data) return;
                 if (!data.success) {
-                    alert(data.message || 'Import failed.');
+                    showToast(data.message || 'Import failed.');
                     return;
                 }
-                alert(data.message);
+                showToast(data.message, 'success');
                 window.location = '/Attendance/Records';
             } catch (err) {
-                alert((err && err.message) ? err.message : 'Could not import the attendance file.');
+                showToast((err && err.message) ? err.message : 'Could not import the attendance file.');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Import Attendance';
