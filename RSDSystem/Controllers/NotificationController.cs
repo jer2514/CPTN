@@ -203,6 +203,60 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Correction request returned." });
         }
 
+        [HttpGet]
+        public async Task<IActionResult> GetTask(int id)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var schedule = await _db.PayrollSchedules
+                .AsNoTracking()
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+
+            var pending = schedule.TaskCompleted && !schedule.TaskApproved;
+            return Json(new
+            {
+                success = true,
+                id = schedule.PayrollScheduleId,
+                payrollStaff = string.IsNullOrWhiteSpace(schedule.Project?.AssignedPayrollStaff)
+                    ? "—"
+                    : schedule.Project!.AssignedPayrollStaff.Trim(),
+                projectName = string.IsNullOrWhiteSpace(schedule.Project?.ProjectName)
+                    ? "—"
+                    : schedule.Project!.ProjectName!.Trim(),
+                projectType = schedule.TypeOfService ?? schedule.Project?.TypeOfService ?? "—",
+                period = PayrollPeriods.Label(schedule),
+                pending
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveTask(int id)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+            if (!schedule.TaskCompleted)
+                return Json(new { success = false, message = "Payroll staff have not marked this task as done." });
+            if (schedule.TaskApproved)
+                return Json(new { success = false, message = "This task was already approved." });
+
+            schedule.TaskApproved = true;
+            await _db.SaveChangesAsync();
+            await _notifications.NotifyTaskCompletionApprovedAsync(schedule, HttpContext.RequestAborted);
+
+            return Json(new { success = true, message = "Task approved. It has been removed from To do task." });
+        }
+
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 

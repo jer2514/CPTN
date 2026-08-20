@@ -205,6 +205,9 @@ namespace RSDSystem.Migrations
                     b.Property<DateTime>("StartingDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("TaskApproved")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("TaskCompleted")
                         .HasColumnType("bit");
 

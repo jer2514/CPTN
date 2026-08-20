@@ -40,8 +40,8 @@
                             @Html.AntiForgeryToken()
                             @if (s.TaskCompleted)
                             {
-                                <input type="checkbox" class="tbl-check" title="Mark as done" checked
-                                       onchange="this.form.submit()" />
+                                <input type="checkbox" class="tbl-check" title="Waiting for admin approval" checked disabled />
+                                <span class="task-pending">Pending approval</span>
                             }
                             else
                             {

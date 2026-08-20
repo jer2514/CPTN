@@ -1886,6 +1886,17 @@ button.badge-btn {
     height: 18px;
 }
 
+.task-pending {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #c0392b;
+}
+
+.task-approval-modal {
+    width: min(460px, 94vw);
+}
+
 
 /*payroll staff*/
 /* ── Generate Payroll — project search + employee table ─── */
