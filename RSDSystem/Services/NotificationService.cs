@@ -298,10 +298,10 @@ namespace RSDSystem.Services
             if (string.Equals(role, NotificationRoles.Admin, StringComparison.OrdinalIgnoreCase))
                 return source.Where(n => n.RecipientRole == NotificationRoles.Admin);
 
-            var name = (fullName ?? "").Trim();
+            var name = (fullName ?? "").Trim().ToLower();
             return source.Where(n => n.RecipientRole == NotificationRoles.PayrollStaff
                 && n.RecipientName != null
-                && n.RecipientName.Trim() == name);
+                && n.RecipientName.Trim().ToLower() == name);
         }
 
         private async Task<bool> RecentlyNotifiedAsync(

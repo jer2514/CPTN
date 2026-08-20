@@ -5,6 +5,9 @@ using RSDSystem.Filters;
 using RSDSystem.Models;
 using RSDSystem.Services;
 using System;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,6 +48,8 @@ builder.Services.AddSession(options =>
     options.IdleTimeout = TimeSpan.FromMinutes(60);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
 Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -234,9 +239,8 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
-
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -249,5 +253,17 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");
+
+try
+{
+    Console.WriteLine("On this computer: http://localhost:5114");
+    var host = Dns.GetHostEntry(Dns.GetHostName());
+    foreach (var ip in host.AddressList.Where(a => a.AddressFamily == AddressFamily.InterNetwork))
+        Console.WriteLine("Other computers on this Wi-Fi/network: http://" + ip + ":5114");
+}
+catch
+{
+    // ignore address lookup failures
+}
 
 app.Run();

@@ -8,7 +8,6 @@ namespace RSDSystem.Controllers
 {
     public class AttendanceController : Controller
     {
-        private const string CurrentStaffName = "Patrick Bateman";
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };
 
         private readonly PayrollDbContext _db;
@@ -441,25 +440,20 @@ namespace RSDSystem.Controllers
 
         private async Task<List<Project>> LoadProjectsAsync()
         {
-            var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
-            var role = HttpContext.Session.GetString("Role");
             var query = _db.Projects.AsNoTracking().Ongoing();
+            var role = HttpContext.Session.GetString("Role");
+            if (role != "PayrollStaff")
+                return await query.OrderBy(p => p.ProjectName).ToListAsync();
 
-            if (role == "PayrollStaff" && !string.IsNullOrWhiteSpace(staffName))
-            {
-                var trimmed = staffName.Trim();
-                var assigned = await query
-                    .Where(p => p.AssignedPayrollStaff != null && p.AssignedPayrollStaff.Trim() == trimmed)
-                    .OrderBy(p => p.ProjectName)
-                    .ToListAsync();
+            var staffName = StaffNames.FromSession(HttpContext.Session);
+            if (string.IsNullOrWhiteSpace(staffName))
+                return new List<Project>();
 
-                if (assigned.Count > 0)
-                    return assigned;
-
-                ViewBag.ShowingAllProjects = true;
-            }
-
-            return await query.OrderBy(p => p.ProjectName).ToListAsync();
+            var key = staffName.ToLower();
+            return await query
+                .Where(p => p.AssignedPayrollStaff != null && p.AssignedPayrollStaff.Trim().ToLower() == key)
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
         }
 
         private string? StaffScope()
@@ -468,7 +462,7 @@ namespace RSDSystem.Controllers
             if (role != "PayrollStaff")
                 return null;
 
-            return (HttpContext.Session.GetString("FullName") ?? CurrentStaffName).Trim();
+            return StaffNames.FromSession(HttpContext.Session);
         }
 
         private string ImportedBy() =>

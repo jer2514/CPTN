@@ -13,9 +13,6 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _attendance;
         private readonly NotificationService _notifications;
 
-        // TODO: replace with the signed-in user's FullName once auth/session is wired up
-        private const string CurrentStaffName = "Patrick Bateman";
-
         public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance, NotificationService notifications)
         {
             _db = db;
@@ -33,11 +30,12 @@ namespace RSDSystem.Controllers
                 return View(new List<PayrollSchedule>());
             }
 
+            var key = staffName.ToLower();
             var tasks = await _db.PayrollSchedules
                 .Include(s => s.Project)
                 .Where(s => s.Project != null
                     && s.Project.AssignedPayrollStaff != null
-                    && s.Project.AssignedPayrollStaff.Trim() == staffName)
+                    && s.Project.AssignedPayrollStaff.Trim().ToLower() == key)
                 .Where(s => s.Project!.Status == ProjectStatusOptions.OnGoing
                     || s.Project.Status == "Active"
                     || s.Project.Status == null
@@ -60,9 +58,7 @@ namespace RSDSystem.Controllers
                 .Include(s => s.Project)
                 .FirstOrDefaultAsync(s => s.PayrollScheduleId == id);
 
-            if (schedule?.Project != null
-                && (string.IsNullOrWhiteSpace(staffName)
-                    || string.Equals(schedule.Project.AssignedPayrollStaff?.Trim(), staffName, StringComparison.Ordinal)))
+            if (schedule?.Project != null && StaffNames.IsAssigned(schedule.Project.AssignedPayrollStaff, staffName))
             {
                 schedule.TaskCompleted = !schedule.TaskCompleted;
                 await _db.SaveChangesAsync();
@@ -71,44 +67,31 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        private string StaffName() =>
-            (HttpContext.Session.GetString("FullName") ?? CurrentStaffName).Trim();
+        private string? StaffName() => StaffNames.FromSession(HttpContext.Session);
+
+        private async Task<List<Project>> AssignedOngoingProjectsAsync()
+        {
+            var staffName = StaffName();
+            if (string.IsNullOrWhiteSpace(staffName))
+                return new List<Project>();
+
+            var key = staffName.ToLower();
+            return await _db.Projects.Ongoing()
+                .Where(p => p.AssignedPayrollStaff != null
+                    && p.AssignedPayrollStaff.Trim().ToLower() == key)
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+        }
 
 
 
         // GET /PayrollStaff/GeneratePayroll
         public async Task<IActionResult> GeneratePayroll(int? projectId)
         {
-            var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
-
-            var projectsQuery = _db.Projects.Ongoing();
-
-            List<Project> projects;
-
-            if (!string.IsNullOrWhiteSpace(staffName))
-            {
-                var trimmedStaff = staffName.Trim();
-                projects = await projectsQuery
-                   .Where(p => p.AssignedPayrollStaff != null &&
-                          p.AssignedPayrollStaff.Trim() == trimmedStaff)
-                   .OrderBy(p => p.ProjectName)
-                   .ToListAsync();
-            }
-            else
-            {
-                projects = new List<Project>();
-            }
-
-            if (!projects.Any())
-            {
-                projects = await projectsQuery
-                   .OrderBy(p => p.ProjectName)
-                   .ToListAsync();
-                ViewBag.ShowingAllProjects = true;
-            }
+            var projects = await AssignedOngoingProjectsAsync();
 
             ViewBag.PageTitle = "Generate Payroll";
-            ViewBag.PreselectProjectId = projectId; // NEW
+            ViewBag.PreselectProjectId = projectId;
             return View(projects);
         }
 
@@ -515,7 +498,7 @@ namespace RSDSystem.Controllers
                 payroll.GrossPay = gross;
                 payroll.CashAdvance = cashAdvance;
                 payroll.NetPay = net;
-                payroll.GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
+                payroll.GeneratedBy = StaffName() ?? "Staff";
                 payroll.GeneratedDate = DateTime.Now;
             }
             else
@@ -557,7 +540,7 @@ namespace RSDSystem.Controllers
                     CashAdvance = cashAdvance,
                     NetPay = net,
                     Status = PayrollStatusOptions.Draft,
-                    GeneratedBy = HttpContext.Session.GetString("FullName") ?? CurrentStaffName,
+                    GeneratedBy = StaffName() ?? "Staff",
                     GeneratedDate = DateTime.Now
                 };
                 _db.Set<Payroll>().Add(payroll);
@@ -597,30 +580,7 @@ namespace RSDSystem.Controllers
         // GET /PayrollStaff/PendingPayroll?projectId=5
         public async Task<IActionResult> PendingPayroll(int? projectId)
         {
-            var staffName = HttpContext.Session.GetString("FullName") ?? CurrentStaffName;
-
-            var projectsQuery = _db.Projects.Ongoing();
-            List<Project> projects;
-
-            if (!string.IsNullOrWhiteSpace(staffName))
-            {
-                var trimmedStaff = staffName.Trim();
-                projects = await projectsQuery
-                                .Where(p => p.AssignedPayrollStaff != null &&
-                                            p.AssignedPayrollStaff.Trim() == trimmedStaff)
-                                .OrderBy(p => p.ProjectName)
-                                .ToListAsync();
-            }
-            else
-            {
-                projects = new List<Project>();
-            }
-
-            if (!projects.Any())
-            {
-                projects = await projectsQuery.OrderBy(p => p.ProjectName).ToListAsync();
-                ViewBag.ShowingAllProjects = true;
-            }
+            var projects = await AssignedOngoingProjectsAsync();
 
             ViewBag.PageTitle = "Pending Payroll";
             ViewBag.PreselectProjectId = projectId;
