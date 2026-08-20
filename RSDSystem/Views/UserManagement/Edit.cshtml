@@ -136,21 +136,18 @@
                         <label class="form-lbl">New Password <span style="color:#9ab0d8;font-weight:400">(leave blank to keep)</span></label>
                         <div class="pwd-wrap">
                             <input type="password" name="NewPassword" id="pwd" class="@Ctrl("NewPassword")"
-                                   data-validate="minlen8" data-label="Password" />
-                            <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
-                                <i class="bi bi-eye-slash" id="eye1"></i>
-                            </span>
+                                   autocomplete="new-password" data-validate="minlen8" data-label="Password" />
+                            <button type="button" class="pwd-toggle" onclick="togglePwd('pwd', this)" aria-label="Show password">Show</button>
                         </div>
+                        <div class="pwd-hint">The current password stays hidden. Leave blank to keep it, or type a new one and click Show to check it.</div>
                         <span class="field-error" data-error-for="NewPassword">@Err("NewPassword")</span>
                     </div>
                     <div>
                         <label class="form-lbl">Confirm Password</label>
                         <div class="pwd-wrap">
                             <input type="password" name="ConfirmPassword" id="cpwd" class="@Ctrl("ConfirmPassword")"
-                                   data-validate="match" data-match="pwd" data-label="Confirm password" />
-                            <span class="pwd-eye" onclick="togglePwd('cpwd','eye2')">
-                                <i class="bi bi-eye-slash" id="eye2"></i>
-                            </span>
+                                   autocomplete="new-password" data-validate="match" data-match="pwd" data-label="Confirm password" />
+                            <button type="button" class="pwd-toggle" onclick="togglePwd('cpwd', this)" aria-label="Show password">Show</button>
                         </div>
                         <span class="field-error" data-error-for="ConfirmPassword">@Err("ConfirmPassword")</span>
                     </div>
@@ -224,12 +221,13 @@
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
-        function togglePwd(inputId, iconId) {
+        function togglePwd(inputId, btn) {
             const input = document.getElementById(inputId);
-            const icon  = document.getElementById(iconId);
-            if (!input || !icon) return;
-            input.type = input.type === 'password' ? 'text' : 'password';
-            icon.className = input.type === 'text' ? 'bi bi-eye' : 'bi bi-eye-slash';
+            if (!input || !btn) return;
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            btn.textContent = show ? 'Hide' : 'Show';
+            btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
         }
         function previewPhoto(input) {
             document.getElementById('fileLabel').textContent =

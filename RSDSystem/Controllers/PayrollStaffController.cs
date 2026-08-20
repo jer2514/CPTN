@@ -9,6 +9,9 @@ namespace RSDSystem.Controllers
 {
     public class PayrollStaffController : Controller
     {
+        private const string AttendanceRequiredMessage =
+            "Import attendance for this payroll schedule before generating payroll.";
+
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _attendance;
         private readonly NotificationService _notifications;
@@ -106,7 +109,7 @@ namespace RSDSystem.Controllers
                     return Json(new { success = false, message = "Project not found." });
 
                 var employees = await _db.Employees
-                      .Where(e => e.ProjectId == projectId)
+                      .Where(e => e.ProjectId == projectId && e.IsActive)
                       .OrderBy(e => e.LastName)
                       .ToListAsync();
 
@@ -115,6 +118,9 @@ namespace RSDSystem.Controllers
                     .OrderBy(s => s.StartingDate)
                     .ToListAsync();
                 var openSchedule = PayrollPeriods.Open(schedules);
+                var hasAttendance = openSchedule != null
+                    && await _attendance.HasImportedAttendanceAsync(
+                        projectId, openSchedule.StartingDate, openSchedule.EndDate, HttpContext.RequestAborted);
 
                 var generatedEmployeeIds = new HashSet<int>();
                 try
@@ -145,18 +151,27 @@ namespace RSDSystem.Controllers
                     AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId)
                 });
 
+                string? message = null;
+                if (openSchedule == null)
+                {
+                    message = schedules.Count == 0
+                        ? "Ask the admin to add a payroll schedule before generating payroll."
+                        : "All payroll schedules for this project are marked done. Ask the admin to add the next schedule.";
+                }
+                else if (!hasAttendance)
+                {
+                    message = AttendanceRequiredMessage;
+                }
+
                 return Json(new
                 {
                     success = true,
                     projectName = project.ProjectName,
                     hasSchedule = openSchedule != null,
+                    hasAttendance,
                     scheduleId = openSchedule?.PayrollScheduleId,
                     scheduleLabel = openSchedule != null ? PayrollPeriods.Label(openSchedule) : null,
-                    message = openSchedule == null
-                        ? (schedules.Count == 0
-                            ? "Ask the admin to add a payroll schedule before generating payroll."
-                            : "All payroll schedules for this project are marked done. Ask the admin to add the next schedule.")
-                        : null,
+                    message,
                     employees = result
                 });
             }
@@ -290,6 +305,23 @@ namespace RSDSystem.Controllers
             if (defaultEnd < defaultStart)
                 defaultEnd = defaultStart;
 
+            if (existing == null)
+            {
+                if (!emp.IsActive || emp.ProjectId != projectId)
+                {
+                    TempData["Error"] = "This employee is not active on this project.";
+                    return RedirectToAction(nameof(GeneratePayroll), new { projectId });
+                }
+
+                var imported = await _attendance.HasImportedAttendanceAsync(
+                    projectId, defaultStart, defaultEnd, HttpContext.RequestAborted);
+                if (!imported)
+                {
+                    TempData["Error"] = AttendanceRequiredMessage;
+                    return RedirectToAction(nameof(GeneratePayroll), new { projectId });
+                }
+            }
+
             var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
                 projectId, employeeId, defaultStart, defaultEnd, HttpContext.RequestAborted);
 
@@ -386,6 +418,17 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null)
                 return Json(new { success = false, message = "Project not found." });
+
+            if (payrollId <= 0)
+            {
+                if (!emp.IsActive || emp.ProjectId != projectId)
+                    return Json(new { success = false, message = "This employee is not active on this project." });
+
+                var imported = await _attendance.HasImportedAttendanceAsync(
+                    projectId, payPeriodStart, payPeriodEnd, HttpContext.RequestAborted);
+                if (!imported)
+                    return Json(new { success = false, message = AttendanceRequiredMessage });
+            }
 
             var errors = new Dictionary<string, string>();
             PayrollSchedule? coveringSchedule = null;
