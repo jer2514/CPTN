@@ -425,14 +425,13 @@ namespace RSDSystem.Controllers
 
             var project = await _db.Projects.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ProjectId == record.ProjectId);
-            var projectName = string.IsNullOrWhiteSpace(project?.ProjectName) ? "the project" : project!.ProjectName!.Trim();
-            await _notifications.NotifyAdminsAsync(
-                NotificationKinds.AttendanceCorrectionRequest,
-                "Attendance Correction Request",
-                $"Payroll Staff requested to correct Employee: {pending.EmployeeName} attendance record(s) for {projectName}",
+            await _notifications.NotifyAttendanceCorrectionRequestedAsync(
+                pending.PayrollStaffName,
+                pending.EmployeeName,
+                project?.ProjectName,
+                pending.WorkDate,
                 record.ProjectId,
                 pending.AttendanceCorrectionRequestId,
-                "/Notification/Index",
                 HttpContext.RequestAborted);
 
             return Json(new { success = true, message = "Correction request sent to admin." });

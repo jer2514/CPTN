@@ -148,11 +148,12 @@ namespace RSDSystem.Controllers
             var projectName = string.IsNullOrWhiteSpace(request.Project?.ProjectName)
                 ? "the project"
                 : request.Project!.ProjectName!.Trim();
+            var employee = string.IsNullOrWhiteSpace(request.EmployeeName) ? "the employee" : request.EmployeeName.Trim();
             await _notifications.NotifyStaffAsync(
                 request.PayrollStaffName,
                 NotificationKinds.AttendanceCorrectionApproved,
-                "Attendance Correction Approved",
-                $"Your attendance correction request for {projectName} has been approved by the Admin.",
+                "Attendance correction approved",
+                $"Admin approved your correction for {employee} on {projectName}. The attendance record is updated.",
                 request.ProjectId,
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
@@ -188,11 +189,12 @@ namespace RSDSystem.Controllers
             var projectName = string.IsNullOrWhiteSpace(request.Project?.ProjectName)
                 ? "the project"
                 : request.Project!.ProjectName!.Trim();
+            var employee = string.IsNullOrWhiteSpace(request.EmployeeName) ? "the employee" : request.EmployeeName.Trim();
             await _notifications.NotifyStaffAsync(
                 request.PayrollStaffName,
                 NotificationKinds.AttendanceCorrectionRejected,
-                "Attendance Correction Rejected",
-                $"Your attendance correction request for {projectName} was rejected. Reason: {note}",
+                "Attendance correction returned",
+                $"Admin returned your correction for {employee} on {projectName}. Reason: {note}. Open Attendance Records to edit and send it again.",
                 request.ProjectId,
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
