@@ -14,9 +14,13 @@
         <i class="bi bi-arrow-left"></i> Back
     </a>
 
-    @if (Model.Status != "Submitted")
+    @if (Model.Status == "Draft" || Model.Status == "Correction")
     {
-        <a asp-action="PayrollSlip" asp-route-employeeId="@Model.EmployeeId" asp-route-projectId="@Model.ProjectId"
+        <a asp-action="PayrollSlip"
+           asp-route-employeeId="@Model.EmployeeId"
+           asp-route-projectId="@Model.ProjectId"
+           asp-route-payrollId="@Model.PayrollId"
+           asp-route-returnUrl="@Url.Action("ViewPayroll", new { id = Model.PayrollId })"
            class="btn-primary-blue">Edit</a>
     }
 </div>

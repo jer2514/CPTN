@@ -117,10 +117,12 @@ namespace RSDSystem.Controllers
             }
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            user.FirstName = ti.ToTitleCase(user.FirstName.Trim().ToLower());
-            user.LastName = ti.ToTitleCase(user.LastName.Trim().ToLower());
-            user.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password);
+            user.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
+            user.LastName = ti.ToTitleCase((user.LastName ?? string.Empty).Trim().ToLower());
+            user.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
+                ? null
+                : user.MiddleInitial.Trim().ToUpperInvariant();
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password ?? string.Empty);
             user.UserId = 0;
             user.UserCode = GenerateUserCode();
             user.CreatedAt = DateTime.Now;
@@ -203,15 +205,17 @@ namespace RSDSystem.Controllers
             if (existing == null) return NotFound();
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            existing.FirstName = ti.ToTitleCase(user.FirstName.Trim().ToLower());
-            existing.LastName = ti.ToTitleCase(user.LastName.Trim().ToLower());
-            existing.MiddleInitial = user.MiddleInitial?.Trim().ToUpper();
+            existing.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
+            existing.LastName = ti.ToTitleCase((user.LastName ?? string.Empty).Trim().ToLower());
+            existing.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
+                ? null
+                : user.MiddleInitial.Trim().ToUpperInvariant();
             existing.DateOfBirth = user.DateOfBirth;
             existing.Gender = user.Gender;
-            existing.Username = user.Username ?? string.Empty;
-            existing.Email = user.Email;
-            existing.ContactNumber = user.ContactNumber;
-            existing.Address = user.Address;
+            existing.Username = username;
+            existing.Email = email;
+            existing.ContactNumber = user.ContactNumber?.Trim();
+            existing.Address = user.Address?.Trim();
             existing.Role = user.Role;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))

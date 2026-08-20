@@ -1,4 +1,4 @@
-﻿@model List<RSDSystem.Models.Project>
+﻿@model List<RSDSystem.Models.PayrollSchedule>
 @{
     ViewData["Title"] = "To do task";
     Layout = "_PayrollStaffLayout";
@@ -8,7 +8,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card task-page-card">
     <div class="task-card-title">To do task</div>
 
     <table class="task-table">
@@ -25,29 +25,29 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="5" class="text-center text-muted py-4">No tasks assigned.</td>
+                    <td colspan="5" class="task-empty">No tasks assigned.</td>
                 </tr>
             }
-            @foreach (var p in Model)
+            @foreach (var s in Model)
             {
                 <tr>
-                    <td>@p.ProjectName</td>
-                    <td>@(p.TypeOfService ?? "—")</td>
-                    <td>@(p.StartingDate?.ToString("MMMM d, yyyy") ?? "—")</td>
-                    <td>@(p.EstimateEndDate?.ToString("MMMM d, yyyy") ?? "—")</td>
-                    <td class="text-center">
-                        <form asp-action="ToggleTask" asp-route-id="@p.ProjectId" method="post" class="d-inline">
+                    <td>@(s.Project?.ProjectName ?? "—")</td>
+                    <td>@(s.TypeOfService ?? s.Project?.TypeOfService ?? "—")</td>
+                    <td>@s.StartingDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                    <td>@s.EndDate.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)</td>
+                    <td>
+                        <form asp-action="ToggleTask" asp-route-id="@s.PayrollScheduleId" method="post" class="task-check-form">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="task-check-btn @(p.TaskCompleted ? "checked" : "")" title="Mark as done">
-                                @if (p.TaskCompleted)
-                                {
-                                    <i class="bi bi-check-square-fill"></i>
-                                }
-                                else
-                                {
-                                    <i class="bi bi-square"></i>
-                                }
-                            </button>
+                            @if (s.TaskCompleted)
+                            {
+                                <input type="checkbox" class="tbl-check" title="Mark as done" checked
+                                       onchange="this.form.submit()" />
+                            }
+                            else
+                            {
+                                <input type="checkbox" class="tbl-check" title="Mark as done"
+                                       onchange="this.form.submit()" />
+                            }
                         </form>
                     </td>
                 </tr>

@@ -1,0 +1,170 @@
+@model List<RSDSystem.Models.Payroll>
+@using RSDSystem.Helpers
+@using System.Globalization
+@{
+    ViewData["Title"] = "View Payroll";
+    var projectId = (int)ViewBag.ProjectId;
+    var projectName = ViewBag.ProjectName as string ?? "Project";
+    var start = (DateTime)ViewBag.Start;
+    var end = (DateTime)ViewBag.End;
+    var startLabel = ViewBag.StartLabel as string ?? "";
+    var endLabel = ViewBag.EndLabel as string ?? "";
+    var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
+    int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
+    int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
+    var dateCulture = CultureInfo.InvariantCulture;
+}
+
+<div class="pred-topbar">
+    <a asp-action="Period"
+       asp-route-projectId="@projectId"
+       asp-route-start="@start.ToString("yyyy-MM-dd")"
+       asp-route-end="@end.ToString("yyyy-MM-dd")"
+       class="btn-back pred-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="pred-heading-row">
+    <div>
+        <div class="pred-project">@projectName</div>
+        <div class="pred-dates">@startLabel - @endLabel</div>
+    </div>
+    <div class="pred-actions">
+        <a asp-action="PrintPayslips"
+           asp-route-projectId="@projectId"
+           asp-route-start="@start.ToString("yyyy-MM-dd")"
+           asp-route-end="@end.ToString("yyyy-MM-dd")"
+           target="_blank"
+           class="pred-btn-pdf">Download PDF</a>
+        <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+    </div>
+</div>
+
+<div class="page-card pred-card">
+    @if (!Model.Any())
+    {
+        <div class="text-center text-muted py-5">
+            No payslips for this period yet. Generate payslips first.
+        </div>
+    }
+    else
+    {
+        <div class="pred-grid">
+            @foreach (var slip in Model)
+            {
+                <a class="pred-slip"
+                   asp-action="View"
+                   asp-route-id="@slip.PayrollId"
+                   asp-route-from="payslips">
+                    <div class="mini-title">RSD Construction Services</div>
+                    <div class="mini-sub">Employee Payslip</div>
+
+                    <div class="mini-section">Employee Information</div>
+                    <div class="mini-info">
+                        <div><span class="mini-lbl">Employee ID: </span><span class="mini-val">@EmployeeIds.Format(slip.Employee?.EmployeeCode)</span></div>
+                        <div><span class="mini-lbl">Project Assigned: </span><span class="mini-val">@(slip.Project?.ProjectName ?? projectName)</span></div>
+                        <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
+                        <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
+                        <div><span class="mini-lbl">Job Classification: </span><span class="mini-val">@(slip.Employee?.JobClassification)</span></div>
+                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                    </div>
+
+                    <div class="mini-section">
+                        Attendance Summary
+                        <span class="mini-period">@slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
+                    </div>
+                    <div class="mini-fields">
+                        <span class="mini-lbl">Regular Days Worked:</span><span class="mini-val">@slip.RegularDaysWorked Days</span>
+                        <span class="mini-lbl">Overtime:</span><span class="mini-val">@slip.OvertimeHours.ToString("0.##") hours</span>
+                        <span class="mini-lbl">Absent:</span><span class="mini-val">@slip.AbsentDays Days</span>
+                    </div>
+
+                    <div class="mini-section">Payroll Computation</div>
+                    <div class="mini-fields">
+                        <span class="mini-lbl">Regular Pay:</span><span class="mini-val">₱@slip.RegularPay.ToString("N2")</span>
+                        <span class="mini-lbl">Overtime Pay:</span><span class="mini-val">₱@slip.OvertimePay.ToString("N2")</span>
+                    </div>
+                    <div class="mini-fields mini-fields-gap">
+                        <span class="mini-lbl">Gross Pay:</span><span class="mini-val">₱@slip.GrossPay.ToString("N2")</span>
+                        <span class="mini-lbl">Cash Advance:</span><span class="mini-val">₱@slip.CashAdvance.ToString("N2")</span>
+                    </div>
+                    <div class="mini-net">
+                        <span class="mini-lbl">Net Pay:</span><span class="mini-val">₱@slip.NetPay.ToString("N2")</span>
+                    </div>
+                    <div class="mini-footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                </a>
+            }
+        </div>
+    }
+</div>
+
+<div class="pred-pager">
+    <div>Page @currentPage of @totalPages</div>
+    <div class="pred-pager-arrows">
+        @if (currentPage > 1)
+        {
+            <a asp-action="GeneratedPayslips"
+               asp-route-projectId="@projectId"
+               asp-route-start="@start.ToString("yyyy-MM-dd")"
+               asp-route-end="@end.ToString("yyyy-MM-dd")"
+               asp-route-page="@(currentPage - 1)">&lt;</a>
+        }
+        else
+        {
+            <span class="disabled">&lt;</span>
+        }
+        @if (totalPages > currentPage)
+        {
+            <a asp-action="GeneratedPayslips"
+               asp-route-projectId="@projectId"
+               asp-route-start="@start.ToString("yyyy-MM-dd")"
+               asp-route-end="@end.ToString("yyyy-MM-dd")"
+               asp-route-page="@(currentPage + 1)">&gt;</a>
+        }
+        else
+        {
+            <span class="disabled">&gt;</span>
+        }
+    </div>
+</div>
+
+<div class="del-overlay" id="sendOverlay" onclick="closeSendModal(arguments[0])">
+    <div class="gen-modal" onclick="stopModalClick(arguments[0])">
+        <div class="gen-modal-title">Send to Payroll Staff</div>
+        <div class="gen-modal-text">The following PDF will be sent:</div>
+        <div class="send-file-row">
+            <i class="bi bi-file-earmark-text"></i>
+            <span>@fileName</span>
+        </div>
+        <div class="gen-modal-actions">
+            <form asp-action="SendToStaff" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="projectId" value="@projectId" />
+                <input type="hidden" name="start" value="@start.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="end" value="@end.ToString("yyyy-MM-dd")" />
+                <button type="submit" class="btn-primary-blue-block gen-modal-btn">Send</button>
+            </form>
+            <button type="button" class="gen-modal-cancel" onclick="closeSendModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openSendModal() {
+            document.getElementById('sendOverlay').classList.add('open');
+        }
+        function stopModalClick(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+        }
+        function closeSendModal(e) {
+            if (!e || e.target === document.getElementById('sendOverlay'))
+                document.getElementById('sendOverlay').classList.remove('open');
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeSendModal();
+        });
+    </script>
+}

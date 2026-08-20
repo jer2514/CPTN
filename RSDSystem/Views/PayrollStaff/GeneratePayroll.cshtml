@@ -28,6 +28,7 @@
         </div>
         <button type="button" id="loadEmployeesBtn" class="btn-primary-blue-solid">Load</button>
     </div>
+    <div id="scheduleNote" class="genpay-fallback-note" style="display:none"></div>
 
     <div id="employeeSection" style="display:none">
         <div class="emp-card-head" style="margin-top:6px">
@@ -70,14 +71,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        // ── Project data pushed from server ─────────────────────────
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                    @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput   = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -134,6 +131,14 @@
         // ── Load employees ───────────────────────────────────────────
         let currentEmployees = [];
         let currentProjectId = null;
+        let currentScheduleId = null;
+
+        function setScheduleNote(text, show) {
+            const note = document.getElementById('scheduleNote');
+            if (!note) return;
+            note.textContent = text || '';
+            note.style.display = show ? 'block' : 'none';
+        }
 
         document.getElementById('loadEmployeesBtn').addEventListener('click', async function () {
             if (!projectIdInput.value) {
@@ -141,6 +146,7 @@
                 return;
             }
             currentProjectId = projectIdInput.value;
+            currentScheduleId = null;
 
             const emptyBox = document.getElementById('employeeEmpty');
             const section  = document.getElementById('employeeSection');
@@ -148,17 +154,26 @@
             section.style.display = 'none';
             emptyBox.style.display = 'block';
             emptyBox.textContent = 'Loading employees...';
+            setScheduleNote('', false);
 
             try {
                 const res  = await fetch('/PayrollStaff/GetProjectEmployees?projectId=' + currentProjectId);
                 const data = await res.json();
 
                 if (!data.success) {
-                    emptyBox.textContent = data.message;
+                    emptyBox.textContent = data.message || 'Could not load employees for this project.';
                     return;
                 }
 
-                currentEmployees = data.employees;
+                currentEmployees = data.employees || [];
+                currentScheduleId = data.scheduleId || null;
+
+                if (!data.hasSchedule) {
+                    emptyBox.textContent = data.message || 'Ask the admin to add a payroll schedule before generating payroll.';
+                    return;
+                }
+
+                setScheduleNote('Generating payroll for schedule: ' + (data.scheduleLabel || 'current period'), true);
 
                 if (currentEmployees.length === 0) {
                     emptyBox.textContent = 'No employees assigned to this project.';
@@ -169,7 +184,7 @@
                 section.style.display = 'block';
                 renderEmployees(currentEmployees);
             } catch (err) {
-                emptyBox.textContent = 'Something went wrong while loading employees.';
+                emptyBox.textContent = 'Could not load employees. Refresh the page after the latest update, then try Load again.';
             }
         });
 
@@ -177,19 +192,23 @@
             const tbody = document.getElementById('employeeTableBody');
             const fmt = n => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            tbody.innerHTML = list.map(e => `
-                <tr>
+            tbody.innerHTML = list.map(e => {
+                const generated = e.alreadyGenerated === true;
+                const action = generated
+                    ? `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`
+                    : `<a class="btn-generate-pill"
+                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}${currentScheduleId ? '&scheduleId=' + currentScheduleId : ''}">
+                            Generate
+                       </a>`;
+                return `
+                <tr class="${generated ? 'row-generated' : ''}">
                     <td>${e.displayId}</td>
                     <td>${e.name}</td>
                     <td>${e.jobClassification}</td>
                     <td>${fmt(e.dailyRate)}</td>
-                    <td>
-                        <a class="btn-generate-pill"
-                           href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}">
-                            Generate
-                        </a>
-                    </td>
-                </tr>`).join('');
+                    <td>${action}</td>
+                </tr>`;
+            }).join('');
         }
 
         function filterEmployees() {
@@ -213,7 +232,8 @@
             btn.disabled = true;
             btn.textContent = 'Generating...';
 
-            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
             const form = new FormData();
             form.append('employeeId', employeeId);
             form.append('projectId', currentProjectId);

@@ -5,6 +5,8 @@
     var unassigned = ViewBag.UnassignedEmployees as List<RSDSystem.Models.Employee> ?? new();
     var budgets = Model.MonthlyBudgets?.OrderBy(m => m.MonthDate).ToList()
                      ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
+    var statusLabel = ProjectStatusOptions.Normalize(Model.Status);
+    var statusClass = ProjectStatusOptions.BadgeClass(Model.Status);
 }
 
 
@@ -16,16 +18,22 @@
     <i class="bi bi-arrow-left"></i> Back
 </a>
 
-<div class="form-card" style="max-width:680px">
+<div class="form-card">
 
-    <div class="proj-view-actions">
-        <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
-            <i class="bi bi-pencil-fill"></i>
-        </a>
-        <button type="button" class="action-btn action-delete" title="Delete"
-                onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw(Model.ProjectName.Replace("'", "\\'"))')">
-            <i class="bi bi-trash-fill"></i>
-        </button>
+    <div class="proj-view-toolbar">
+        <div class="proj-status-line">
+            <span class="form-lbl">Status:</span>
+            <span class="@statusClass">@statusLabel</span>
+        </div>
+        <div class="proj-view-actions">
+            <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
+                <i class="bi bi-pencil-fill"></i>
+            </a>
+            <button type="button" class="action-btn action-delete" title="Delete"
+                    onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw((Model.ProjectName ?? "").Replace("'", "\\'"))')">
+                <i class="bi bi-trash-fill"></i>
+            </button>
+        </div>
     </div>
 
     <div class="proj-view-group">
@@ -66,7 +74,7 @@
         <div class="form-lbl">Monthly Budget</div>
         @if (!budgets.Any())
         {
-            <div class="proj-view-field" style="color:#9ab0d8;font-size:12.5px">
+            <div class="proj-view-field proj-view-field-muted">
                 No monthly budget set.
             </div>
         }

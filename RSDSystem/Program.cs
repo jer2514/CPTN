@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RSDSystem.Filters;
 using RSDSystem.Models;
+using RSDSystem.Services;
 using System;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +25,19 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
 builder.Services.AddDbContext<PayrollDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<AttendanceImportService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddHttpClient("PayrollPrediction", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddScoped<PayrollPredictionService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -56,6 +68,117 @@ using (var scope = app.Services.CreateScope())
         //{
         //    // ignore migration errors in local dev if DB unavailable
         //}
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Projects', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'Status' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN Status nvarchar(max) NULL;
+
+    IF EXISTS (
+        SELECT 1 FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Projects')
+          AND name = N'ProjectName' AND is_nullable = 0
+    )
+        ALTER TABLE dbo.Projects ALTER COLUMN ProjectName nvarchar(150) NULL;
+
+    UPDATE dbo.Projects SET Status = N'On Going' WHERE Status IS NULL OR LTRIM(RTRIM(Status)) = N'' OR Status = N'Active';
+    UPDATE dbo.Projects SET Status = N'Finished' WHERE Status = N'Completed';
+    UPDATE dbo.Projects SET Status = N'On Hold' WHERE Status = N'Cancelled';
+    UPDATE dbo.Projects SET ProjectName = N'' WHERE ProjectName IS NULL;
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Project null-column fix error: " + ex.Message);
+        }
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Employees', N'Email') IS NOT NULL
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'dbo.Employees')
+          AND name = N'Email'
+          AND is_nullable = 0
+    )
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE name = N'IX_Employees_Email'
+              AND object_id = OBJECT_ID(N'dbo.Employees')
+        )
+            DROP INDEX IX_Employees_Email ON dbo.Employees;
+
+        ALTER TABLE dbo.Employees ALTER COLUMN Email nvarchar(100) NULL;
+    END
+
+    IF NOT EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE name = N'IX_Employees_Email'
+          AND object_id = OBJECT_ID(N'dbo.Employees')
+    )
+    BEGIN
+        CREATE UNIQUE INDEX IX_Employees_Email ON dbo.Employees(Email)
+        WHERE [Email] IS NOT NULL AND [Email] <> N'';
+    END
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Employee email schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.PayrollSchedules', N'TaskCompleted') IS NULL
+BEGIN
+    ALTER TABLE dbo.PayrollSchedules ADD TaskCompleted bit NOT NULL CONSTRAINT DF_PayrollSchedules_TaskCompleted DEFAULT(0);
+END");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule task column fix error: " + ex.Message);
+        }
+
+        try
+        {
+            PayrollSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Payroll schedule link schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            AttendanceSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Attendance schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            NotificationSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Notification schema fix error: " + ex.Message);
+        }
 
         var toAdd = new List<User>();
 
