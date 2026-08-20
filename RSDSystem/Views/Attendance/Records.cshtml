@@ -1,7 +1,9 @@
 @model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Attendance Records";
-    Layout = Context.Session.GetString("Role") == "PayrollStaff" ? "_PayrollStaffLayout" : "_Layout";
+    var isAdmin = ViewBag.IsAdmin is true
+        || string.Equals(Context.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
+    Layout = isAdmin ? "_Layout" : "_PayrollStaffLayout";
 }
 
 <div class="content-topbar">
@@ -80,7 +82,10 @@
                         <th>Overtime In</th>
                         <th>Overtime Out</th>
                         <th>Status</th>
-                        <th>Action</th>
+                        @if (!isAdmin)
+                        {
+                            <th>Action</th>
+                        }
                     </tr>
                 </thead>
                 <tbody id="recordsBody"></tbody>
@@ -99,6 +104,8 @@
     </div>
 </div>
 
+@if (!isAdmin)
+{
 <div id="recordEditOverlay" class="att-edit-overlay" hidden>
     <div class="page-card att-edit-panel">
         <div class="att-page-title" id="recordEditTitle">Request Edit</div>
@@ -146,11 +153,13 @@
         </div>
     </div>
 </div>
+}
 
 @section Scripts {
     <partial name="_ProjectListData" model="Model" />
     <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
     <script>
+        const isAdmin = @(isAdmin ? "true" : "false");
         const projectsEl = document.getElementById('project-list-data');
         const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
@@ -323,7 +332,10 @@
                     `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${filterNote}${byline}`;
                 document.getElementById('recordsBody').innerHTML = data.rows.length
                     ? data.rows.map(r => {
-                        const actionLabel = r.actionLabel || (r.status === 'Complete' ? 'Request Edit' : 'Edit');
+                        const action = isAdmin ? '' : (() => {
+                            const actionLabel = r.actionLabel || (r.status === 'Complete' ? 'Request Edit' : 'Edit');
+                            return `<td><button type="button" class="att-action-link" data-record-id="${r.recordId}">${actionLabel}</button></td>`;
+                        })();
                         return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
                             <td>${r.displayId || '——'}</td>
                             <td>${r.employeeName || '——'}</td>
@@ -335,10 +347,10 @@
                             <td>${timeCell(r.overtimeIn)}</td>
                             <td>${timeCell(r.overtimeOut)}</td>
                             <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
-                            <td><button type="button" class="att-action-link" data-record-id="${r.recordId}">${actionLabel}</button></td>
+                            ${action}
                         </tr>`;
                     }).join('')
-                    : '<tr><td colspan="11" class="text-center text-muted py-4">No attendance rows match this filter.</td></tr>';
+                    : `<tr><td colspan="${isAdmin ? 10 : 11}" class="text-center text-muted py-4">No attendance rows match this filter.</td></tr>`;
 
                 document.getElementById('recordsPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
@@ -470,7 +482,7 @@
         }
 
         function openRecordEdit(row) {
-            if (!row) return;
+            if (isAdmin || !row) return;
             if (row.pendingCorrection) {
                 showToast('This attendance row already has a correction request waiting for admin review.');
                 return;
@@ -507,6 +519,7 @@
             editingRecord = null;
         }
 
+        if (!isAdmin) {
         document.getElementById('recordsBody').addEventListener('click', function (e) {
             const btn = e.target.closest('[data-record-id]');
             if (!btn) return;
@@ -572,5 +585,6 @@
                 closeRecordEdit();
             }
         });
+        }
     </script>
 }
