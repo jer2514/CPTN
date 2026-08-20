@@ -1095,29 +1095,55 @@ select.form-ctrl {
 }
 
 
-/* ── Password input with eye toggle ─────────────────────── */
+/* ── Password input with show/hide toggle ───────────────── */
 .pwd-wrap {
     position: relative;
 }
 
     .pwd-wrap .form-ctrl {
-        padding-right: 38px;
+        padding-right: 72px;
     }
 
-.pwd-eye {
+.pwd-eye,
+.pwd-toggle {
     position: absolute;
-    right: 12px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
+    user-select: none;
+}
+
+.pwd-eye {
     color: #9ab0d8;
     font-size: 15px;
-    user-select: none;
 }
 
     .pwd-eye:hover {
         color: #266DF1;
     }
+
+.pwd-toggle {
+    border: 0;
+    background: #e8f0ff;
+    color: #266DF1;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+    .pwd-toggle:hover {
+        background: #d6e4ff;
+    }
+
+.pwd-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #6b7c99;
+    line-height: 1.4;
+}
 
 /* ── Edit layout (photo left + fields right) ─────────────── */
 .edit-layout {

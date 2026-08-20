@@ -300,8 +300,29 @@
                 return;
             }
             const dest = document.querySelector('[data-error-for="MonthlyBudget"]');
+            if (monthlyTotalExceedsPayrollBudget()) {
+                if (dest) dest.textContent = 'Monthly budget total cannot exceed the payroll budget.';
+                return;
+            }
             if (dest) dest.textContent = '';
             alert('Monthly budget saved. It will be submitted with the project.');
+        }
+
+        function payrollBudgetValue() {
+            const el = document.querySelector('input[name="PayrollBudget"]');
+            if (!el || el.value === '') return NaN;
+            return parseFloat(el.value);
+        }
+
+        function monthlyBudgetTotal() {
+            return Array.from(document.querySelectorAll('input[name="MonthAmounts"]'))
+                .reduce((sum, el) => sum + (parseFloat(el.value) || 0), 0);
+        }
+
+        function monthlyTotalExceedsPayrollBudget() {
+            const payroll = payrollBudgetValue();
+            if (!Number.isFinite(payroll)) return false;
+            return monthlyBudgetTotal() > payroll + 0.001;
         }
 
         document.querySelector('form.js-validate')?.addEventListener('submit', function (e) {
@@ -311,6 +332,11 @@
             if (start && end && document.querySelectorAll('input[name="MonthAmounts"]').length === 0) {
                 e.preventDefault();
                 if (dest) dest.textContent = 'Select starting and estimate end dates to generate monthly budget rows.';
+                return;
+            }
+            if (monthlyTotalExceedsPayrollBudget()) {
+                e.preventDefault();
+                if (dest) dest.textContent = 'Monthly budget total cannot exceed the payroll budget.';
             }
         });
     </script>

@@ -64,15 +64,14 @@ using (var scope = app.Services.CreateScope())
     {
         var db = services.GetRequiredService<PayrollDbContext>();
 
-        // Optional: apply migrations automatically in development - remove for production deployments
-        //try
-        //{
-        //    db.Database.Migrate();
-        //}
-        //catch
-        //{
-        //    // ignore migration errors in local dev if DB unavailable
-        //}
+        try
+        {
+            db.Database.Migrate();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Database migrate error: " + ex.Message);
+        }
 
         try
         {
