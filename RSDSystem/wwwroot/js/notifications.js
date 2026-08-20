@@ -122,6 +122,11 @@
             openCorrectionModal(related);
             return;
         }
+        if (isAdmin && kind === 'TaskCompletionRequested' && related) {
+            closeAll();
+            openTaskModal(related);
+            return;
+        }
         if (el.dataset.url) window.location.href = el.dataset.url;
     }
 
@@ -142,7 +147,7 @@
             });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Could not load the correction request.');
+                showToast(data.message || 'Could not load the correction request.');
                 overlay.classList.remove('open');
                 return;
             }
@@ -160,12 +165,46 @@
             const actions = document.getElementById('corrActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
         } catch (err) {
-            alert('Could not load the correction request.');
+            showToast('Could not load the correction request.');
             overlay.classList.remove('open');
         }
     }
 
     window.rsdOpenCorrection = openCorrectionModal;
+
+    async function openTaskModal(id) {
+        const overlay = document.getElementById('taskApprovalOverlay');
+        if (!overlay) {
+            window.location.href = '/Notification';
+            return;
+        }
+        overlay.classList.add('open');
+        overlay.dataset.id = id;
+        document.getElementById('taskStaff').textContent = '…';
+        document.getElementById('taskProject').textContent = '…';
+        document.getElementById('taskType').textContent = '…';
+        document.getElementById('taskPeriod').textContent = '…';
+        try {
+            const res = await fetch('/Notification/GetTask?id=' + encodeURIComponent(id), {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || 'Could not load the task.');
+                overlay.classList.remove('open');
+                return;
+            }
+            document.getElementById('taskStaff').textContent = data.payrollStaff || '—';
+            document.getElementById('taskProject').textContent = data.projectName || '—';
+            document.getElementById('taskType').textContent = data.projectType || '—';
+            document.getElementById('taskPeriod').textContent = data.period || '—';
+            const actions = document.getElementById('taskActions');
+            if (actions) actions.style.display = data.pending ? 'flex' : 'none';
+        } catch (err) {
+            showToast('Could not load the task.');
+            overlay.classList.remove('open');
+        }
+    }
 
     document.addEventListener('click', function (e) {
         const bell = e.target.closest('.bell-btn');
@@ -213,7 +252,7 @@
             approveBtn.addEventListener('click', async function () {
                 const id = overlay.dataset.id;
                 const data = await postForm('/Notification/ApproveCorrection', { id: id });
-                if (!data.success) { alert(data.message || 'Could not approve.'); return; }
+                if (!data.success) { showToast(data.message || 'Could not approve.'); return; }
                 overlay.classList.remove('open');
                 window.location.reload();
             });
@@ -224,8 +263,25 @@
                 const reason = window.prompt('Reason for returning this correction:', 'The submitted correction could not be verified.');
                 if (reason == null) return;
                 const data = await postForm('/Notification/ReturnCorrection', { id: id, reason: reason });
-                if (!data.success) { alert(data.message || 'Could not return the request.'); return; }
+                if (!data.success) { showToast(data.message || 'Could not return the request.'); return; }
                 overlay.classList.remove('open');
+                window.location.reload();
+            });
+        }
+    }
+
+    const taskOverlay = document.getElementById('taskApprovalOverlay');
+    if (taskOverlay) {
+        taskOverlay.addEventListener('click', function (e) {
+            if (e.target === taskOverlay) taskOverlay.classList.remove('open');
+        });
+        const taskApproveBtn = document.getElementById('taskApprove');
+        if (taskApproveBtn) {
+            taskApproveBtn.addEventListener('click', async function () {
+                const id = taskOverlay.dataset.id;
+                const data = await postForm('/Notification/ApproveTask', { id: id });
+                if (!data.success) { showToast(data.message || 'Could not approve the task.'); return; }
+                taskOverlay.classList.remove('open');
                 window.location.reload();
             });
         }

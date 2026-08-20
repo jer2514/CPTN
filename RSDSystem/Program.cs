@@ -150,6 +150,13 @@ IF OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
 AND COL_LENGTH(N'dbo.PayrollSchedules', N'TaskCompleted') IS NULL
 BEGIN
     ALTER TABLE dbo.PayrollSchedules ADD TaskCompleted bit NOT NULL CONSTRAINT DF_PayrollSchedules_TaskCompleted DEFAULT(0);
+END
+
+IF OBJECT_ID(N'dbo.PayrollSchedules', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.PayrollSchedules', N'TaskApproved') IS NULL
+BEGIN
+    ALTER TABLE dbo.PayrollSchedules ADD TaskApproved bit NOT NULL CONSTRAINT DF_PayrollSchedules_TaskApproved DEFAULT(0);
+    EXEC(N'UPDATE dbo.PayrollSchedules SET TaskApproved = 1 WHERE TaskCompleted = 1');
 END");
         }
         catch (Exception ex)

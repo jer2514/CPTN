@@ -187,7 +187,7 @@ namespace RSDSystem.Controllers
             html.Append($"<span>OT hours: {summary.OvertimeHours:0.00}</span>");
             html.Append("</div>");
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Days Worked</th><th>Absent</th><th>Late</th><th>Incomplete</th><th>Regular</th><th>OT</th>");
+            html.Append("<th>Employee</th><th>Days Worked</th><th>Absent</th><th>Late</th><th>Half-day</th><th>Regular</th><th>OT</th>");
             html.Append("</tr></thead><tbody>");
             if (summary.Rows.Count == 0)
             {
@@ -258,7 +258,7 @@ namespace RSDSystem.Controllers
             }
 
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Previous month 1</th><th>Amount</th><th>Previous month 2</th><th>Amount</th><th>Predicted month</th><th>Predicted budget</th>");
+            html.Append("<th>Previous month 1</th><th>Amount</th><th>Previous month 2</th><th>Amount</th><th>Predicted month</th><th>Predicted budget</th><th>Allocated budget</th><th>Anomaly</th>");
             html.Append("</tr></thead><tbody>");
             foreach (var row in page.Rows)
             {
@@ -266,6 +266,12 @@ namespace RSDSystem.Controllers
                 html.Append($"<td>{Esc(row.PreviousLabel1)}</td><td>₱{row.PreviousAmount1:N2}</td>");
                 html.Append($"<td>{Esc(row.PreviousLabel2)}</td><td>₱{row.PreviousAmount2:N2}</td>");
                 html.Append($"<td>{Esc(row.PredictionLabel)}</td><td>₱{row.PredictedPayroll:N2}</td>");
+                html.Append(row.HasAllocatedBudget
+                    ? $"<td>₱{row.AllocatedBudget:N2}</td>"
+                    : "<td>—</td>");
+                html.Append(row.ExceedsBudget
+                    ? "<td>Next month exceeds the allocated budget</td>"
+                    : "<td>None</td>");
                 html.Append("</tr>");
             }
             html.Append("</tbody></table>");
@@ -281,10 +287,10 @@ namespace RSDSystem.Controllers
             var flags = new List<string>();
             foreach (var row in page.Rows)
             {
+                if (row.ExceedsBudget)
+                    flags.Add($"The predicted amount for {row.PredictionLabel} (₱{row.PredictedPayroll:N2}) exceeds the allocated budget (₱{row.AllocatedBudget:N2}).");
                 if (row.UnusualChange)
                     flags.Add("A significant change was detected compared with the usual payroll pattern.");
-                if (project.PayrollBudget.HasValue && row.PredictedPayroll > project.PayrollBudget.Value)
-                    flags.Add($"Predicted payroll ₱{row.PredictedPayroll:N2} may exceed the allocated project budget ₱{project.PayrollBudget:N2}.");
             }
 
             if (start.HasValue && end.HasValue)

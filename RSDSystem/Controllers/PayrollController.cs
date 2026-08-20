@@ -204,6 +204,7 @@ namespace RSDSystem.Controllers
                     predictedBudget = r.PredictedPayroll,
                     predictedPayroll = r.PredictedPayroll,
                     allocatedBudget = r.AllocatedBudget,
+                    hasAllocatedBudget = r.HasAllocatedBudget,
                     budgetDifference = r.BudgetDifference,
                     exceedsBudget = r.ExceedsBudget,
                     unusualChange = r.UnusualChange,
@@ -538,6 +539,7 @@ namespace RSDSystem.Controllers
         {
             var payroll = await _db.Set<Payroll>()
                 .Include(p => p.Project)
+                .Include(p => p.Employee)
                 .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
@@ -570,6 +572,7 @@ namespace RSDSystem.Controllers
 
             var payroll = await _db.Set<Payroll>()
                 .Include(p => p.Project)
+                .Include(p => p.Employee)
                 .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
@@ -620,7 +623,7 @@ namespace RSDSystem.Controllers
             var assigned = await _db.Projects.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ProjectId == ProjectId);
             if (assigned != null)
-                await _notifications.NotifyNewTaskAsync(assigned, HttpContext.RequestAborted);
+                await _notifications.NotifyNewTaskAsync(assigned, StartingDate.Date, EndDate.Date, HttpContext.RequestAborted);
 
             TempData["Success"] = "Schedule added. Payroll staff can generate payroll for this period.";
             return RedirectToAction("Index", "Home");

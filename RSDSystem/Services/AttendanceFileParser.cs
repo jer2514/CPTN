@@ -646,7 +646,7 @@ namespace RSDSystem.Services
                 var statusCell = Cell(values, headerMap, "status");
                 row.Status = string.IsNullOrWhiteSpace(statusCell)
                     ? DeriveStatus(row)
-                    : statusCell.Trim();
+                    : AttendanceStatuses.Display(statusCell.Trim());
 
                 result.Rows.Add(row);
             }

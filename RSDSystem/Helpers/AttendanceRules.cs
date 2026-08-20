@@ -91,8 +91,15 @@ namespace RSDSystem.Helpers
             if (!anyPunch && row.WorkHoursActual <= 0)
                 return AttendanceStatuses.Absent;
 
-            if ((hasIn1 ^ hasOut1) || (hasIn2 ^ hasOut2) || (hasOtIn && !hasOtOut))
-                return AttendanceStatuses.Incomplete;
+            var morningComplete = hasIn1 && hasOut1;
+            var afternoonComplete = hasIn2 && hasOut2;
+            var morningOpen = hasIn1 ^ hasOut1;
+            var afternoonOpen = hasIn2 ^ hasOut2;
+            var overtimeOpen = hasOtIn && !hasOtOut;
+
+            // Half-day: only one complete session, or a session with a missing punch.
+            if (morningOpen || afternoonOpen || overtimeOpen || (morningComplete != afternoonComplete))
+                return AttendanceStatuses.HalfDay;
 
             var late = LateMinutes(row.TimeIn1) > 0;
             var early = EarlyMinutes(row.TimeOut1, row.TimeOut2) > 0;
@@ -103,10 +110,10 @@ namespace RSDSystem.Helpers
             if (early)
                 return AttendanceStatuses.EarlyOff;
 
-            if (row.WorkHoursActual > 0 || (hasIn1 && hasOut1) || (hasIn2 && hasOut2))
+            if (row.WorkHoursActual > 0 || morningComplete || afternoonComplete)
                 return AttendanceStatuses.Complete;
 
-            return AttendanceStatuses.Incomplete;
+            return AttendanceStatuses.HalfDay;
         }
 
         private static bool HasAnyPunch(AttendanceRecord row) =>

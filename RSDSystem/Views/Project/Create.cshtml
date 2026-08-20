@@ -302,10 +302,11 @@
             const dest = document.querySelector('[data-error-for="MonthlyBudget"]');
             if (monthlyTotalExceedsPayrollBudget()) {
                 if (dest) dest.textContent = 'Monthly budget total cannot exceed the payroll budget.';
+                showToast('Monthly budget total cannot exceed the payroll budget.');
                 return;
             }
             if (dest) dest.textContent = '';
-            alert('Monthly budget saved. It will be submitted with the project.');
+            showToast('Monthly budget saved. It will be submitted with the project.', 'success');
         }
 
         function payrollBudgetValue() {
@@ -337,6 +338,7 @@
             if (monthlyTotalExceedsPayrollBudget()) {
                 e.preventDefault();
                 if (dest) dest.textContent = 'Monthly budget total cannot exceed the payroll budget.';
+                showToast('Monthly budget total cannot exceed the payroll budget.');
             }
         });
     </script>
