@@ -338,12 +338,21 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
+            if (IsAdmin)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
+                });
+            }
+
             var record = await _db.AttendanceRecords.AsNoTracking()
                 .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
 
-            if (!IsAdmin && record.Status == AttendanceStatuses.Complete)
+            if (record.Status == AttendanceStatuses.Complete)
             {
                 return Json(new
                 {
@@ -375,12 +384,11 @@ namespace RSDSystem.Controllers
         {
             if (IsAdmin)
             {
-                var direct = await _imports.UpdateRecordAsync(
-                    recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, null,
-                    HttpContext.RequestAborted);
-                if (direct != null)
-                    return Json(new { success = false, message = direct });
-                return Json(new { success = true, message = "Attendance row updated." });
+                return Json(new
+                {
+                    success = false,
+                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
+                });
             }
 
             var note = (reason ?? "").Trim();
