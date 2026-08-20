@@ -51,7 +51,7 @@
                         <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Absent">Has absences</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Late">Has late days</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Has half-day</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Half-day">Has half-day</a></li>
                     </ul>
                 </div>
                 <div class="search-wrap">
@@ -163,7 +163,7 @@
 
         async function loadPeriods(autoLoad) {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
 
@@ -198,7 +198,7 @@
 
         async function loadSummary() {
             if (!projectIdInput.value) {
-                alert('Please select a project from the suggestion list.');
+                showToast('Please select a project from the suggestion list.');
                 return;
             }
 

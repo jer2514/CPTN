@@ -338,12 +338,21 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
+            if (IsAdmin)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
+                });
+            }
+
             var record = await _db.AttendanceRecords.AsNoTracking()
                 .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
 
-            if (!IsAdmin && record.Status == AttendanceStatuses.Complete)
+            if (record.Status == AttendanceStatuses.Complete)
             {
                 return Json(new
                 {
@@ -375,12 +384,11 @@ namespace RSDSystem.Controllers
         {
             if (IsAdmin)
             {
-                var direct = await _imports.UpdateRecordAsync(
-                    recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, null,
-                    HttpContext.RequestAborted);
-                if (direct != null)
-                    return Json(new { success = false, message = direct });
-                return Json(new { success = true, message = "Attendance row updated." });
+                return Json(new
+                {
+                    success = false,
+                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
+                });
             }
 
             var note = (reason ?? "").Trim();
@@ -425,14 +433,13 @@ namespace RSDSystem.Controllers
 
             var project = await _db.Projects.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ProjectId == record.ProjectId);
-            var projectName = string.IsNullOrWhiteSpace(project?.ProjectName) ? "the project" : project!.ProjectName!.Trim();
-            await _notifications.NotifyAdminsAsync(
-                NotificationKinds.AttendanceCorrectionRequest,
-                "Attendance Correction Request",
-                $"Payroll Staff requested to correct Employee: {pending.EmployeeName} attendance record(s) for {projectName}",
+            await _notifications.NotifyAttendanceCorrectionRequestedAsync(
+                pending.PayrollStaffName,
+                pending.EmployeeName,
+                project?.ProjectName,
+                pending.WorkDate,
                 record.ProjectId,
                 pending.AttendanceCorrectionRequestId,
-                "/Notification/Index",
                 HttpContext.RequestAborted);
 
             return Json(new { success = true, message = "Correction request sent to admin." });
@@ -496,7 +503,19 @@ namespace RSDSystem.Controllers
 
         private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
         {
-            var requestEdit = AttendanceStatuses.CountsAsWorked(row.Status) && row.Status == AttendanceStatuses.Complete;
+            var computed = new AttendanceRecord
+            {
+                TimeIn1 = row.TimeIn1,
+                TimeOut1 = row.TimeOut1,
+                TimeIn2 = row.TimeIn2,
+                TimeOut2 = row.TimeOut2,
+                OvertimeIn = row.OvertimeIn,
+                OvertimeOut = row.OvertimeOut,
+                WorkHoursActual = row.WorkHoursActual
+            };
+            AttendanceRules.Apply(computed);
+            var status = AttendanceStatuses.Display(computed.Status);
+            var requestEdit = AttendanceStatuses.CountsAsWorked(status) && status == AttendanceStatuses.Complete;
             string actionLabel;
             if (pendingCorrection)
                 actionLabel = "Pending Review";
@@ -527,8 +546,8 @@ namespace RSDSystem.Controllers
                 row.EarlyMinutes,
                 row.OvertimeHours,
                 row.AbsenceDays,
-                row.Status,
-                statusClass = AttendanceStatuses.CssClass(row.Status),
+                Status = status,
+                statusClass = AttendanceStatuses.CssClass(status),
                 row.Matched,
                 row.Note,
                 format,

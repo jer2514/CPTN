@@ -42,7 +42,7 @@
         <div class="att-summary-chip"><span>Days worked</span><strong id="sumWorked">@Model.DaysWorked</strong></div>
         <div class="att-summary-chip"><span>Absent</span><strong id="sumAbsent">@Model.DaysAbsent</strong></div>
         <div class="att-summary-chip"><span>Late</span><strong id="sumLate">@Model.DaysLate</strong></div>
-        <div class="att-summary-chip"><span>Incomplete</span><strong id="sumIncomplete">@Model.DaysIncomplete</strong></div>
+        <div class="att-summary-chip"><span>Half-day</span><strong id="sumIncomplete">@Model.DaysIncomplete</strong></div>
         <div class="att-summary-chip"><span>Regular hours</span><strong id="sumRegular">@Model.RegularHours.ToString("0.00")</strong></div>
         <div class="att-summary-chip"><span>Overtime hours</span><strong id="sumOt">@Model.OvertimeHours.ToString("0.00")</strong></div>
     </div>
@@ -140,7 +140,8 @@
     <script>
         const statusClass = {
             Complete: 'att-status-complete',
-            Incomplete: 'att-status-incomplete',
+            Incomplete: 'att-status-halfday',
+            'Half-day': 'att-status-halfday',
             Late: 'att-status-late',
             Absent: 'att-status-absent'
         };
@@ -157,14 +158,16 @@
         function deriveStatus(in1, out1, in2, out2, otIn, otOut) {
             const any = in1 || out1 || in2 || out2 || otIn || otOut;
             if (!any) return 'Absent';
+            const morningComplete = !!(in1 && out1);
+            const afternoonComplete = !!(in2 && out2);
+            if ((!!in1 !== !!out1) || (!!in2 !== !!out2) || (otIn && !otOut) || (morningComplete !== afternoonComplete))
+                return 'Half-day';
             if (in1) {
                 const [h, m] = in1.split(':').map(Number);
-                if (h * 60 + m > 8 * 60 + 15) return 'Late';
+                if (h * 60 + m > 8 * 60 + 30) return 'Late';
             }
-            if ((!!in1 !== !!out1) || (!!in2 !== !!out2) || (otIn && !otOut))
-                return 'Incomplete';
             if ((in1 && out1) || (in2 && out2)) return 'Complete';
-            return 'Incomplete';
+            return 'Half-day';
         }
 
         function rowTimes(row) {
@@ -181,7 +184,7 @@
             row.querySelector('.js-ot-hours').textContent = 'OT ' + ot.toFixed(2);
             const pill = row.querySelector('.js-status');
             pill.textContent = status;
-            pill.className = 'status-pill js-status ' + (statusClass[status] || 'att-status-incomplete');
+            pill.className = 'status-pill js-status ' + (statusClass[status] || 'att-status-halfday');
         }
 
         function refreshSummary() {
@@ -193,10 +196,10 @@
                 const [in1, out1, in2, out2, otIn, otOut] = rowTimes(row);
                 regular += hoursBetween(in1, out1) + hoursBetween(in2, out2);
                 ot += hoursBetween(otIn, otOut);
-                if (status === 'Complete' || status === 'Late') worked++;
+                if (status === 'Complete' || status === 'Late' || status === 'Half-day') worked++;
                 if (status === 'Absent') absent++;
                 if (status === 'Late') late++;
-                if (status === 'Incomplete') incomplete++;
+                if (status === 'Half-day' || status === 'Incomplete') incomplete++;
             });
             document.getElementById('sumWorked').textContent = worked;
             document.getElementById('sumAbsent').textContent = absent;

@@ -105,7 +105,7 @@ else
 
         async function submitCorrection() {
             const reason = document.getElementById('correctionReasonInput').value.trim();
-            if (!reason) { alert('Please enter a reason for correction.'); return; }
+            if (!reason) { showToast('Please enter a reason for correction.'); return; }
 
             const form = new FormData();
             form.append('id', payrollId);
@@ -119,7 +119,7 @@ else
         }
 
         function showResult(data) {
-            if (!data.success) { alert(data.message || 'Something went wrong.'); return; }
+            if (!data.success) { showToast(data.message || 'Something went wrong.'); return; }
             document.getElementById('actionResultMsg').textContent = data.message;
             document.getElementById('actionResultOverlay').classList.add('open');
         }

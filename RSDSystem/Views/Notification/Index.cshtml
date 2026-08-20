@@ -36,13 +36,15 @@
             {
                 var url = item.Url ?? "#";
                 var correction = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionRequest && item.RelatedId.HasValue;
+                var task = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.TaskCompletionRequested && item.RelatedId.HasValue;
                 <button type="button"
                         class="notif-page-item @(item.IsRead ? "is-read" : "")"
                         data-id="@item.AppNotificationId"
                         data-url="@url"
                         data-kind="@item.Kind"
                         data-related="@(item.RelatedId?.ToString() ?? "")"
-                        data-correction="@(correction ? "1" : "0")">
+                        data-correction="@(correction ? "1" : "0")"
+                        data-task="@(task ? "1" : "0")">
                     <span class="notif-icon @RSDSystem.Models.NotificationKinds.IconClass(item.Kind)">
                         <i class="bi @RSDSystem.Models.NotificationKinds.Icon(item.Kind)"></i>
                     </span>

@@ -375,10 +375,10 @@
                     btn.classList.add('badge-active');
                     btn.textContent = 'Active';
                 } else if (!data.success) {
-                    alert(data.message || 'Could not update status.');
+                    showToast(data.message || 'Could not update status.');
                 }
             } catch (err) {
-                alert('Something went wrong. Please try again.');
+                showToast('Something went wrong. Please try again.');
             } finally {
                 btn.disabled = false;
             }
@@ -420,11 +420,11 @@
                     const countEl = document.getElementById('empTotalCount');
                     countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
                 } else {
-                    alert(data.message || 'Could not update employee.');
+                    showToast(data.message || 'Could not update employee.');
                     btn.disabled = false;
                 }
             } catch (err) {
-                alert('Something went wrong. Please try again.');
+                showToast('Something went wrong. Please try again.');
                 btn.disabled = false;
             }
 
@@ -467,13 +467,13 @@
                     const countEl = document.getElementById('empTotalCount');
                     countEl.textContent = parseInt(countEl.textContent) + 1;
                 } else {
-                    alert(data.message || 'Could not add employee.');
+                    showToast(data.message || 'Could not add employee.');
                     btn.disabled = false;
                     btn.textContent = 'Add';
                 }
             } catch (err) {
                 console.error('assignEmployee error:', err);
-                alert('Something went wrong. Please try again.');
+                showToast('Something went wrong. Please try again.');
                 btn.disabled = false;
                 btn.textContent = 'Add';
             }

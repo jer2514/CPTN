@@ -34,6 +34,8 @@ namespace RSDSystem.Models
 
         public bool TaskCompleted { get; set; } = false;
 
+        public bool TaskApproved { get; set; } = false;
+
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
             foreach (var result in DateRules.ValidateDateRange(

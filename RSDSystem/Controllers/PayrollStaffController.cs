@@ -43,6 +43,7 @@ namespace RSDSystem.Controllers
                     || s.Project.Status == "Active"
                     || s.Project.Status == null
                     || s.Project.Status == "")
+                .Where(s => !s.TaskApproved)
                 .OrderBy(s => s.StartingDate)
                 .ThenBy(s => s.Project!.ProjectName)
                 .ToListAsync();
@@ -63,8 +64,13 @@ namespace RSDSystem.Controllers
 
             if (schedule?.Project != null && StaffNames.IsAssigned(schedule.Project.AssignedPayrollStaff, staffName))
             {
-                schedule.TaskCompleted = !schedule.TaskCompleted;
-                await _db.SaveChangesAsync();
+                if (!schedule.TaskApproved && !schedule.TaskCompleted)
+                {
+                    schedule.TaskCompleted = true;
+                    await _db.SaveChangesAsync();
+                    await _notifications.NotifyTaskCompletionRequestedAsync(
+                        schedule, staffName, HttpContext.RequestAborted);
+                }
             }
 
             return RedirectToAction(nameof(Index));

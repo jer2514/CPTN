@@ -65,7 +65,7 @@ namespace RSDSystem.Helpers
             if (exceeds)
             {
                 riskTitle = "Budget Exceeding Risk";
-                riskDetail = "Predicted payroll exceeds the allocated budget.";
+                riskDetail = "The predicted amount for next month exceeds the allocated budget.";
             }
             else if (unusual)
             {

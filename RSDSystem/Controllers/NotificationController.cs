@@ -108,7 +108,7 @@ namespace RSDSystem.Controllers
                 timeOut2 = AttendanceDisplay.Clock(request.TimeOut2) ?? "—",
                 overtimeIn = AttendanceDisplay.Clock(request.OvertimeIn) ?? "—",
                 overtimeOut = AttendanceDisplay.Clock(request.OvertimeOut) ?? "—",
-                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Incomplete Attendance" : request.Reason,
+                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Half-day attendance" : request.Reason,
                 pending = request.Status == CorrectionRequestStatuses.Pending
             });
         }
@@ -148,11 +148,12 @@ namespace RSDSystem.Controllers
             var projectName = string.IsNullOrWhiteSpace(request.Project?.ProjectName)
                 ? "the project"
                 : request.Project!.ProjectName!.Trim();
+            var employee = string.IsNullOrWhiteSpace(request.EmployeeName) ? "the employee" : request.EmployeeName.Trim();
             await _notifications.NotifyStaffAsync(
                 request.PayrollStaffName,
                 NotificationKinds.AttendanceCorrectionApproved,
-                "Attendance Correction Approved",
-                $"Your attendance correction request for {projectName} has been approved by the Admin.",
+                "Attendance correction approved",
+                $"Admin approved your correction for {employee} on {projectName}. The attendance record is updated.",
                 request.ProjectId,
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
@@ -188,17 +189,72 @@ namespace RSDSystem.Controllers
             var projectName = string.IsNullOrWhiteSpace(request.Project?.ProjectName)
                 ? "the project"
                 : request.Project!.ProjectName!.Trim();
+            var employee = string.IsNullOrWhiteSpace(request.EmployeeName) ? "the employee" : request.EmployeeName.Trim();
             await _notifications.NotifyStaffAsync(
                 request.PayrollStaffName,
                 NotificationKinds.AttendanceCorrectionRejected,
-                "Attendance Correction Rejected",
-                $"Your attendance correction request for {projectName} was rejected. Reason: {note}",
+                "Attendance correction returned",
+                $"Admin returned your correction for {employee} on {projectName}. Reason: {note}. Open Attendance Records to edit and send it again.",
                 request.ProjectId,
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
                 HttpContext.RequestAborted);
 
             return Json(new { success = true, message = "Correction request returned." });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTask(int id)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var schedule = await _db.PayrollSchedules
+                .AsNoTracking()
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+
+            var pending = schedule.TaskCompleted && !schedule.TaskApproved;
+            return Json(new
+            {
+                success = true,
+                id = schedule.PayrollScheduleId,
+                payrollStaff = string.IsNullOrWhiteSpace(schedule.Project?.AssignedPayrollStaff)
+                    ? "—"
+                    : schedule.Project!.AssignedPayrollStaff.Trim(),
+                projectName = string.IsNullOrWhiteSpace(schedule.Project?.ProjectName)
+                    ? "—"
+                    : schedule.Project!.ProjectName!.Trim(),
+                projectType = schedule.TypeOfService ?? schedule.Project?.TypeOfService ?? "—",
+                period = PayrollPeriods.Label(schedule),
+                pending
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveTask(int id)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+            if (!schedule.TaskCompleted)
+                return Json(new { success = false, message = "Payroll staff have not marked this task as done." });
+            if (schedule.TaskApproved)
+                return Json(new { success = false, message = "This task was already approved." });
+
+            schedule.TaskApproved = true;
+            await _db.SaveChangesAsync();
+            await _notifications.NotifyTaskCompletionApprovedAsync(schedule, HttpContext.RequestAborted);
+
+            return Json(new { success = true, message = "Task approved. It has been removed from To do task." });
         }
 
         private bool IsAdmin =>

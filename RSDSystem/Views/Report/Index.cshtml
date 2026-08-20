@@ -107,11 +107,11 @@
 
         async function generateReport() {
             if (!projectEl.value) {
-                alert('Select a project first.');
+                showToast('Select a project first.');
                 return;
             }
             if (needsPeriod() && !selectedPeriod()) {
-                alert('Select a payroll period first.');
+                showToast('Select a payroll period first.');
                 return;
             }
 
