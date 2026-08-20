@@ -1,0 +1,285 @@
+@model List<RSDSystem.Models.Project>
+@{
+    ViewData["Title"] = "Attendance Summary";
+    Layout = "_Layout";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="att-page-title">Attendance Summary</div>
+
+    <div class="att-filter-grid">
+        <div class="att-field">
+            <label class="form-lbl">Project Name</label>
+            <div class="att-field-controls">
+                <div class="genpay-autocomplete att-grow">
+                    <input type="text" id="projectInput" class="form-ctrl"
+                           placeholder="Type to search project..." autocomplete="off" />
+                    <input type="hidden" id="projectIdInput" />
+                    <ul id="projectSuggestions" class="genpay-suggest-list"></ul>
+                </div>
+                <button type="button" id="projectLoadBtn" class="btn-primary-blue-solid">Load</button>
+            </div>
+        </div>
+        <div class="att-field">
+            <label class="form-lbl">Period</label>
+            <div class="att-field-controls">
+                <select id="periodSelect" class="form-ctrl att-grow">
+                    <option value="">Select a project first</option>
+                </select>
+                <button type="button" id="periodLoadBtn" class="btn-primary-blue-solid">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="summarySection" style="display:none">
+        <div id="summaryChips" class="att-summary att-summary-wide"></div>
+        <div id="summaryMeta" class="att-preview-meta" style="margin-bottom:12px"></div>
+
+        <div class="emp-card-head">
+            <div></div>
+            <div class="emp-controls">
+                <div class="dropdown">
+                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Absent">Has absences</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Late">Has late days</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Incomplete">Has incomplete days</a></li>
+                    </ul>
+                </div>
+                <div class="search-wrap">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="rowSearch" placeholder="Search User" />
+                </div>
+            </div>
+        </div>
+
+        <div class="att-table-wrap">
+            <table class="emp-table att-table">
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Employee Name</th>
+                        <th>Days Worked</th>
+                        <th>Absent</th>
+                        <th>Late</th>
+                        <th>Incomplete</th>
+                        <th>Regular Hours</th>
+                        <th>Overtime Hours</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryBody"></tbody>
+            </table>
+        </div>
+
+        <div class="att-preview-footer att-records-footer">
+            <div class="att-footer-spacer"></div>
+            <div id="summaryPager" class="att-pager"></div>
+            <div class="att-footer-actions"></div>
+        </div>
+    </div>
+
+    <div id="summaryEmpty" class="text-center text-muted py-5">
+        Select a project and click Load, then choose a period.
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ProjectListData" model="Model" />
+    <script>
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
+
+        const projectInput = document.getElementById('projectInput');
+        const projectIdInput = document.getElementById('projectIdInput');
+        const suggestList = document.getElementById('projectSuggestions');
+        const periodSelect = document.getElementById('periodSelect');
+        let statusFilter = 'all';
+        let currentPage = 1;
+
+        function renderSuggestions(matches) {
+            if (matches.length === 0) {
+                suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
+                suggestList.style.display = 'block';
+                return;
+            }
+            suggestList.innerHTML = matches.map(p =>
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+            ).join('');
+            suggestList.style.display = 'block';
+        }
+
+        projectInput.addEventListener('input', function () {
+            projectIdInput.value = '';
+            const q = projectInput.value.trim().toLowerCase();
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
+        });
+        projectInput.addEventListener('focus', function () {
+            const q = projectInput.value.trim().toLowerCase();
+            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+        });
+        suggestList.addEventListener('click', function (e) {
+            const li = e.target.closest('li[data-id]');
+            if (!li) return;
+            projectInput.value = li.dataset.name;
+            projectIdInput.value = li.dataset.id;
+            suggestList.style.display = 'none';
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
+        });
+
+        document.querySelectorAll('.filter-menu [data-status]').forEach(el => {
+            el.addEventListener('click', function (e) {
+                e.preventDefault();
+                statusFilter = this.dataset.status;
+                currentPage = 1;
+                loadSummary();
+            });
+        });
+        document.getElementById('rowSearch').addEventListener('input', function () {
+            currentPage = 1;
+            loadSummary();
+        });
+
+        function selectedPeriod() {
+            const value = periodSelect.value;
+            if (!value || !value.includes('|')) return null;
+            const parts = value.split('|');
+            return { start: parts[0], end: parts[1], label: periodSelect.options[periodSelect.selectedIndex].text };
+        }
+
+        function chip(label, value) {
+            return `<div class="att-summary-chip"><span>${label}</span><strong>${value}</strong></div>`;
+        }
+
+        async function loadPeriods(autoLoad) {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+
+            const empty = document.getElementById('summaryEmpty');
+            const section = document.getElementById('summarySection');
+            empty.style.display = 'block';
+            section.style.display = 'none';
+            empty.textContent = 'Loading imported periods...';
+
+            try {
+                const res = await fetch(`/Attendance/GetPeriods?projectId=${projectIdInput.value}`);
+                const data = await res.json();
+                if (!data.success) { empty.textContent = data.message; return; }
+                if (!data.periods.length) {
+                    periodSelect.innerHTML = '<option value="">No imported periods</option>';
+                    empty.textContent = 'Payroll staff have not imported attendance for this project yet.';
+                    return;
+                }
+
+                periodSelect.innerHTML = data.periods.map(p =>
+                    `<option value="${p.start}|${p.end}">${p.label}</option>`
+                ).join('');
+                empty.textContent = 'Select a period and click Load.';
+                if (autoLoad) {
+                    currentPage = 1;
+                    await loadSummary();
+                }
+            } catch (err) {
+                empty.textContent = 'Could not load imported periods.';
+            }
+        }
+
+        async function loadSummary() {
+            if (!projectIdInput.value) {
+                alert('Please select a project from the suggestion list.');
+                return;
+            }
+
+            const period = selectedPeriod();
+            const empty = document.getElementById('summaryEmpty');
+            const section = document.getElementById('summarySection');
+            if (!period) {
+                empty.style.display = 'block';
+                section.style.display = 'none';
+                empty.textContent = 'Select a period and click Load.';
+                return;
+            }
+
+            const q = encodeURIComponent(document.getElementById('rowSearch').value.trim());
+            const url = `/Attendance/GetSummary?projectId=${projectIdInput.value}&search=${q}&status=${encodeURIComponent(statusFilter)}&page=${currentPage}&periodStart=${period.start}&periodEnd=${period.end}`;
+
+            empty.style.display = 'block';
+            section.style.display = 'none';
+            empty.textContent = 'Loading attendance summary...';
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!data.success) { empty.textContent = data.message; return; }
+                if (!data.rows.length) {
+                    empty.textContent = 'No imported attendance for this project and period.';
+                    return;
+                }
+
+                const t = data.totals;
+                document.getElementById('summaryChips').innerHTML =
+                    chip('Employees', t.employees) +
+                    chip('Days worked', t.daysWorked) +
+                    chip('Absent', t.daysAbsent) +
+                    chip('Late', t.daysLate) +
+                    chip('Incomplete', t.daysIncomplete) +
+                    chip('Regular hours', Number(t.regularHours).toFixed(2)) +
+                    chip('Overtime hours', Number(t.overtimeHours).toFixed(2)) +
+                    chip('Unmatched', t.unmatched);
+
+                const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
+                document.getElementById('summaryMeta').textContent =
+                    `${data.projectName} · ${data.periodLabel}${byline}`;
+
+                document.getElementById('summaryBody').innerHTML = data.rows.map(r => `
+                    <tr class="${r.matched ? '' : 'att-row-unmatched'}">
+                        <td>${r.displayId || '——'}</td>
+                        <td>${r.employeeName || '——'}</td>
+                        <td>${r.daysWorked}</td>
+                        <td>${r.daysAbsent}</td>
+                        <td>${r.daysLate}</td>
+                        <td>${r.daysIncomplete}</td>
+                        <td>${r.regularHours}</td>
+                        <td>${r.overtimeHours}</td>
+                    </tr>`).join('');
+
+                document.getElementById('summaryPager').innerHTML =
+                    `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
+                     <span>Page ${data.page} of ${data.totalPages}</span>
+                     <button type="button" class="att-page-btn" ${data.page >= data.totalPages ? 'disabled' : ''} data-dir="1">&rsaquo;</button>`;
+
+                empty.style.display = 'none';
+                section.style.display = 'block';
+            } catch (err) {
+                empty.textContent = 'Could not load attendance summary.';
+            }
+        }
+
+        document.getElementById('projectLoadBtn').addEventListener('click', function () {
+            currentPage = 1;
+            loadPeriods(true);
+        });
+        document.getElementById('periodLoadBtn').addEventListener('click', function () {
+            currentPage = 1;
+            loadSummary();
+        });
+        document.getElementById('summaryPager').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-dir]');
+            if (!btn || btn.disabled) return;
+            currentPage += Number(btn.dataset.dir);
+            loadSummary();
+        });
+    </script>
+}

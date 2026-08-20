@@ -1,0 +1,116 @@
+@model List<RSDSystem.Models.PayrollPeriodEmployeeRow>
+@{
+    ViewData["Title"] = "View Payroll";
+    var projectId = (int)ViewBag.ProjectId;
+    var projectName = ViewBag.ProjectName as string ?? "Project";
+    var start = (DateTime)ViewBag.Start;
+    var end = (DateTime)ViewBag.End;
+    var startLabel = ViewBag.StartLabel as string ?? "";
+    var endLabel = ViewBag.EndLabel as string ?? "";
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<a asp-action="Index" class="btn-back">
+    <i class="bi bi-arrow-left"></i> Back
+</a>
+
+<div class="page-card">
+    <div class="vp-detail-heading">
+        <div>
+            <div class="vp-detail-title">@projectName</div>
+            <div class="vp-detail-dates">Date: @startLabel - @endLabel</div>
+        </div>
+        <div class="vp-detail-actions">
+            <button type="button" class="btn-primary-blue-solid" onclick="openGenerateModal()">Generate Payslips</button>
+        </div>
+    </div>
+
+    <table class="emp-table vp-employee-table">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Job</th>
+                <th>Regular Hours</th>
+                <th>OT Hours</th>
+                <th>Net Pay</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No approved payrolls for this period.</td>
+                </tr>
+            }
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@row.EmployeeName</td>
+                    <td>@row.Job</td>
+                    <td>@row.RegularHours.ToString("0.##")</td>
+                    <td>@row.OtHours.ToString("0.##")</td>
+                    <td>₱@row.NetPay.ToString("N2")</td>
+                    <td>
+                        <span class="badge-active">Approved</span>
+                    </td>
+                    <td>
+                        @if (row.PayrollId.HasValue)
+                        {
+                            <a class="pill-btn pill-view" asp-action="View" asp-route-id="@row.PayrollId">
+                                <i class="bi bi-eye-fill"></i> View
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div class="del-overlay" id="generateOverlay" onclick="closeGenerateModal(arguments[0])">
+    <div class="gen-modal" onclick="stopModalClick(arguments[0])">
+        <div class="gen-modal-title">Generate Payslips</div>
+        <div class="gen-modal-text">
+            Generate payslips for all employees under <strong>@projectName</strong>.
+        </div>
+        <div class="gen-modal-period-lbl">Payroll Period:</div>
+        <div class="gen-modal-period">@startLabel - @endLabel</div>
+        <div class="gen-modal-actions">
+            <form asp-action="GeneratePayslips" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="projectId" value="@projectId" />
+                <input type="hidden" name="start" value="@start.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="end" value="@end.ToString("yyyy-MM-dd")" />
+                <button type="submit" class="btn-primary-blue-block gen-modal-btn">Generate Payslips</button>
+            </form>
+            <button type="button" class="gen-modal-cancel" onclick="closeGenerateModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openGenerateModal() {
+            document.getElementById('generateOverlay').classList.add('open');
+        }
+        function stopModalClick(e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+        }
+        function closeGenerateModal(e) {
+            if (!e || e.target === document.getElementById('generateOverlay'))
+                document.getElementById('generateOverlay').classList.remove('open');
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeGenerateModal();
+        });
+    </script>
+}

@@ -15,11 +15,17 @@ namespace RSDSystem.Models
         public int ProjectId { get; set; }
         public Project? Project { get; set; }
 
+        public int? PayrollScheduleId { get; set; }
+        public PayrollSchedule? PayrollSchedule { get; set; }
+
         public DateTime PayPeriodStart { get; set; }
         public DateTime PayPeriodEnd { get; set; }
 
         public int RegularDaysWorked { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal OvertimeHours { get; set; }
+
         public int AbsentDays { get; set; }
 
         [Column(TypeName = "decimal(12,2)")]

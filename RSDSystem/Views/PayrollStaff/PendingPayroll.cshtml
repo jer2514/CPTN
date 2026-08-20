@@ -1,4 +1,5 @@
-﻿@{
+﻿@model List<RSDSystem.Models.Project>
+@{
     ViewData["Title"] = "Pending Payroll";
     Layout = "_PayrollStaffLayout";
 }
@@ -48,6 +49,7 @@
                     <th>Employee ID</th>
                     <th>Employee Name</th>
                     <th>Job</th>
+                    <th>Period</th>
                     <th>Status</th>
                     <th>Action</th>
                 </tr>
@@ -62,13 +64,10 @@
 </div>
 
 @section Scripts {
+    <partial name="_ProjectListData" model="Model" />
     <script>
-        const allProjects = [
-            @foreach (var p in Model)
-            {
-                                @:{ id: @p.ProjectId, name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(p.ProjectName)) },
-            }
-        ];
+        const projectsEl = document.getElementById('project-list-data');
+        const allProjects = JSON.parse(projectsEl && projectsEl.textContent ? projectsEl.textContent : '[]');
 
         const projectInput   = document.getElementById('projectInput');
         const projectIdInput = document.getElementById('projectIdInput');
@@ -157,29 +156,21 @@
             return '';
         }
 
-        // ── Build the action buttons per row based on status ─────────
-        // Draft       -> Submit, View, Delete
-        // Correction  -> Submit, View
-        // Submitted   -> View only
-        // Approved    -> View only
+        // Draft -> Submit, View, Delete
+        // Correction -> Submit, View
+        // Submitted / Approved -> View only
         function actionButtons(p) {
+            const status = (p.status || '').trim();
             let btns = '';
 
-            if (p.status === 'Draft') {
-                // Submit first
+            if (status === 'Draft' || status === 'Correction') {
                 btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
-                // View next
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-                // Delete last
-                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
-            } else if (p.status === 'Correction') {
-                btns += `<button type="button" class="pill-btn pill-submit" onclick="confirmSubmit(${p.payrollId})">Submit</button>`;
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
-            } else {
-                // Submitted / Approved / other statuses -> View only
-                btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
             }
 
+            btns += `<a class="pill-btn pill-view" href="/PayrollStaff/ViewPayroll/${p.payrollId}">View</a>`;
+            if (status === 'Draft') {
+                btns += `<button type="button" class="pill-btn pill-delete" onclick="confirmDelete(${p.payrollId})">Delete</button>`;
+            }
             return btns;
         }
 
@@ -191,6 +182,7 @@
                     <td>${p.displayId}</td>
                     <td>${p.employeeName}</td>
                     <td>${p.job}</td>
+                    <td>${p.period || '—'}</td>
                     <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">
@@ -249,11 +241,16 @@
             pendingSubmitId = null;
         });
 
-        // ── Delete confirmation (Draft only) ─────────────────────────
         let pendingDeleteId = null;
 
         function confirmDelete(payrollId) {
             pendingDeleteId = payrollId;
+            const row = currentPayrolls.find(p => p.payrollId === payrollId);
+            const name = (row && row.employeeName) || 'this employee';
+            const status = ((row && row.status) || 'payroll').toLowerCase();
+            document.getElementById('deleteTitle').textContent = 'Delete Payroll?';
+            document.getElementById('deleteMsg').textContent =
+                `This will permanently remove ${name}'s ${status} payroll record. This action cannot be undone.`;
             document.getElementById('deleteOverlay').classList.add('open');
         }
 
@@ -328,9 +325,9 @@
         <div class="del-icon-wrap">
             <i class="bi bi-exclamation-triangle-fill del-icon"></i>
         </div>
-        <div class="del-title">Delete Draft Payroll?</div>
-        <div class="del-msg">
-            This draft payroll record will be permanently deleted. This action cannot be undone.
+        <div class="del-title" id="deleteTitle">Delete Payroll?</div>
+        <div class="del-msg" id="deleteMsg">
+            This payroll record will be permanently deleted. This action cannot be undone.
         </div>
         <div class="del-actions">
             <button class="del-btn-cancel" id="deleteCancelBtn">Cancel</button>

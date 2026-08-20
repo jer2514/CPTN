@@ -1,0 +1,83 @@
+@model List<RSDSystem.Models.Payroll>
+@using RSDSystem.Helpers
+@using System.Globalization
+@{
+    Layout = null;
+    var projectName = ViewBag.ProjectName as string ?? "Project";
+    var startLabel = ViewBag.StartLabel as string ?? "";
+    var endLabel = ViewBag.EndLabel as string ?? "";
+    var fileName = ViewBag.FileName as string ?? "Payslips.pdf";
+    var dateCulture = CultureInfo.InvariantCulture;
+    var slips = Model ?? new List<RSDSystem.Models.Payroll>();
+    var slipCount = slips.Count;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@fileName</title>
+    <link rel="stylesheet" href="~/css/payslip-print.css" />
+</head>
+<body>
+    <div class="no-print">
+        <button type="button" onclick="window.print()">Print / Save as PDF</button>
+        <div>@projectName — @startLabel - @endLabel</div>
+    </div>
+    @if (slipCount == 0)
+    {
+        <p style="padding:24px">No payslips to print.</p>
+    }
+    else
+    {
+        @for (var i = 0; slipCount > i; i += 4)
+        {
+            <div class="sheet">
+                @for (var n = i; (i + 4) > n && slipCount > n; n++)
+                {
+                    var slip = slips[n];
+                    <div class="slip">
+                        <div class="title">RSD Construction Services</div>
+                        <div class="subtitle">Employee Payslip</div>
+
+                        <div class="section">Employee Information</div>
+                        <div class="info-grid">
+                            <div><span class="lbl">Employee ID: </span><span class="val">@EmployeeIds.Format(slip.Employee?.EmployeeCode)</span></div>
+                            <div><span class="lbl">Project Assigned: </span><span class="val">@(slip.Project?.ProjectName ?? projectName)</span></div>
+                            <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "")</span></div>
+                            <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
+                            <div><span class="lbl">Job Classification: </span><span class="val">@(slip.Employee?.JobClassification)</span></div>
+                            <div><span class="lbl">Rate per hour: </span><span class="val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                        </div>
+
+                        <div class="section">
+                            Attendance Summary
+                            <span class="period-val">@slip.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) - @slip.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
+                        </div>
+                        <div class="fields">
+                            <span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span>
+                            <span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span>
+                            <span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span>
+                        </div>
+
+                        <div class="section">Payroll Computation</div>
+                        <div class="fields">
+                            <span class="lbl">Regular Pay:</span><span class="val">₱@slip.RegularPay.ToString("N2")</span>
+                            <span class="lbl">Overtime Pay:</span><span class="val">₱@slip.OvertimePay.ToString("N2")</span>
+                            <span class="gap"></span>
+                            <span class="lbl">Gross Pay:</span><span class="val">₱@slip.GrossPay.ToString("N2")</span>
+                            <span class="lbl">Cash Advance:</span><span class="val">₱@slip.CashAdvance.ToString("N2")</span>
+                        </div>
+                        <hr class="net-rule" />
+                        <div class="fields">
+                            <span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span>
+                        </div>
+
+                        <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    <script>window.addEventListener('load', function () { window.print(); });</script>
+</body>
+</html>

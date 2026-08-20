@@ -227,6 +227,7 @@
         function togglePwd(inputId, iconId) {
             const input = document.getElementById(inputId);
             const icon  = document.getElementById(iconId);
+            if (!input || !icon) return;
             input.type = input.type === 'password' ? 'text' : 'password';
             icon.className = input.type === 'text' ? 'bi bi-eye' : 'bi bi-eye-slash';
         }
