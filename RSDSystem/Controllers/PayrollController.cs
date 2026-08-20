@@ -204,6 +204,7 @@ namespace RSDSystem.Controllers
                     predictedBudget = r.PredictedPayroll,
                     predictedPayroll = r.PredictedPayroll,
                     allocatedBudget = r.AllocatedBudget,
+                    hasAllocatedBudget = r.HasAllocatedBudget,
                     budgetDifference = r.BudgetDifference,
                     exceedsBudget = r.ExceedsBudget,
                     unusualChange = r.UnusualChange,

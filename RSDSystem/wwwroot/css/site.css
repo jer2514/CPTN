@@ -2561,7 +2561,26 @@ button.badge-btn {
 }
 
 .pred-risk-warn {
-    background: #fff1e6;
+    background: #fdecea;
+    color: #9b1c1c;
+}
+
+.pred-risk-warn i,
+.pred-risk-warn .pred-risk-title {
+    color: #c0392b;
+}
+
+.pred-anomaly-flag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fdecea;
+    color: #c0392b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    vertical-align: middle;
 }
 
 .pred-risk-title {
