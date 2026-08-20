@@ -173,10 +173,15 @@
                     return;
                 }
 
+                if (!data.hasAttendance) {
+                    emptyBox.textContent = data.message || 'Import attendance for this payroll schedule before generating payroll.';
+                    return;
+                }
+
                 setScheduleNote('Generating payroll for schedule: ' + (data.scheduleLabel || 'current period'), true);
 
                 if (currentEmployees.length === 0) {
-                    emptyBox.textContent = 'No employees assigned to this project.';
+                    emptyBox.textContent = 'No active employees assigned to this project.';
                     return;
                 }
 

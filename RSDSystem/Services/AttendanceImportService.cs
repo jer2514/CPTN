@@ -347,6 +347,17 @@ namespace RSDSystem.Services
             };
         }
 
+        public async Task<bool> HasImportedAttendanceAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            return await ApplyRecordFilters(
+                    RecordsForProject(projectId), null, null, periodStart, periodEnd)
+                .AnyAsync(cancellationToken);
+        }
+
         public async Task<AttendanceEmployeeSummary?> GetEmployeePeriodTotalsAsync(
             int projectId,
             int employeeId,
@@ -1054,6 +1065,11 @@ namespace RSDSystem.Services
             if (sql.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
             {
                 return "The attendance tables are missing. Restart the app and import again.";
+            }
+
+            if (sql.Contains("Invalid column name", StringComparison.OrdinalIgnoreCase))
+            {
+                return "The attendance tables are missing a required column. Restart the app so the database can update, then import again.";
             }
 
             if (sql.Contains("truncated", StringComparison.OrdinalIgnoreCase))
