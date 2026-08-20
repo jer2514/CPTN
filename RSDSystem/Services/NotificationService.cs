@@ -183,6 +183,44 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
+        public async Task NotifyTaskCompletionRequestedAsync(
+            PayrollSchedule schedule, string? staffName, CancellationToken cancellationToken = default)
+        {
+            var project = schedule.Project;
+            var name = ProjectName(project);
+            var staff = PersonName(staffName ?? project?.AssignedPayrollStaff, "Payroll staff");
+            var period = PeriodLabel(schedule.StartingDate, schedule.EndDate);
+            await NotifyAdminsAsync(
+                NotificationKinds.TaskCompletionRequested,
+                "Task marked done — approval needed",
+                $"{staff} marked the payroll task for {name} ({period}) as done. Open the notification to approve and close the task.",
+                schedule.ProjectId,
+                schedule.PayrollScheduleId,
+                "/Notification/Index",
+                cancellationToken);
+        }
+
+        public async Task NotifyTaskCompletionApprovedAsync(
+            PayrollSchedule schedule, CancellationToken cancellationToken = default)
+        {
+            var project = schedule.Project;
+            var staff = project?.AssignedPayrollStaff?.Trim();
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            var period = PeriodLabel(schedule.StartingDate, schedule.EndDate);
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.TaskCompletionApproved,
+                "Task approved",
+                $"Admin approved your completed task for {name} ({period}). It has been removed from To do task.",
+                schedule.ProjectId,
+                schedule.PayrollScheduleId,
+                "/PayrollStaff/Index",
+                cancellationToken);
+        }
+
         public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, CancellationToken cancellationToken = default)
         {
             var staff = StaffFor(payroll, project);
