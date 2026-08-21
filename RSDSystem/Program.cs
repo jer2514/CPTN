@@ -270,4 +270,6 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");
 
+PredictionApiHost.TryStart(app);
+
 app.Run();

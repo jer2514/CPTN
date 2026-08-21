@@ -117,6 +117,8 @@ namespace RSDSystem.Services
                 ProjectId = project.ProjectId,
                 ProjectName = project.ProjectName ?? "—",
                 GeneratedAt = DateTime.Now,
+                Engine = forecast.Engine,
+                Model = forecast.Model,
                 Rows =
                 {
                     new PayrollPredictionRow
@@ -159,7 +161,12 @@ namespace RSDSystem.Services
             };
 
             var remote = await TryRemoteForecastAsync(input, cancellationToken);
-            return remote ?? PayrollPredictionEngine.Forecast(input);
+            if (remote != null)
+                return remote;
+
+            var local = PayrollPredictionEngine.Forecast(input);
+            local.Engine = "local";
+            return local;
         }
 
         private async Task<PayrollForecastResult?> TryRemoteForecastAsync(
@@ -172,21 +179,24 @@ namespace RSDSystem.Services
             try
             {
                 var client = _httpFactory.CreateClient("PayrollPrediction");
-                using var response = await client.PostAsJsonAsync(
-                    Combine(apiUrl, "/predict"),
-                    new
-                    {
-                        previous_payroll_1 = input.PreviousPayroll1,
-                        previous_payroll_2 = input.PreviousPayroll2,
-                        allocated_budget = input.AllocatedBudget,
-                        anomaly_percent = input.AnomalyPercent,
-                        previousPayroll1 = input.PreviousPayroll1,
-                        previousPayroll2 = input.PreviousPayroll2,
-                        allocatedBudget = input.AllocatedBudget,
-                        anomalyPercent = input.AnomalyPercent
-                    },
-                    JsonOptions,
-                    cancellationToken);
+                using var request = new HttpRequestMessage(HttpMethod.Post, Combine(apiUrl, "/predict"));
+                var apiKey = (_config["Prediction:ApiKey"] ?? "").Trim();
+                if (apiKey.Length > 0)
+                    request.Headers.TryAddWithoutValidation("X-Api-Key", apiKey);
+
+                request.Content = JsonContent.Create(new
+                {
+                    previous_payroll_1 = input.PreviousPayroll1,
+                    previous_payroll_2 = input.PreviousPayroll2,
+                    allocated_budget = input.AllocatedBudget,
+                    anomaly_percent = input.AnomalyPercent,
+                    previousPayroll1 = input.PreviousPayroll1,
+                    previousPayroll2 = input.PreviousPayroll2,
+                    allocatedBudget = input.AllocatedBudget,
+                    anomalyPercent = input.AnomalyPercent
+                }, options: JsonOptions);
+
+                using var response = await client.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -209,7 +219,11 @@ namespace RSDSystem.Services
                     UnusualChange = payload.UnusualChange ?? false,
                     ChangePercent = payload.ChangePercent ?? 0,
                     RiskTitle = payload.RiskTitle,
-                    RiskDetail = payload.RiskDetail
+                    RiskDetail = payload.RiskDetail,
+                    Engine = "python",
+                    Model = string.IsNullOrWhiteSpace(payload.Model)
+                        ? "sklearn.linear_model.LinearRegression"
+                        : payload.Model
                 };
             }
             catch (Exception ex)
@@ -315,6 +329,9 @@ namespace RSDSystem.Services
                 get => RiskDetail;
                 set => RiskDetail = value;
             }
+
+            public string? Engine { get; set; }
+            public string? Model { get; set; }
         }
     }
 
@@ -324,6 +341,8 @@ namespace RSDSystem.Services
         public string ProjectName { get; set; } = "—";
         public DateTime GeneratedAt { get; set; } = DateTime.Now;
         public string? Error { get; set; }
+        public string Engine { get; set; } = "local";
+        public string? Model { get; set; }
         public List<PayrollPredictionRow> Rows { get; set; } = new();
     }
 
