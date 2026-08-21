@@ -22,11 +22,16 @@ namespace RSDSystem.Controllers
 
         // GET: /Account/Login
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null)
+        public IActionResult Login(string? returnUrl = null, int? inactive = null)
         {
             var role = HttpContext.Session.GetString("Role");
             if (role == "Admin") return RedirectToAction("Index", "Home");
             if (role == "PayrollStaff") return RedirectToAction("Index", "PayrollStaff");
+
+            if (inactive == 1)
+                ViewBag.Error = "This account is inactive and cannot log in.";
+            else if (TempData["LoginError"] is string loginError)
+                ViewBag.Error = loginError;
 
             return View();
         }
@@ -37,18 +42,24 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Login(string Username, string Password, string? returnUrl)
         {
             var user = await _db.Users
-                                .FirstOrDefaultAsync(u => u.Username == Username && u.IsActive);
+                                .FirstOrDefaultAsync(u => u.Username == Username);
 
-            if (user != null && BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
+            if (user == null || !BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
             {
-                SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
-                return user.Role == "Admin"
-                    ? RedirectToAction("Index", "Home")
-                    : RedirectToAction("Index", "PayrollStaff");
+                ViewBag.Error = "Invalid username or password.";
+                return View();
             }
 
-            ViewBag.Error = "Invalid username or password.";
-            return View();
+            if (!user.IsActive)
+            {
+                ViewBag.Error = "This account is inactive and cannot log in.";
+                return View();
+            }
+
+            SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
+            return user.Role == "Admin"
+                ? RedirectToAction("Index", "Home")
+                : RedirectToAction("Index", "PayrollStaff");
         }
 
         private void SignIn(int userId, string fullName, string role, string? photoPath)

@@ -246,20 +246,9 @@ namespace RSDSystem.Controllers
         // POST /UserManagement/Delete/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public IActionResult Delete(int id)
         {
-            var user = await _db.Users.FindAsync(id);
-            if (user != null)
-            {
-                if (await IsLastAdminAsync(user))
-                {
-                    TempData["Error"] = "The system must keep one admin account.";
-                    return RedirectToAction(nameof(Index));
-                }
-                _db.Users.Remove(user);
-                await _db.SaveChangesAsync();
-                TempData["Success"] = "User deleted.";
-            }
+            TempData["Error"] = "Users cannot be deleted. Set payroll staff inactive to stop them from logging in.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -274,36 +263,11 @@ namespace RSDSystem.Controllers
             return $"/uploads/users/{fileName}";
         }
 
-        //delete multiple users
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> BulkDelete(List<int> selectedIds)
+        public IActionResult BulkDelete(List<int> selectedIds)
         {
-            if (selectedIds == null || selectedIds.Count == 0)
-                return RedirectToAction(nameof(Index));
-
-            var users = await _db.Users
-                           .Where(u => selectedIds.Contains(u.UserId))
-                           .ToListAsync();
-
-            var removable = new List<User>();
-            foreach (var user in users)
-            {
-                if (!await IsLastAdminAsync(user))
-                    removable.Add(user);
-            }
-
-            if (removable.Count == 0)
-            {
-                TempData["Error"] = "The system must keep one admin account.";
-                return RedirectToAction(nameof(Index));
-            }
-
-            _db.Users.RemoveRange(removable);
-            await _db.SaveChangesAsync();
-            TempData["Success"] = removable.Count == users.Count
-                ? "Users deleted."
-                : "Selected users were deleted. The admin account was kept.";
+            TempData["Error"] = "Users cannot be deleted. Set payroll staff inactive to stop them from logging in.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -319,8 +283,12 @@ namespace RSDSystem.Controllers
                     TempData["Error"] = "The system must keep one active admin account.";
                     return RedirectToAction(nameof(Index));
                 }
+
                 user.IsActive = !user.IsActive;
                 await _db.SaveChangesAsync();
+                TempData["Success"] = user.IsActive
+                    ? "User is now active and can log in."
+                    : "User is now inactive and cannot log in.";
             }
             return RedirectToAction(nameof(Index));
         }
