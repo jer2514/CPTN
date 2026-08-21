@@ -497,7 +497,9 @@
         function openRecordEdit(row) {
             if (isAdmin || !row) return;
             if (row.locked) {
-                showToast('This attendance row was already approved and cannot be edited again.');
+                showToast(row.payrollLocked
+                    ? 'Payroll for this employee is already approved. Attendance cannot be edited.'
+                    : 'This attendance row was already approved and cannot be edited again.');
                 return;
             }
             if (row.pendingCorrection) {

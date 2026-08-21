@@ -86,9 +86,22 @@ namespace RSDSystem.Services
                 return new AttendanceImportResult { Error = preview.Error ?? "Import failed." };
             }
 
+            var closedPayrolls = await PayrollAttendanceLock.LoadClosedAsync(
+                _db, preview.Project.ProjectId, cancellationToken);
+            var skippedLocked = preview.Rows.Count(r =>
+                PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate));
+            preview.Rows = preview.Rows
+                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                .ToList();
+
             if (preview.Rows.Count == 0)
             {
-                return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
+                return new AttendanceImportResult
+                {
+                    Error = skippedLocked > 0
+                        ? "Payroll for these employees is already approved. Attendance cannot be imported again for that period."
+                        : "The file did not contain any attendance rows."
+                };
             }
 
             try
@@ -120,10 +133,11 @@ namespace RSDSystem.Services
                 preview.Project.ProjectId,
                 AttendanceDisplay.UsableDate(preview.PeriodStart),
                 AttendanceDisplay.UsableDate(preview.PeriodEnd),
+                closedPayrolls,
                 cancellationToken);
 
             await RemoveConflictingRecordsAsync(
-                preview.Project.ProjectId, preview.Rows, cancellationToken);
+                preview.Project.ProjectId, preview.Rows, closedPayrolls, cancellationToken);
 
             foreach (var row in preview.Rows)
             {
@@ -178,7 +192,8 @@ namespace RSDSystem.Services
                 RowCount = preview.Rows.Count,
                 MatchedCount = preview.Rows.Count(r => r.Matched),
                 UnmatchedCount = preview.Rows.Count(r => !r.Matched),
-                ReplacedPrevious = replaced
+                ReplacedPrevious = replaced,
+                SkippedLockedCount = skippedLocked
             };
         }
 
@@ -527,6 +542,7 @@ namespace RSDSystem.Services
             int projectId,
             DateTime? periodStart,
             DateTime? periodEnd,
+            List<ClosedPayrollWindow> closedPayrolls,
             CancellationToken cancellationToken)
         {
             var start = AttendanceDisplay.UsableDate(periodStart ?? periodEnd);
@@ -546,13 +562,33 @@ namespace RSDSystem.Services
             if (toRemove.Count == 0)
                 return false;
 
-            _db.AttendanceImports.RemoveRange(toRemove);
-            return true;
+            var removedUnlocked = false;
+            foreach (var import in toRemove)
+            {
+                var locked = import.Records
+                    .Where(r => PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                    .ToList();
+                var unlocked = import.Records
+                    .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                    .ToList();
+
+                if (unlocked.Count > 0)
+                {
+                    _db.AttendanceRecords.RemoveRange(unlocked);
+                    removedUnlocked = true;
+                }
+
+                if (locked.Count == 0)
+                    _db.AttendanceImports.Remove(import);
+            }
+
+            return removedUnlocked;
         }
 
         private async Task RemoveConflictingRecordsAsync(
             int projectId,
             List<AttendancePreviewRow> rows,
+            List<ClosedPayrollWindow> closedPayrolls,
             CancellationToken cancellationToken)
         {
             var employeeIds = rows
@@ -585,6 +621,10 @@ namespace RSDSystem.Services
                          (r.WorkDate == null || r.WorkDate.Value.Year < 1900))
                     ))
                 .ToListAsync(cancellationToken);
+
+            existing = existing
+                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                .ToList();
 
             if (existing.Count > 0)
                 _db.AttendanceRecords.RemoveRange(existing);
@@ -657,6 +697,12 @@ namespace RSDSystem.Services
             if (record == null)
             {
                 return "Attendance row not found.";
+            }
+
+            if (await PayrollAttendanceLock.IsLockedAsync(
+                    _db, record.ProjectId, record.EmployeeId, record.WorkDate, cancellationToken))
+            {
+                return "Payroll for this employee is already approved. Attendance cannot be edited.";
             }
 
             record.TimeIn1 = EmptyToNull(timeIn1);

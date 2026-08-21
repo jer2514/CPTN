@@ -204,8 +204,8 @@ namespace RSDSystem.Controllers
             var slips = await _db.Payrolls.AsNoTracking()
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == project.ProjectId
-                    && p.PayPeriodStart.Date <= monthEnd
-                    && p.PayPeriodEnd.Date >= monthStart)
+                    && p.PayPeriodStart.Date >= monthStart
+                    && p.PayPeriodStart.Date <= monthEnd)
                 .OrderBy(p => p.PayPeriodStart)
                 .ThenBy(p => p.Employee!.LastName)
                 .ThenBy(p => p.Employee!.FirstName)
@@ -444,10 +444,7 @@ namespace RSDSystem.Controllers
                 .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd })
                 .ToListAsync();
             foreach (var payroll in payrolls)
-            {
                 Add(payroll.PayPeriodStart);
-                Add(payroll.PayPeriodEnd);
-            }
 
             var budgets = await _db.ProjectMonthlyBudgets.AsNoTracking()
                 .Where(m => m.ProjectId == projectId)

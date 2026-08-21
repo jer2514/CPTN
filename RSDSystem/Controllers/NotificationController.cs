@@ -130,6 +130,19 @@ namespace RSDSystem.Controllers
             if (request.Status != CorrectionRequestStatuses.Pending)
                 return Json(new { success = false, message = "This request was already reviewed." });
 
+            var attendance = await _db.AttendanceRecords.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == request.AttendanceRecordId, HttpContext.RequestAborted);
+            if (attendance != null
+                && await PayrollAttendanceLock.IsLockedAsync(
+                    _db, attendance.ProjectId, attendance.EmployeeId, attendance.WorkDate, HttpContext.RequestAborted))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Payroll for this employee is already approved. Attendance cannot be edited."
+                });
+            }
+
             var error = await _imports.UpdateRecordAsync(
                 request.AttendanceRecordId,
                 AttendanceDisplay.HtmlTime(request.TimeIn1),
