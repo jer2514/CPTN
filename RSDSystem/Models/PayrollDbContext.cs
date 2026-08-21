@@ -20,6 +20,7 @@ namespace RSDSystem.Models
         public DbSet<AttendanceRecord> AttendanceRecords { get; set; }
         public DbSet<AppNotification> AppNotifications { get; set; }
         public DbSet<AttendanceCorrectionRequest> AttendanceCorrectionRequests { get; set; }
+        public DbSet<ProjectEmployeeHistory> ProjectEmployeeHistories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -151,6 +152,22 @@ namespace RSDSystem.Models
                 .WithMany()
                 .HasForeignKey(c => c.ProjectId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasOne(h => h.Project)
+                .WithMany()
+                .HasForeignKey(h => h.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasOne(h => h.Employee)
+                .WithMany()
+                .HasForeignKey(h => h.EmployeeId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasIndex(h => new { h.ProjectId, h.EmployeeId })
+                .IsUnique();
         }
     }
 }

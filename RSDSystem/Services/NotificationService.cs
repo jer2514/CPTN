@@ -176,7 +176,7 @@ namespace RSDSystem.Services
 
         public async Task NotifyStaffAssignedAsync(Project project, CancellationToken cancellationToken = default)
         {
-            var staff = project.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
@@ -196,20 +196,21 @@ namespace RSDSystem.Services
             Project project, DateTime start, DateTime end, int count,
             CancellationToken cancellationToken = default)
         {
-            var staff = project.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
             var name = ProjectName(project);
             var period = PeriodLabel(start, end);
-            var slips = count == 1 ? "1 payslip" : count + " payslips";
+            var slips = count == 1 ? "1 PDF payslip" : count + " PDF payslips";
+            var relatedId = start.Year * 10000 + start.Month * 100 + start.Day;
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayslipsSent,
-                "Payslips sent",
-                $"Admin sent {slips} for {name} ({period}). Open Pending Payroll to review them.",
+                "PDF payslips ready to download",
+                $"Admin sent {slips} for {name} ({period}). Open Pending Payroll to download the PDF.",
                 project.ProjectId,
-                null,
+                relatedId,
                 "/PayrollStaff/PendingPayroll?projectId=" + project.ProjectId,
                 cancellationToken);
         }
@@ -218,7 +219,7 @@ namespace RSDSystem.Services
             Project project, DateTime? periodStart = null, DateTime? periodEnd = null,
             CancellationToken cancellationToken = default)
         {
-            var staff = project.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
@@ -257,7 +258,7 @@ namespace RSDSystem.Services
             PayrollSchedule schedule, CancellationToken cancellationToken = default)
         {
             var project = schedule.Project;
-            var staff = project?.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project?.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
@@ -276,7 +277,9 @@ namespace RSDSystem.Services
 
         public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, CancellationToken cancellationToken = default)
         {
-            var staff = StaffFor(payroll, project);
+            var staff = await ResolveStaffRecipientAsync(StaffFor(payroll, project), cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
             var name = ProjectName(project);
             var employee = PersonName(payroll.Employee?.FullName, "an employee");
             var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
@@ -293,7 +296,9 @@ namespace RSDSystem.Services
 
         public async Task NotifyPayrollReturnedAsync(Payroll payroll, Project? project, string reason, CancellationToken cancellationToken = default)
         {
-            var staff = StaffFor(payroll, project);
+            var staff = await ResolveStaffRecipientAsync(StaffFor(payroll, project), cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
             var name = ProjectName(project);
             var employee = PersonName(payroll.Employee?.FullName, "an employee");
             var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
@@ -426,10 +431,13 @@ namespace RSDSystem.Services
             if (string.Equals(role, NotificationRoles.Admin, StringComparison.OrdinalIgnoreCase))
                 return source.Where(n => n.RecipientRole == NotificationRoles.Admin);
 
-            var name = (fullName ?? "").Trim().ToLower();
+            var keys = StaffNames.LookupKeys(fullName);
+            if (keys.Count == 0)
+                return source.Where(n => false);
+
             return source.Where(n => n.RecipientRole == NotificationRoles.PayrollStaff
                 && n.RecipientName != null
-                && n.RecipientName.Trim().ToLower() == name);
+                && keys.Contains(n.RecipientName));
         }
 
         private async Task<bool> RecentlyNotifiedAsync(
@@ -450,6 +458,22 @@ namespace RSDSystem.Services
                 query = query.Where(n => n.RelatedId == relatedId);
 
             return await query.AnyAsync(cancellationToken);
+        }
+
+        private async Task<string?> ResolveStaffRecipientAsync(string? staffName, CancellationToken cancellationToken)
+        {
+            var assigned = (staffName ?? "").Trim();
+            if (assigned.Length == 0)
+                return null;
+
+            var staff = await _db.Users.AsNoTracking()
+                .Where(u => u.Role == "PayrollStaff")
+                .ToListAsync(cancellationToken);
+            var match = staff.FirstOrDefault(u =>
+                StaffNames.SamePerson(assigned, u.FullName)
+                || StaffNames.SamePerson(assigned, $"{u.FirstName} {u.LastName}")
+                || string.Equals(assigned, u.Username, StringComparison.OrdinalIgnoreCase));
+            return match?.FullName ?? assigned;
         }
 
         private static string ClipMessage(string message)

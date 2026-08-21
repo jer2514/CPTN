@@ -94,6 +94,7 @@ namespace RSDSystem.Services
         public string EmployeeName { get; set; } = "";
         public bool Matched { get; set; }
         public int DaysWorked { get; set; }
+        public int DaysPresent { get; set; }
         public int DaysAbsent { get; set; }
         public int DaysLate { get; set; }
         public int DaysIncomplete { get; set; }

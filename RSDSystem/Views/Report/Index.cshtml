@@ -33,7 +33,7 @@
             }
         </select>
 
-        <label class="form-lbl">Payroll Period</label>
+        <label class="form-lbl" id="reportPeriodLabel">Payroll Period</label>
         <select id="reportPeriod" class="form-ctrl">
             <option value="">Select a project first</option>
         </select>
@@ -54,8 +54,13 @@
         const typeEl = document.getElementById('reportType');
         const projectEl = document.getElementById('reportProject');
         const periodEl = document.getElementById('reportPeriod');
+        const periodLabel = document.getElementById('reportPeriodLabel');
         const preview = document.getElementById('reportPreview');
         let lastQuery = null;
+
+        function isMonthly() {
+            return typeEl.value === 'Monthly Payroll Report';
+        }
 
         function needsPeriod() {
             const type = typeEl.value;
@@ -63,21 +68,25 @@
         }
 
         async function loadPeriods() {
-            periodEl.innerHTML = '<option value="">Loading periods...</option>';
+            periodEl.innerHTML = '<option value="">Loading...</option>';
             if (!projectEl.value) {
                 periodEl.innerHTML = '<option value="">Select a project first</option>';
                 return;
             }
             try {
-                const res = await fetch('/Report/Periods?projectId=' + encodeURIComponent(projectEl.value), {
-                    headers: { 'Accept': 'application/json' }
-                });
+                const url = isMonthly()
+                    ? '/Report/Months?projectId=' + encodeURIComponent(projectEl.value)
+                    : '/Report/Periods?projectId=' + encodeURIComponent(projectEl.value);
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const data = await res.json();
-                if (!data.success || !data.periods.length) {
-                    periodEl.innerHTML = '<option value="">No periods found</option>';
+                const items = isMonthly() ? (data.months || []) : (data.periods || []);
+                if (!data.success || !items.length) {
+                    periodEl.innerHTML = isMonthly()
+                        ? '<option value="">No months found</option>'
+                        : '<option value="">No periods found</option>';
                     return;
                 }
-                periodEl.innerHTML = data.periods.map(p =>
+                periodEl.innerHTML = items.map(p =>
                     `<option value="${p.start}|${p.end}">${p.label}</option>`
                 ).join('');
             } catch (err) {
@@ -111,7 +120,7 @@
                 return;
             }
             if (needsPeriod() && !selectedPeriod()) {
-                showToast('Select a payroll period first.');
+                showToast(isMonthly() ? 'Select a month first.' : 'Select a payroll period first.');
                 return;
             }
 
@@ -145,13 +154,21 @@
             window.open('/Report/Print?' + lastQuery, '_blank');
         }
 
-        projectEl.addEventListener('change', loadPeriods);
-        typeEl.addEventListener('change', function () {
+        function syncPeriodUi() {
             periodEl.disabled = !needsPeriod();
-        });
+            if (periodLabel) {
+                periodLabel.textContent = isMonthly() ? 'Month' : 'Payroll Period';
+            }
+            if (projectEl.value && needsPeriod()) {
+                loadPeriods();
+            }
+        }
+
+        projectEl.addEventListener('change', loadPeriods);
+        typeEl.addEventListener('change', syncPeriodUi);
         document.getElementById('generateReportBtn').addEventListener('click', generateReport);
         document.getElementById('printReportBtn').addEventListener('click', openPrint);
         document.getElementById('downloadPdfBtn').addEventListener('click', openPrint);
-        periodEl.disabled = !needsPeriod();
+        syncPeriodUi();
     </script>
 }

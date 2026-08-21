@@ -57,6 +57,37 @@ AND NOT EXISTS (
     CREATE UNIQUE INDEX IX_Payrolls_EmployeeId_PayrollScheduleId
         ON dbo.Payrolls(EmployeeId, PayrollScheduleId)
         WHERE PayrollScheduleId IS NOT NULL;");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'RegularHours') IS NULL
+    ALTER TABLE dbo.Payrolls ADD RegularHours decimal(18,2) NOT NULL CONSTRAINT DF_Payrolls_RegularHours DEFAULT(0);");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'RegularHours') IS NOT NULL
+    UPDATE dbo.Payrolls
+    SET RegularHours = CAST(RegularDaysWorked AS decimal(18,2)) * 8
+    WHERE RegularHours = 0 AND RegularDaysWorked > 0;");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.ProjectEmployeeHistories', N'U') IS NULL
+AND OBJECT_ID(N'dbo.Projects', N'U') IS NOT NULL
+AND OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+BEGIN
+    CREATE TABLE dbo.ProjectEmployeeHistories (
+        Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        ProjectId int NOT NULL,
+        EmployeeId int NOT NULL,
+        RecordedAt datetime2 NOT NULL,
+        CONSTRAINT FK_ProjectEmployeeHistories_Projects
+            FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(ProjectId) ON DELETE CASCADE,
+        CONSTRAINT FK_ProjectEmployeeHistories_Employees
+            FOREIGN KEY (EmployeeId) REFERENCES dbo.Employees(EmployeeId) ON DELETE NO ACTION
+    );
+    CREATE UNIQUE INDEX IX_ProjectEmployeeHistories_ProjectId_EmployeeId
+        ON dbo.ProjectEmployeeHistories(ProjectId, EmployeeId);
+END");
         }
     }
 }

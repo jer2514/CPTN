@@ -61,6 +61,7 @@ namespace RSDSystem.Controllers
             ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
+            ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
             return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date, approvedOnly: true));
         }
 
@@ -73,6 +74,12 @@ namespace RSDSystem.Controllers
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
+
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot generate payslips.";
+                return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
             var employees = await _db.Employees
                 .Where(e => e.ProjectId == projectId && e.IsActive)
@@ -106,6 +113,7 @@ namespace RSDSystem.Controllers
                     continue;
 
                 var regularPay = emp.DailyRate * daysWorked;
+                var regularHours = daysWorked * 8m;
                 _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
@@ -114,6 +122,7 @@ namespace RSDSystem.Controllers
                     PayPeriodStart = start.Date,
                     PayPeriodEnd = end.Date,
                     RegularDaysWorked = daysWorked,
+                    RegularHours = regularHours,
                     OvertimeHours = 0,
                     AbsentDays = 0,
                     RegularPay = regularPay,
@@ -247,6 +256,7 @@ namespace RSDSystem.Controllers
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPages;
+            ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
             return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
@@ -285,6 +295,12 @@ namespace RSDSystem.Controllers
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
+
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot send payslips.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
             var count = await _db.Set<Payroll>().CountAsync(p => p.ProjectId == projectId
                 && p.PayPeriodStart.Date == start.Date
@@ -421,7 +437,7 @@ namespace RSDSystem.Controllers
                         PayrollId = slip.PayrollId,
                         EmployeeName = slip.Employee?.FullName ?? "—",
                         Job = slip.Employee?.JobClassification ?? "—",
-                        RegularHours = slip.RegularDaysWorked * 8,
+                        RegularHours = PayrollComputation.PaidRegularHours(slip),
                         OtHours = slip.OvertimeHours,
                         NetPay = slip.NetPay,
                         Status = slip.Status
@@ -443,7 +459,7 @@ namespace RSDSystem.Controllers
                     PayrollId = slip?.PayrollId,
                     EmployeeName = emp.FullName,
                     Job = emp.JobClassification,
-                    RegularHours = slip == null ? 0 : slip.RegularDaysWorked * 8,
+                    RegularHours = slip == null ? 0 : PayrollComputation.PaidRegularHours(slip),
                     OtHours = slip?.OvertimeHours ?? 0,
                     NetPay = slip?.NetPay ?? 0,
                     Status = slip?.Status ?? "—"
