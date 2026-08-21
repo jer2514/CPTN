@@ -339,4 +339,52 @@
         .then(function (res) { return res.json(); })
         .then(function (data) { if (data.success) setBadges(data.unread || 0); })
         .catch(function () { });
+
+    const isStaff = document.body.dataset.role === 'PayrollStaff';
+
+    function shownPayslipKey(id) {
+        return 'rsd-payslip-toast-' + id;
+    }
+
+    async function showPayslipDownloadToasts() {
+        if (!isStaff || typeof window.showToast !== 'function') return;
+        if (window.location.pathname.toLowerCase().indexOf('/payrollstaff/downloadpayslips') === 0)
+            return;
+        try {
+            const res = await fetch('/Notification/Recent', { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (!data.success) return;
+            if (typeof data.unread === 'number') setBadges(data.unread);
+            (data.items || []).forEach(function (item) {
+                if (item.isRead) return;
+                if (item.kind !== 'PayslipsSent') return;
+                var key = shownPayslipKey(item.id);
+                try {
+                    if (sessionStorage.getItem(key)) return;
+                    sessionStorage.setItem(key, '1');
+                } catch (err) { /* ignore */ }
+                var href = item.url || '/PayrollStaff/PendingPayroll';
+                window.showToast(item.message || 'Payslips are ready to download.', 'success', {
+                    delay: 14000,
+                    action: {
+                        label: 'Download',
+                        href: href,
+                        onClick: function (e, url) {
+                            if (e) e.preventDefault();
+                            postForm('/Notification/MarkRead', { id: item.id })
+                                .catch(function () { })
+                                .finally(function () {
+                                    window.location.href = url || href;
+                                });
+                        }
+                    }
+                });
+            });
+        } catch (err) { /* ignore */ }
+    }
+
+    if (isStaff) {
+        showPayslipDownloadToasts();
+        window.setInterval(showPayslipDownloadToasts, 20000);
+    }
 })();

@@ -110,6 +110,7 @@ namespace RSDSystem.Controllers
                     p.ProjectId,
                     p.GeneratedBy,
                     p.GeneratedDate,
+                    p.SubmittedAt,
                     ProjectName = p.Project != null ? p.Project.ProjectName ?? "" : "",
                     AssignedStaff = p.Project != null ? p.Project.AssignedPayrollStaff ?? "" : ""
                 })
@@ -119,7 +120,7 @@ namespace RSDSystem.Controllers
                 .GroupBy(p => p.ProjectId)
                 .Select(g =>
                 {
-                    var latest = g.OrderByDescending(x => x.GeneratedDate).First();
+                    var latest = g.OrderByDescending(x => x.SubmittedAt ?? x.GeneratedDate).First();
                     var staffName = !string.IsNullOrWhiteSpace(latest.GeneratedBy)
                         ? latest.GeneratedBy
                         : latest.AssignedStaff;
@@ -128,7 +129,7 @@ namespace RSDSystem.Controllers
                         ProjectId = g.Key,
                         StaffName = string.IsNullOrWhiteSpace(staffName) ? "Payroll Staff" : staffName,
                         ProjectName = string.IsNullOrWhiteSpace(latest.ProjectName) ? "—" : latest.ProjectName,
-                        Date = latest.GeneratedDate
+                        Date = latest.SubmittedAt ?? latest.GeneratedDate
                     };
                 })
                 .OrderByDescending(r => r.Date)

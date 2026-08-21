@@ -202,16 +202,19 @@ namespace RSDSystem.Services
 
             var name = ProjectName(project);
             var period = PeriodLabel(start, end);
-            var slips = count == 1 ? "1 PDF payslip" : count + " PDF payslips";
+            var slips = count == 1 ? "1 payslip" : count + " payslips";
             var relatedId = start.Year * 10000 + start.Month * 100 + start.Day;
+            var downloadUrl = "/PayrollStaff/DownloadPayslips?projectId=" + project.ProjectId
+                + "&start=" + start.ToString("yyyy-MM-dd")
+                + "&end=" + end.ToString("yyyy-MM-dd");
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.PayslipsSent,
-                "PDF payslips ready to download",
-                $"Admin sent {slips} for {name} ({period}). Open Pending Payroll to download the PDF.",
+                "Payslips sent",
+                $"Admin sent {slips} for {name} ({period}). Download them from this notification.",
                 project.ProjectId,
                 relatedId,
-                "/PayrollStaff/PendingPayroll?projectId=" + project.ProjectId,
+                downloadUrl,
                 cancellationToken);
         }
 

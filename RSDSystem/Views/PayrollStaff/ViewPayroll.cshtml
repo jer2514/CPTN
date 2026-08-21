@@ -40,7 +40,7 @@
     </div>
     <div class="payslip-row2">
         <div><span class="payslip-lbl">Job Classification: </span><span class="payslip-val">@Model.Employee?.JobClassification</span></div>
-        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@Model.Employee?.RatePerHour.ToString("N2")</span></div>
+        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@EmployeeRates.HourlyFromDaily(Model.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
     </div>
 
     <div class="payslip-section-lbl">

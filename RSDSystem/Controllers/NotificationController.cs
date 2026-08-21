@@ -46,7 +46,7 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Recent()
         {
             var items = await _notifications.RecentAsync(
-                CurrentRole(), CurrentName(), 7, HttpContext.RequestAborted);
+                CurrentRole(), CurrentName(), 15, HttpContext.RequestAborted);
             var unread = await _notifications.UnreadCountAsync(
                 CurrentRole(), CurrentName(), HttpContext.RequestAborted);
             return Json(new

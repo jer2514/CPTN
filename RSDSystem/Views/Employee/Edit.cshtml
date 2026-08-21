@@ -187,19 +187,20 @@
                     </div>
                     <div>
                         <label class="form-lbl">Rate per Day <span class="req-star">*</span></label>
-                        <input type="number" name="DailyRate" class="@Ctrl("DailyRate")"
+                        <input type="number" name="DailyRate" id="DailyRate" class="@Ctrl("DailyRate")"
                                step="0.01" min="0.01" placeholder="0.00"
                                value="@(Model.DailyRate > 0 ? Model.DailyRate.ToString("0.00") : "")"
                                data-validate="money" data-label="Rate per day" />
                         <span class="field-error" data-error-for="DailyRate">@Err("DailyRate")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Rate per Hour <span class="req-star">*</span></label>
-                        <input type="number" name="RatePerHour" class="@Ctrl("RatePerHour")"
-                               step="0.01" min="0.01" placeholder="0.00"
-                               value="@(Model.RatePerHour > 0 ? Model.RatePerHour.ToString("0.00") : "")"
-                               data-validate="money" data-label="Rate per hour" />
-                        <span class="field-error" data-error-for="RatePerHour">@Err("RatePerHour")</span>
+                        <label class="form-lbl">Rate per Hour</label>
+                        <input type="text" id="RatePerHourDisplay" class="form-ctrl" readonly tabindex="-1"
+                               placeholder="0.00"
+                               value="@(Model.DailyRate > 0 ? EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("0.00") : "")" />
+                        <div class="slip-schedule-hint" style="margin-top:6px">
+                            Calculated automatically from an 8-hour workday (rate per day ÷ 8).
+                        </div>
                     </div>
                 </div>
 
@@ -254,6 +255,19 @@
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
+        (function () {
+            var daily = document.getElementById('DailyRate');
+            var hourly = document.getElementById('RatePerHourDisplay');
+            if (!daily || !hourly) return;
+            function syncHourly() {
+                var n = parseFloat(daily.value);
+                hourly.value = (!daily.value || Number.isNaN(n) || n <= 0) ? '' : (n / 8).toFixed(2);
+            }
+            daily.addEventListener('input', syncHourly);
+            daily.addEventListener('change', syncHourly);
+            syncHourly();
+        })();
+
         const hasAssignedProject = @(Model.ProjectId.HasValue ? "true" : "false");
         const employeeIsActive = @(Model.IsActive ? "true" : "false");
 
