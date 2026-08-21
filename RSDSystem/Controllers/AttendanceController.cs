@@ -395,8 +395,12 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "This attendance row was already approved and cannot be edited again." });
 
             var pending = await _db.AttendanceCorrectionRequests
-                .FirstOrDefaultAsync(c => c.AttendanceRecordId == recordId
-                    && c.Status == CorrectionRequestStatuses.Pending);
+                .Where(c => c.AttendanceRecordId == recordId
+                    && (c.Status == CorrectionRequestStatuses.Pending
+                        || c.Status == CorrectionRequestStatuses.Returned))
+                .OrderByDescending(c => c.CreatedAt)
+                .FirstOrDefaultAsync();
+            var resubmitted = pending != null && pending.Status == CorrectionRequestStatuses.Returned;
             if (pending == null)
             {
                 pending = new AttendanceCorrectionRequest
@@ -404,7 +408,7 @@ namespace RSDSystem.Controllers
                     AttendanceRecordId = record.AttendanceRecordId,
                     ProjectId = record.ProjectId,
                     EmployeeId = record.EmployeeId,
-                    CreatedAt = DateTime.Now
+                    CreatedAt = PhilippinesTime.Now
                 };
                 _db.AttendanceCorrectionRequests.Add(pending);
             }
@@ -433,9 +437,16 @@ namespace RSDSystem.Controllers
                 pending.WorkDate,
                 record.ProjectId,
                 pending.AttendanceCorrectionRequestId,
+                resubmitted,
                 HttpContext.RequestAborted);
 
-            return Json(new { success = true, message = "Correction request sent to admin." });
+            return Json(new
+            {
+                success = true,
+                message = resubmitted
+                    ? "Correction request resubmitted to admin."
+                    : "Correction request sent to admin."
+            });
         }
 
         private async Task<List<Project>> LoadProjectsAsync()

@@ -109,6 +109,37 @@ AND COL_LENGTH(N'dbo.Employees', N'RatePerHour') IS NOT NULL
     UPDATE dbo.Employees
     SET RatePerHour = ROUND(DailyRate / 8.0, 2)
     WHERE DailyRate > 0;");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.PayrollPredictionHistories', N'U') IS NULL
+AND OBJECT_ID(N'dbo.Projects', N'U') IS NOT NULL
+BEGIN
+    CREATE TABLE dbo.PayrollPredictionHistories (
+        Id int IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        ProjectId int NOT NULL,
+        PreviousMonth1 datetime2 NOT NULL,
+        PreviousAmount1 decimal(18,2) NOT NULL,
+        PreviousMonth2 datetime2 NOT NULL,
+        PreviousAmount2 decimal(18,2) NOT NULL,
+        PredictionMonth datetime2 NOT NULL,
+        PredictionLabel nvarchar(40) NOT NULL,
+        PredictedPayroll decimal(18,2) NOT NULL,
+        AllocatedBudget decimal(18,2) NOT NULL,
+        HasAllocatedBudget bit NOT NULL,
+        BudgetDifference decimal(18,2) NOT NULL,
+        ExceedsBudget bit NOT NULL,
+        UnusualChange bit NOT NULL,
+        ChangePercent decimal(18,2) NOT NULL,
+        RiskTitle nvarchar(80) NULL,
+        RiskDetail nvarchar(300) NULL,
+        Engine nvarchar(20) NOT NULL,
+        GeneratedAt datetime2 NOT NULL,
+        CONSTRAINT FK_PayrollPredictionHistories_Projects
+            FOREIGN KEY (ProjectId) REFERENCES dbo.Projects(ProjectId) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_PayrollPredictionHistories_ProjectId_GeneratedAt
+        ON dbo.PayrollPredictionHistories(ProjectId, GeneratedAt);
+END");
         }
     }
 }

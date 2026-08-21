@@ -46,7 +46,9 @@
             foreach (var item in Model)
             {
                 var url = item.Url ?? "#";
-                var correction = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionRequest && item.RelatedId.HasValue;
+                var correction = isAdmin && item.RelatedId.HasValue && (
+                    item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionRequest
+                    || item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionResubmitted);
                 var task = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.TaskCompletionRequested && item.RelatedId.HasValue;
                 <button type="button"
                         class="notif-page-item @(item.IsRead ? "is-read" : "")"

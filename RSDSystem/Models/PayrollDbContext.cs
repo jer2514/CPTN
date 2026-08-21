@@ -21,6 +21,7 @@ namespace RSDSystem.Models
         public DbSet<AppNotification> AppNotifications { get; set; }
         public DbSet<AttendanceCorrectionRequest> AttendanceCorrectionRequests { get; set; }
         public DbSet<ProjectEmployeeHistory> ProjectEmployeeHistories { get; set; }
+        public DbSet<PayrollPredictionHistory> PayrollPredictionHistories { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -168,6 +169,15 @@ namespace RSDSystem.Models
             modelBuilder.Entity<ProjectEmployeeHistory>()
                 .HasIndex(h => new { h.ProjectId, h.EmployeeId })
                 .IsUnique();
+
+            modelBuilder.Entity<PayrollPredictionHistory>()
+                .HasOne(h => h.Project)
+                .WithMany()
+                .HasForeignKey(h => h.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PayrollPredictionHistory>()
+                .HasIndex(h => new { h.ProjectId, h.GeneratedAt });
         }
     }
 }

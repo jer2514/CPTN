@@ -45,11 +45,13 @@ namespace RSDSystem.Models
     public static class NotificationKinds
     {
         public const string PayrollSubmitted = "PayrollSubmitted";
+        public const string PayrollResubmitted = "PayrollResubmitted";
         public const string PayrollPredictionAvailable = "PayrollPredictionAvailable";
         public const string AttendanceImported = "AttendanceImported";
         public const string PayrollAnomalyBudget = "PayrollAnomalyBudget";
         public const string PayrollAnomalyPattern = "PayrollAnomalyPattern";
         public const string AttendanceCorrectionRequest = "AttendanceCorrectionRequest";
+        public const string AttendanceCorrectionResubmitted = "AttendanceCorrectionResubmitted";
         public const string PayrollCorrection = "PayrollCorrection";
         public const string NewTask = "NewTask";
         public const string TaskCompletionRequested = "TaskCompletionRequested";
@@ -64,11 +66,13 @@ namespace RSDSystem.Models
         public static string Icon(string? kind) => (kind ?? "").Trim() switch
         {
             PayrollSubmitted => "bi-send-fill",
+            PayrollResubmitted => "bi-arrow-repeat",
             PayrollPredictionAvailable => "bi-check-circle-fill",
             AttendanceImported => "bi-calendar-event-fill",
             PayrollAnomalyBudget => "bi-exclamation-circle-fill",
             PayrollAnomalyPattern => "bi-exclamation-circle-fill",
             AttendanceCorrectionRequest => "bi-file-earmark-text-fill",
+            AttendanceCorrectionResubmitted => "bi-arrow-repeat",
             PayrollCorrection => "bi-exclamation-triangle-fill",
             NewTask => "bi-file-earmark-fill",
             TaskCompletionRequested => "bi-clipboard-check-fill",
@@ -85,11 +89,13 @@ namespace RSDSystem.Models
         public static string IconClass(string? kind) => (kind ?? "").Trim() switch
         {
             PayrollSubmitted => "notif-icon-send",
+            PayrollResubmitted => "notif-icon-send",
             PayrollPredictionAvailable => "notif-icon-ok",
             AttendanceImported => "notif-icon-cal",
             PayrollAnomalyBudget => "notif-icon-warn",
             PayrollAnomalyPattern => "notif-icon-warn",
             AttendanceCorrectionRequest => "notif-icon-doc",
+            AttendanceCorrectionResubmitted => "notif-icon-doc",
             PayrollCorrection => "notif-icon-warn",
             NewTask => "notif-icon-task",
             TaskCompletionRequested => "notif-icon-doc",

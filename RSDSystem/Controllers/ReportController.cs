@@ -321,7 +321,7 @@ namespace RSDSystem.Controllers
 
         private async Task<ReportBuild> PredictionReportAsync(Project project)
         {
-            var page = await _predictions.LoadAsync(project.ProjectId, HttpContext.RequestAborted);
+            var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: HttpContext.RequestAborted);
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Payroll Prediction Report", page.GeneratedAt.ToString("MMMM dd, yyyy", Dates)));
             html.Append(string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase)
@@ -356,7 +356,7 @@ namespace RSDSystem.Controllers
 
         private async Task<ReportBuild> AnomalyReportAsync(Project project, DateTime? start, DateTime? end, string periodLabel)
         {
-            var page = await _predictions.LoadAsync(project.ProjectId, HttpContext.RequestAborted);
+            var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: HttpContext.RequestAborted);
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Payroll Anomaly Report", string.IsNullOrEmpty(periodLabel) ? page.GeneratedAt.ToString("MMMM dd, yyyy", Dates) : periodLabel));
 
