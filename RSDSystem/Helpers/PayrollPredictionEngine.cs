@@ -27,6 +27,8 @@ namespace RSDSystem.Helpers
         public decimal ChangePercent { get; set; }
         public string? RiskTitle { get; set; }
         public string? RiskDetail { get; set; }
+        public string Engine { get; set; } = "local";
+        public string? Model { get; set; }
     }
 
     /// <summary>
@@ -84,7 +86,9 @@ namespace RSDSystem.Helpers
                 UnusualChange = unusual,
                 ChangePercent = changePercent,
                 RiskTitle = riskTitle,
-                RiskDetail = riskDetail
+                RiskDetail = riskDetail,
+                Engine = "local",
+                Model = "linear-trend"
             };
         }
 

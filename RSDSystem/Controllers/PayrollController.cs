@@ -197,6 +197,9 @@ namespace RSDSystem.Controllers
                 projectId = page.ProjectId,
                 projectName = page.ProjectName,
                 generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
+                engine = page.Engine,
+                model = page.Model,
+                usedPythonApi = string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase),
                 rows = page.Rows.Select(r => new
                 {
                     previousMonth1 = string.IsNullOrWhiteSpace(r.PreviousLabel1)

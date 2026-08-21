@@ -30,7 +30,7 @@
     </div>
 
     <div id="predictionEmpty" class="text-center text-muted py-5">
-        Select a project and click Load Prediction to forecast next month from the last two months of generated payroll.
+        Select a project and click Load Prediction. Next-month payroll is predicted by the Python model from the last two months of generated payroll.
     </div>
 </div>
 
@@ -57,7 +57,7 @@
             <span>Predicted Payroll</span>
             <strong id="prPredicted">—</strong>
         </div>
-        <div class="pred-result-hint">Predicted from this project’s last two months of generated payroll.</div>
+        <div class="pred-result-hint" id="prHint">Predicted from this project’s last two months of generated payroll.</div>
         <div class="pred-result-row" id="prAllocatedRow" hidden>
             <span id="prAllocatedLabel">Allocated Budget</span>
             <strong id="prAllocated">—</strong>
@@ -154,7 +154,14 @@
             `).join('');
         }
 
-        function openResult(row, generatedAt, projectName) {
+        function engineHint(page) {
+            if (page && page.usedPythonApi) {
+                return 'Predicted by the Python payroll model (FastAPI + scikit-learn Linear Regression).';
+            }
+            return 'Python prediction API was offline, so the system used the local payroll formula.';
+        }
+
+        function openResult(row, generatedAt, projectName, page) {
             document.getElementById('prProject').textContent = projectName || '—';
             document.getElementById('prMonth').textContent = row.predictionMonth || '—';
             document.getElementById('prPrevious1Label').textContent = row.previousMonth1
@@ -191,6 +198,8 @@
                 risk.hidden = true;
             }
             document.getElementById('prGenerated').textContent = generatedAt || '—';
+            const hint = document.getElementById('prHint');
+            if (hint) hint.textContent = engineHint(page);
             document.getElementById('predictionOverlay').hidden = false;
         }
 
@@ -202,7 +211,7 @@
             const btn = e.target.closest('[data-row-index]');
             if (!btn || !lastPage) return;
             const row = lastPage.rows[Number(btn.dataset.rowIndex)];
-            if (row) openResult(row, lastPage.generatedAt, lastPage.projectName);
+            if (row) openResult(row, lastPage.generatedAt, lastPage.projectName, lastPage);
         });
         document.getElementById('predictionOverlay').addEventListener('click', function (e) {
             if (e.target.id === 'predictionOverlay') closeResult();

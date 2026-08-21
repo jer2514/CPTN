@@ -324,6 +324,9 @@ namespace RSDSystem.Controllers
             var page = await _predictions.LoadAsync(project.ProjectId, HttpContext.RequestAborted);
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Payroll Prediction Report", page.GeneratedAt.ToString("MMMM dd, yyyy", Dates)));
+            html.Append(string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase)
+                ? "<p>Predicted by the Python payroll model (scikit-learn Linear Regression).</p>"
+                : "<p>Predicted with the local payroll formula (Python API offline).</p>");
             if (page.Error != null && page.Rows.Count == 0)
             {
                 html.Append($"<p>{Esc(page.Error)}</p>");
