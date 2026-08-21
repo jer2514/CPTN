@@ -8,8 +8,7 @@ namespace RSDSystem.Helpers
         public static bool IsClosed(string? status)
         {
             var value = (status ?? "").Trim();
-            return string.Equals(value, PayrollStatusOptions.Approved, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, PayrollStatusOptions.Submitted, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(value, PayrollStatusOptions.Approved, StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool Covers(DateTime periodStart, DateTime periodEnd, DateTime workDate)
@@ -23,8 +22,7 @@ namespace RSDSystem.Helpers
         {
             return await db.Payrolls.AsNoTracking()
                 .Where(p => p.ProjectId == projectId
-                    && (p.Status == PayrollStatusOptions.Approved
-                        || p.Status == PayrollStatusOptions.Submitted))
+                    && p.Status == PayrollStatusOptions.Approved)
                 .Select(p => new ClosedPayrollWindow
                 {
                     EmployeeId = p.EmployeeId,
@@ -48,8 +46,7 @@ namespace RSDSystem.Helpers
             return await db.Payrolls.AsNoTracking()
                 .AnyAsync(p => p.ProjectId == projectId
                     && p.EmployeeId == id
-                    && (p.Status == PayrollStatusOptions.Approved
-                        || p.Status == PayrollStatusOptions.Submitted)
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart.Date <= date
                     && p.PayPeriodEnd.Date >= date, cancellationToken);
         }

@@ -279,11 +279,18 @@ namespace RSDSystem.Controllers
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
-                    && p.PayPeriodEnd.Date == end.Date)
+                    && p.PayPeriodEnd.Date == end.Date
+                    && p.Status == PayrollStatusOptions.Approved)
                 .ToListAsync())
                 .OrderBy(p => p.Employee?.LastName)
                 .ThenBy(p => p.Employee?.FirstName)
                 .ToList();
+
+            if (slips.Count == 0)
+            {
+                TempData["Error"] = "Payslips can be printed only after admin has approved this payroll.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
             ViewBag.ProjectName = project.ProjectName;
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
@@ -308,15 +315,26 @@ namespace RSDSystem.Controllers
                 return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
 
-            var count = await _db.Set<Payroll>().CountAsync(p => p.ProjectId == projectId
-                && p.PayPeriodStart.Date == start.Date
-                && p.PayPeriodEnd.Date == end.Date);
+            var slips = await _db.Set<Payroll>()
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .Select(p => p.Status)
+                .ToListAsync();
 
-            if (count == 0)
+            if (slips.Count == 0)
             {
                 TempData["Error"] = "There are no payslips to send for this period.";
                 return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
+
+            if (slips.Any(status => !PayrollStatusOptions.IsApproved(status)))
+            {
+                TempData["Error"] = "Payslips can be sent only after admin has approved this payroll.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
+
+            var count = slips.Count;
 
             var staff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff)
                 ? "payroll staff"
@@ -497,6 +515,9 @@ namespace RSDSystem.Controllers
         // GET /Payroll/View/{id}
         public async Task<IActionResult> View(int id)
         {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
             var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
@@ -544,6 +565,9 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> ViewPartial(int id)
         {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
             var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
@@ -561,12 +585,18 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
         {
+            if (HttpContext.Session.GetString("Role") != "Admin")
+                return Json(new { success = false, message = "Admin access is required." });
+
             var payroll = await _db.Set<Payroll>()
                 .Include(p => p.Project)
                 .Include(p => p.Employee)
                 .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
+
+            if (!PayrollStatusOptions.IsSubmitted(payroll.Status))
+                return Json(new { success = false, message = "Only submitted payroll can be approved." });
 
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;
@@ -591,6 +621,9 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReturnForCorrection(int id, string reason)
         {
+            if (HttpContext.Session.GetString("Role") != "Admin")
+                return Json(new { success = false, message = "Admin access is required." });
+
             if (string.IsNullOrWhiteSpace(reason))
                 return Json(new { success = false, message = "Please provide a reason for correction." });
 
@@ -600,6 +633,9 @@ namespace RSDSystem.Controllers
                 .FirstOrDefaultAsync(p => p.PayrollId == id);
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
+
+            if (!PayrollStatusOptions.IsSubmitted(payroll.Status))
+                return Json(new { success = false, message = "Only submitted payroll can be returned for correction." });
 
             payroll.Status = PayrollStatusOptions.Correction;
             payroll.CorrectionReason = reason.Trim();

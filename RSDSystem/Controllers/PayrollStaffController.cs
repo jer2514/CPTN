@@ -732,11 +732,18 @@ namespace RSDSystem.Controllers
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
-                    && p.PayPeriodEnd.Date == end.Date)
+                    && p.PayPeriodEnd.Date == end.Date
+                    && p.Status == PayrollStatusOptions.Approved)
                 .ToListAsync())
                 .OrderBy(p => p.Employee?.LastName)
                 .ThenBy(p => p.Employee?.FirstName)
                 .ToList();
+
+            if (slips.Count == 0)
+            {
+                TempData["Error"] = "Payslips are available after admin approval.";
+                return RedirectToAction(nameof(PendingPayroll), new { projectId });
+            }
 
             var dateCulture = System.Globalization.CultureInfo.InvariantCulture;
             var safe = new string((project.ProjectName ?? "Project").Where(char.IsLetterOrDigit).ToArray());

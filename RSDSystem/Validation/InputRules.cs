@@ -169,5 +169,30 @@ namespace RSDSystem.Validation
 
             return true;
         }
+
+        public const int MinStaffPasswordLength = 8;
+        public const string StaffPasswordMessage =
+            "Password must be at least 8 characters and include 1 capital letter, 1 number, and 1 special character.";
+
+        public static bool TryValidateStaffPassword(string? password, out string? error)
+        {
+            error = null;
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                error = "Password is required.";
+                return false;
+            }
+
+            if (password.Length < MinStaffPasswordLength
+                || !password.Any(char.IsUpper)
+                || !password.Any(char.IsDigit)
+                || !password.Any(ch => !char.IsLetterOrDigit(ch)))
+            {
+                error = StaffPasswordMessage;
+                return false;
+            }
+
+            return true;
+        }
     }
 }

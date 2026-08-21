@@ -83,8 +83,8 @@ namespace RSDSystem.Controllers
 
             if (string.IsNullOrWhiteSpace(Password))
                 ModelState.AddModelError("Password", "Password is required.");
-            else if (Password.Length < 8)
-                ModelState.AddModelError("Password", "Password must be at least 8 characters.");
+            else if (!InputRules.TryValidateStaffPassword(Password, out var passwordError))
+                ModelState.AddModelError("Password", passwordError!);
 
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
@@ -166,10 +166,21 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
 
+            var existing = await _db.Users.FindAsync(user.UserId);
+            if (existing == null) return NotFound();
+
             if (!string.IsNullOrWhiteSpace(NewPassword))
             {
-                if (NewPassword.Length < 8)
+                if (string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!InputRules.TryValidateStaffPassword(NewPassword, out var passwordError))
+                        ModelState.AddModelError("NewPassword", passwordError!);
+                }
+                else if (NewPassword.Length < 8)
+                {
                     ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+                }
+
                 if (NewPassword != ConfirmPassword)
                     ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
             }
@@ -198,11 +209,11 @@ namespace RSDSystem.Controllers
             if (!ModelState.IsValid)
             {
                 ViewBag.PageTitle = "Edit User";
+                user.Role = existing.Role;
+                user.PhotoPath = existing.PhotoPath;
+                user.UserCode = existing.UserCode;
                 return View(user);
             }
-
-            var existing = await _db.Users.FindAsync(user.UserId);
-            if (existing == null) return NotFound();
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
             existing.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());

@@ -138,12 +138,16 @@
                         <label class="form-lbl">New Password <span style="color:#9ab0d8;font-weight:400">(leave blank to keep)</span></label>
                         <div class="pwd-wrap">
                             <input type="password" name="NewPassword" id="pwd" class="@Ctrl("NewPassword")"
-                                   data-validate="minlen8" data-label="Password" />
+                                   data-validate="@(Model.Role == "PayrollStaff" ? "staffPassword" : "minlen8")" data-label="Password" />
                             <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
                                 <i class="bi bi-eye-slash" id="eye1"></i>
                             </span>
                         </div>
                         <span class="field-error" data-error-for="NewPassword">@Err("NewPassword")</span>
+                        @if (Model.Role == "PayrollStaff")
+                        {
+                            <div style="color:#9ab0d8;font-size:12px;margin-top:4px">Must include 1 capital letter, 1 number, and 1 special character.</div>
+                        }
                     </div>
                     <div>
                         <label class="form-lbl">Confirm Password</label>
