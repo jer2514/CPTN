@@ -155,6 +155,9 @@ namespace RSDSystem.Models
             return OnGoing;
         }
 
+        public static bool IsFinished(string? status) =>
+            Normalize(status) == Finished;
+
         public static string BadgeClass(string? status) => Normalize(status) switch
         {
             Finished => "badge-finished",

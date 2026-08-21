@@ -33,14 +33,33 @@ namespace RSDSystem.Helpers
 
         public static decimal RegularHours(string? in1, string? out1, string? in2, string? out2)
         {
+            var countedIn1 = CountedMorningIn(in1);
             decimal hours = 0;
-            foreach (var (timeIn, timeOut) in new[] { (in1, out1), (in2, out2) })
+            foreach (var (timeIn, timeOut) in new[] { (countedIn1, out1), (in2, out2) })
             {
                 hours += OverlapHours(timeIn, timeOut, MorningStart, MorningEnd);
                 hours += OverlapHours(timeIn, timeOut, AfternoonStart, ShiftEnd);
             }
 
             return Math.Round(hours, 2);
+        }
+
+        /// <summary>
+        /// In by 8:30 counts from 8:00 (grace). After 8:30 the 8–9 hour is unpaid.
+        /// </summary>
+        public static string? CountedMorningIn(string? timeIn)
+        {
+            if (!AttendanceDisplay.TryParseTime(timeIn, out var firstIn))
+                return timeIn;
+
+            if (firstIn <= LateAfter)
+                return "08:00";
+
+            var unpaidHourEnd = MorningStart + TimeSpan.FromHours(1);
+            if (firstIn < unpaidHourEnd)
+                return "09:00";
+
+            return timeIn;
         }
 
         public static decimal OvertimeHours(

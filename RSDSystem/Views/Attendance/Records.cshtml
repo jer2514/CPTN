@@ -138,7 +138,7 @@
         </div>
         <label id="reReasonWrap" class="form-lbl" style="display:block;margin-top:12px">
             Reason
-            <input type="text" id="reReason" class="form-ctrl" placeholder="Half-day attendance" maxlength="250" />
+            <input type="text" id="reReason" class="form-ctrl" placeholder="Why does this row need a correction?" maxlength="250" />
         </label>
         <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime</div>
         <div class="att-preview-footer">
@@ -148,7 +148,7 @@
             </div>
             <div class="att-edit-actions">
                 <button type="button" class="btn-outline-blue" id="reCancel">Cancel</button>
-                <button type="button" class="btn-primary-blue-solid" id="reSave">Save</button>
+                <button type="button" class="btn-primary-blue-solid" id="reSave">Submit Request</button>
             </div>
         </div>
     </div>
@@ -333,8 +333,10 @@
                 document.getElementById('recordsBody').innerHTML = data.rows.length
                     ? data.rows.map(r => {
                         const action = isAdmin ? '' : (() => {
-                            const actionLabel = r.actionLabel || (r.status === 'Complete' ? 'Request Edit' : 'Edit');
-                            return `<td><button type="button" class="att-action-link" data-record-id="${r.recordId}">${actionLabel}</button></td>`;
+                            const actionLabel = r.actionLabel || 'Request Edit';
+                            const locked = r.locked;
+                            const cls = 'att-action-link' + (locked ? ' is-locked' : '');
+                            return `<td><button type="button" class="${cls}" data-record-id="${r.recordId}"${locked ? ' disabled' : ''}>${actionLabel}</button></td>`;
                         })();
                         return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
                             <td>${r.displayId || '——'}</td>
@@ -425,13 +427,22 @@
             return Math.round(((until - from) / 60) * 100) / 100;
         }
 
+        function countedMorningIn(value) {
+            const mins = minutesOf(value);
+            if (mins === null) return value;
+            if (mins <= (8 * 60) + 30) return '08:00';
+            if (mins < 9 * 60) return '09:00';
+            return value;
+        }
+
         function draftHours(draft) {
-            const morning = overlapHours(draft.timeIn1, draft.timeOut1, 8 * 60, 12 * 60)
+            const in1 = countedMorningIn(draft.timeIn1);
+            const morning = overlapHours(in1, draft.timeOut1, 8 * 60, 12 * 60)
                 + overlapHours(draft.timeIn2, draft.timeOut2, 8 * 60, 12 * 60);
-            const afternoon = overlapHours(draft.timeIn1, draft.timeOut1, 13 * 60, 17 * 60)
+            const afternoon = overlapHours(in1, draft.timeOut1, 13 * 60, 17 * 60)
                 + overlapHours(draft.timeIn2, draft.timeOut2, 13 * 60, 17 * 60);
             const punchedOt = overlapHours(draft.overtimeIn, draft.overtimeOut, 17 * 60, 24 * 60);
-            const shiftOt = overlapHours(draft.timeIn1, draft.timeOut1, 17 * 60, 24 * 60)
+            const shiftOt = overlapHours(in1, draft.timeOut1, 17 * 60, 24 * 60)
                 + overlapHours(draft.timeIn2, draft.timeOut2, 17 * 60, 24 * 60);
             return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt > 0 ? punchedOt : shiftOt };
         }
@@ -483,6 +494,10 @@
 
         function openRecordEdit(row) {
             if (isAdmin || !row) return;
+            if (row.locked) {
+                showToast('This attendance row was already approved and cannot be edited again.');
+                return;
+            }
             if (row.pendingCorrection) {
                 showToast('This attendance row already has a correction request waiting for admin review.');
                 return;
@@ -498,18 +513,9 @@
             document.getElementById('reOut2').value = toHtmlTime(row.timeOut2);
             document.getElementById('reOtIn').value = toHtmlTime(row.overtimeIn);
             document.getElementById('reOtOut').value = toHtmlTime(row.overtimeOut);
-            const reasonWrap = document.getElementById('reReasonWrap');
-            const reasonInput = document.getElementById('reReason');
-            const saveBtn = document.getElementById('reSave');
-            if (row.requestEdit) {
-                reasonWrap.style.display = 'block';
-                reasonInput.value = 'Half-day attendance';
-                saveBtn.textContent = 'Submit Request';
-            } else {
-                reasonWrap.style.display = 'none';
-                reasonInput.value = '';
-                saveBtn.textContent = 'Save';
-            }
+            document.getElementById('reReasonWrap').style.display = 'block';
+            document.getElementById('reReason').value = '';
+            document.getElementById('reSave').textContent = 'Submit Request';
             refreshRecordEditMeta();
             document.getElementById('recordEditOverlay').hidden = false;
         }
@@ -550,8 +556,7 @@
         document.getElementById('reSave').addEventListener('click', async function () {
             if (!editingRecord) return;
             const draft = overlayDraft();
-            const requestEdit = !!editingRecord.requestEdit;
-            if (requestEdit && !document.getElementById('reReason').value.trim()) {
+            if (!document.getElementById('reReason').value.trim()) {
                 showToast('Enter a reason for this correction request.');
                 return;
             }
@@ -563,10 +568,10 @@
             body.set('timeOut2', toHtmlTime(draft.timeOut2));
             body.set('overtimeIn', toHtmlTime(draft.overtimeIn));
             body.set('overtimeOut', toHtmlTime(draft.overtimeOut));
-            if (requestEdit) body.set('reason', document.getElementById('reReason').value.trim());
+            body.set('reason', document.getElementById('reReason').value.trim());
             if (token) body.set('__RequestVerificationToken', token);
 
-            const url = requestEdit ? '/Attendance/RequestCorrection' : '/Attendance/UpdateRecord';
+            const url = '/Attendance/RequestCorrection';
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Accept': 'application/json', 'RequestVerificationToken': token },
@@ -578,6 +583,7 @@
                 return;
             }
             closeRecordEdit();
+            showToast(data.message || 'Correction request sent to admin.', 'success');
             loadRecords();
         });
         document.addEventListener('keydown', function (e) {

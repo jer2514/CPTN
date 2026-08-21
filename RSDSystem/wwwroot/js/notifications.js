@@ -3,6 +3,13 @@
     const token = tokenInput ? tokenInput.value : '';
     const isAdmin = document.body.dataset.role === 'Admin';
 
+    function hideReturnReason() {
+        const wrap = document.getElementById('corrReturnWrap');
+        const reason = document.getElementById('corrReturnReason');
+        if (wrap) wrap.hidden = true;
+        if (reason) reason.value = 'The submitted correction could not be verified.';
+    }
+
     function wrapBells() {
         document.querySelectorAll('.bell-btn').forEach(function (btn) {
             if (btn.closest('.notif-bell-wrap')) return;
@@ -51,6 +58,12 @@
                 return;
             }
             setBadges(data.unread || 0);
+            const headSpan = panel.querySelector('.notif-panel-head span');
+            if (headSpan) {
+                headSpan.textContent = data.unread > 0
+                    ? 'Notifications · ' + data.unread + ' unread'
+                    : 'Notifications';
+            }
             const viewAll = panel.querySelector('.notif-view-all');
             if (viewAll && data.viewAllUrl) viewAll.href = data.viewAllUrl;
             if (!data.items || !data.items.length) {
@@ -164,6 +177,7 @@
             document.getElementById('corrReason').textContent = data.reason || '—';
             const actions = document.getElementById('corrActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
+            hideReturnReason();
         } catch (err) {
             showToast('Could not load the correction request.');
             overlay.classList.remove('open');
@@ -244,7 +258,10 @@
     const overlay = document.getElementById('attendanceCorrectionOverlay');
     if (overlay) {
         overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) overlay.classList.remove('open');
+            if (e.target === overlay) {
+                overlay.classList.remove('open');
+                hideReturnReason();
+            }
         });
         const approveBtn = document.getElementById('corrApprove');
         const returnBtn = document.getElementById('corrReturn');
@@ -257,14 +274,44 @@
                 window.location.reload();
             });
         }
+        const returnWrap = document.getElementById('corrReturnWrap');
+        const returnReason = document.getElementById('corrReturnReason');
+        const returnCancel = document.getElementById('corrReturnCancel');
+        const returnSend = document.getElementById('corrReturnSend');
+        const corrActions = document.getElementById('corrActions');
+
+        function showReturnReason() {
+            if (corrActions) corrActions.style.display = 'none';
+            if (returnWrap) returnWrap.hidden = false;
+            if (returnReason) {
+                returnReason.value = 'The submitted correction could not be verified.';
+                returnReason.focus();
+            }
+        }
+
         if (returnBtn) {
-            returnBtn.addEventListener('click', async function () {
+            returnBtn.addEventListener('click', function () {
+                showReturnReason();
+            });
+        }
+        if (returnCancel) {
+            returnCancel.addEventListener('click', function () {
+                hideReturnReason();
+                if (corrActions) corrActions.style.display = 'flex';
+            });
+        }
+        if (returnSend) {
+            returnSend.addEventListener('click', async function () {
                 const id = overlay.dataset.id;
-                const reason = window.prompt('Reason for returning this correction:', 'The submitted correction could not be verified.');
-                if (reason == null) return;
+                const reason = returnReason ? returnReason.value.trim() : '';
+                if (!reason) {
+                    showToast('Enter a reason for returning this correction.');
+                    return;
+                }
                 const data = await postForm('/Notification/ReturnCorrection', { id: id, reason: reason });
                 if (!data.success) { showToast(data.message || 'Could not return the request.'); return; }
                 overlay.classList.remove('open');
+                hideReturnReason();
                 window.location.reload();
             });
         }

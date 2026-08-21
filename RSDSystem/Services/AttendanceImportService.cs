@@ -492,7 +492,7 @@ namespace RSDSystem.Services
                 DisplayId = AttendanceDisplay.EmployeeId(first.Employee?.EmployeeCode ?? first.ExternalUserId),
                 EmployeeName = first.Employee?.FullName ?? first.EmployeeName,
                 Matched = rows.Any(r => r.Matched),
-                DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
+                DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsFullDay(r.Status)),
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),
@@ -739,7 +739,7 @@ namespace RSDSystem.Services
                 });
             }
 
-            edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsWorked(d.Status));
+            edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsFullDay(d.Status));
             edit.DaysAbsent = edit.Days.Count(d => d.Status == AttendanceStatuses.Absent);
             edit.DaysLate = edit.Days.Count(d => AttendanceStatuses.CountsAsLate(d.Status));
             edit.DaysIncomplete = edit.Days.Count(d => AttendanceStatuses.IsHalfDay(d.Status));

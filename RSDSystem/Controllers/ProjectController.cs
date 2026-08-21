@@ -1,16 +1,19 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
     public class ProjectController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly NotificationService _notifications;
 
-        public ProjectController(PayrollDbContext db)
+        public ProjectController(PayrollDbContext db, NotificationService notifications)
         {
             _db = db;
+            _notifications = notifications;
         }
 
         private void PopulateViewBag()
@@ -60,7 +63,7 @@ namespace RSDSystem.Controllers
                                      .ToListAsync();
 
             var unassignedEmployees = await _db.Employees
-                                     .Where(e => e.ProjectId == null && e.IsActive)
+                                     .Where(e => e.ProjectId == null)
                                      .OrderBy(e => e.FirstName)
                                      .ToListAsync();
 
@@ -117,6 +120,7 @@ namespace RSDSystem.Controllers
 
             _db.Projects.Add(project);
             await _db.SaveChangesAsync();
+            await _notifications.NotifyStaffAssignedAsync(project, HttpContext.RequestAborted);
             TempData["Success"] = "Project added successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -129,6 +133,11 @@ namespace RSDSystem.Controllers
                                    .FirstOrDefaultAsync(p => p.ProjectId == id);
 
             if (project == null) return NotFound();
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot be edited.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
 
             var employees = await _db.Employees
                                      .Where(e => e.ProjectId == id)
@@ -167,6 +176,15 @@ namespace RSDSystem.Controllers
                                     .FirstOrDefaultAsync(p => p.ProjectId == project.ProjectId);
 
             if (existing == null) return NotFound();
+            if (ProjectStatusOptions.IsFinished(existing.Status))
+            {
+                TempData["Error"] = "Finished projects cannot be edited.";
+                return RedirectToAction(nameof(Details), new { id = existing.ProjectId });
+            }
+
+            var previousStaff = existing.AssignedPayrollStaff;
+            var becomingFinished = ProjectStatusOptions.IsFinished(project.Status)
+                && !ProjectStatusOptions.IsFinished(existing.Status);
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
             existing.ProjectName = ti.ToTitleCase((project.ProjectName ?? string.Empty).Trim().ToLower());
@@ -196,8 +214,17 @@ namespace RSDSystem.Controllers
                 }
             }
 
+            if (becomingFinished)
+                await InactivateAssignedEmployeesAsync(existing.ProjectId);
+
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Project updated successfully.";
+
+            if (!string.Equals(previousStaff?.Trim(), existing.AssignedPayrollStaff?.Trim(), StringComparison.OrdinalIgnoreCase))
+                await _notifications.NotifyStaffAssignedAsync(existing, HttpContext.RequestAborted);
+
+            TempData["Success"] = becomingFinished
+                ? "Project marked finished. Assigned employees are now inactive."
+                : "Project updated successfully.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -253,17 +280,10 @@ namespace RSDSystem.Controllers
         // POST /Project/Delete/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public IActionResult Delete(int id)
         {
-            var project = await _db.Projects
-                                   .Include(p => p.MonthlyBudgets)
-                                   .FirstOrDefaultAsync(p => p.ProjectId == id);
-            if (project != null)
-            {
-                _db.Projects.Remove(project);
-                await _db.SaveChangesAsync();
-            }
-            return RedirectToAction(nameof(Index));
+            TempData["Error"] = "Projects cannot be deleted. Mark the project as Finished instead.";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         // POST /Project/RemoveEmployee
@@ -275,6 +295,7 @@ namespace RSDSystem.Controllers
             if (emp != null)
             {
                 emp.ProjectId = null;
+                emp.IsActive = false;
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Edit), new { id = projectId });
@@ -286,6 +307,12 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignEmployee(int employeeId, int projectId)
         {
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+            if (ProjectStatusOptions.IsFinished(project.Status))
+                return Json(new { success = false, message = "Finished projects cannot have employees assigned." });
+
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
@@ -331,6 +358,18 @@ namespace RSDSystem.Controllers
                     job = emp.JobClassification
                 }
             });
+        }
+
+        private async Task InactivateAssignedEmployeesAsync(int projectId)
+        {
+            var employees = await _db.Employees
+                .Where(e => e.ProjectId == projectId)
+                .ToListAsync();
+            foreach (var emp in employees)
+            {
+                emp.IsActive = false;
+                emp.ProjectId = null;
+            }
         }
     }
 }

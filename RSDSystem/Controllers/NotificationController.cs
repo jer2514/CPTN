@@ -24,18 +24,20 @@ namespace RSDSystem.Controllers
             _imports = imports;
         }
 
-        public async Task<IActionResult> Index(int page = 1)
+        public async Task<IActionResult> Index(int page = 1, string? filter = null)
         {
             ViewData["Title"] = "Notifications";
             ViewBag.PageTitle = "Notifications";
             if (IsStaff)
                 ViewBag.LayoutName = "_PayrollStaffLayout";
 
+            var unreadOnly = string.Equals(filter, "unread", StringComparison.OrdinalIgnoreCase);
             var (items, total, unread) = await _notifications.ListAsync(
-                CurrentRole(), CurrentName(), page, PageSize, HttpContext.RequestAborted);
+                CurrentRole(), CurrentName(), page, PageSize, unreadOnly, HttpContext.RequestAborted);
             ViewBag.Page = page;
             ViewBag.TotalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
             ViewBag.Unread = unread;
+            ViewBag.Filter = unreadOnly ? "unread" : "all";
             ViewBag.IsAdmin = IsAdmin;
             return View(items);
         }
@@ -108,7 +110,7 @@ namespace RSDSystem.Controllers
                 timeOut2 = AttendanceDisplay.Clock(request.TimeOut2) ?? "—",
                 overtimeIn = AttendanceDisplay.Clock(request.OvertimeIn) ?? "—",
                 overtimeOut = AttendanceDisplay.Clock(request.OvertimeOut) ?? "—",
-                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Half-day attendance" : request.Reason,
+                reason = string.IsNullOrWhiteSpace(request.Reason) ? "—" : request.Reason,
                 pending = request.Status == CorrectionRequestStatuses.Pending
             });
         }

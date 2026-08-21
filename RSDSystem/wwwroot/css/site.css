@@ -3101,6 +3101,14 @@ button.badge-btn {
     text-decoration: underline;
 }
 
+.att-action-link.is-locked,
+.att-action-link:disabled {
+    color: #9aa4b5;
+    cursor: not-allowed;
+    text-decoration: none;
+    pointer-events: none;
+}
+
 .att-preview-footer {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -3662,9 +3670,35 @@ button.badge-btn {
     margin-bottom: 8px;
 }
 
+.notif-filter-tabs {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notif-filter-tab {
+    border: none;
+    background: transparent;
+    color: #5b6b8a;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 0;
+}
+
+.notif-filter-tab:hover {
+    color: #163F8B;
+}
+
+.notif-filter-tab.is-active,
 .notif-filter-active {
     font-weight: 600;
     color: #163F8B;
+}
+
+.notif-unread-count {
+    font-size: 12px;
+    color: #5b6b8a;
 }
 
 .notif-mark-all {
@@ -3743,6 +3777,19 @@ button.badge-btn {
 .corr-reason {
     margin: 8px 0 18px;
     font-size: 14px;
+}
+
+.corr-return-wrap {
+    margin-top: 8px;
+}
+
+.corr-return-wrap .form-lbl {
+    margin-bottom: 6px;
+}
+
+.corr-return-wrap textarea {
+    margin-bottom: 14px;
+    resize: vertical;
 }
 
 .corr-actions {

@@ -197,15 +197,10 @@
                         <span class="field-error" data-error-for="photo">@Err("photo")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Role <span class="req-star">*</span></label>
-                        <select name="Role" class="@Ctrl("Role")" data-validate="required" data-label="Role">
-                            <option value="">Select role</option>
-                            @foreach (var r in roles)
-                            {
-                                <option value="@r" selected="@(r == Model.Role)">@((r == "PayrollStaff") ? "Payroll Staff" : r)</option>
-                            }
-                        </select>
-                        <span class="field-error" data-error-for="Role">@Err("Role")</span>
+                        <label class="form-lbl">Role</label>
+                        <input type="text" class="form-ctrl"
+                               value="@(Model.Role == "PayrollStaff" ? "Payroll Staff" : Model.Role)" readonly />
+                        <input type="hidden" name="Role" value="@Model.Role" />
                     </div>
                 </div>
 

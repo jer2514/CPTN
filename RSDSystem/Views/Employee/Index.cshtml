@@ -58,38 +58,20 @@
     <table class="emp-table">
         <thead>
             <tr>
-                <th style="width:40px">
-                    <input type="checkbox" class="tbl-check" onclick="toggleAll(this)" />
-                </th>
                 <th>Employee ID</th>
                 <th>Employee</th>
                 <th>Job</th>
                 <th>Assigned to</th>
                 <th>Date Added</th>
                 <th>Status</th>
-                <th>
-                    <div>
-                        <span>Action</span>
-                        <form id="bulkDeleteForm" asp-action="BulkDelete" method="post" class="d-inline m-0">
-                            @Html.AntiForgeryToken()
-                            <div id="bulkIdsContainer"></div>
-                            <button type="button"
-                                    id="bulkDeleteBtn"
-                                    class="action-btn action-delete"
-                                    style="display:none"
-                                    onclick="openBulkDeleteModal()">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
-                        </form>
-                    </div>
-                </th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">No employees found.</td>
+                    <td colspan="7" class="text-center text-muted py-4">No employees found.</td>
                 </tr>
             }
             @foreach (var emp in Model)
@@ -97,7 +79,6 @@
                 var initials = $"{(string.IsNullOrEmpty(emp.FirstName) ? "" : emp.FirstName[..1])}{(string.IsNullOrEmpty(emp.LastName) ? "" : emp.LastName[..1])}";
                 var dateAdded = emp.DateAdded.Year > 1900 ? emp.DateAdded.ToString("MMM d, yyyy") : "—";
                 <tr>
-                    <td><input type="checkbox" class="tbl-check row-cb" data-id="@emp.EmployeeId" /></td>
                     <td>@EmployeeIds.Format(emp.EmployeeCode)</td>
                     <td>
                         <div class="emp-name-cell">
@@ -131,10 +112,6 @@
                                class="action-btn action-edit" title="Edit">
                                 <i class="bi bi-pencil-fill"></i>
                             </a>
-                            <button type="button" class="action-btn action-delete" title="Delete"
-                                    onclick="openDeleteModal(@emp.EmployeeId, '@emp.FullName.Replace("'", "\\'")')">
-                                <i class="bi bi-trash-fill"></i>
-                            </button>
                         </div>
                     </td>
                 </tr>
@@ -144,112 +121,3 @@
 
     @await Html.PartialAsync("_Pagination")
 </div>
-
-<!-- Delete Overlay -->
-<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
-    <div class="del-modal">
-        <div class="del-icon-wrap">
-            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
-        </div>
-        <div class="del-title">Are you sure?</div>
-        <div class="del-msg">
-            You are about to permanently delete Employee:
-            <strong id="deleteEmpName"></strong>.
-            This action cannot be undone.
-        </div>
-        <div class="del-actions">
-            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
-            <form id="deleteForm" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="del-btn-delete">Delete</button>
-            </form>
-        </div>
-    </div>
-</div>
-
-
-<!-- Bulk Delete Overlay -->
-<div class="del-overlay" id="bulkDeleteOverlay" onclick="closeBulkDeleteModal(arguments[0])">
-    <div class="del-modal">
-        <div class="del-icon-wrap">
-            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
-        </div>
-        <div class="del-title">Are you sure?</div>
-        <div class="del-msg">
-            You are about to permanently delete
-            <strong id="bulkDeleteCount">0</strong> employee(s).
-            This action cannot be undone.
-        </div>
-        <div class="del-actions">
-            <button class="del-btn-cancel" onclick="closeBulkDeleteModal()">Cancel</button>
-            <button class="del-btn-delete" onclick="document.getElementById('bulkDeleteForm').submit()">
-                Delete
-            </button>
-        </div>
-    </div>
-</div>
-
-@section Scripts {
-    <script>
-        function toggleAll(src) {
-            document.querySelectorAll('.row-cb').forEach(cb => cb.checked = src.checked);
-            updateBulkBar();
-        }
-
-        document.addEventListener('change', function (e) {
-            if (e.target.classList.contains('row-cb')) updateBulkBar();
-        });
-
-        function updateBulkBar() {
-            const checked = document.querySelectorAll('.row-cb:checked');
-            const btn     = document.getElementById('bulkDeleteBtn');
-
-            if (checked.length > 0) {
-                btn.style.display = 'inline-flex';
-            } else {
-                btn.style.display = 'none';
-            }
-        }
-
-        function openBulkDeleteModal() {
-            const checked   = document.querySelectorAll('.row-cb:checked');
-            const container = document.getElementById('bulkIdsContainer');
-            const count     = document.getElementById('bulkDeleteCount');
-
-            container.innerHTML = '';
-            checked.forEach(cb => {
-                const input = document.createElement('input');
-                input.type  = 'hidden';
-                input.name  = 'selectedIds';
-                input.value = cb.dataset.id;
-                container.appendChild(input);
-            });
-
-            count.textContent = checked.length;
-            document.getElementById('bulkDeleteOverlay').classList.add('open');
-        }
-
-        function closeBulkDeleteModal(e) {
-            if (!e || e.target === document.getElementById('bulkDeleteOverlay'))
-                document.getElementById('bulkDeleteOverlay').classList.remove('open');
-        }
-
-        function openDeleteModal(id, name) {
-            document.getElementById('deleteEmpName').textContent = name;
-            document.getElementById('deleteForm').action = '/Employee/Delete/' + id;
-            document.getElementById('deleteOverlay').classList.add('open');
-        }
-
-        function closeDeleteModal(e) {
-            if (!e || e.target === document.getElementById('deleteOverlay'))
-                document.getElementById('deleteOverlay').classList.remove('open');
-        }
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') {
-                closeDeleteModal();
-                closeBulkDeleteModal();
-            }
-        });
-    </script>
-}
