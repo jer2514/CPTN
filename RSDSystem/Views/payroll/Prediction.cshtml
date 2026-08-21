@@ -30,7 +30,7 @@
     </div>
 
     <div id="predictionEmpty" class="text-center text-muted py-5">
-        Select a project and click Load Prediction. Next-month payroll is predicted by the Python model from the last two months of generated payroll.
+        Select a project and click Load Prediction. The next month is predicted from two complete months of approved payroll. Allocated budget is shown beside each forecast, and every load is saved for this project.
     </div>
 </div>
 
@@ -57,15 +57,15 @@
             <span>Predicted Payroll</span>
             <strong id="prPredicted">—</strong>
         </div>
-        <div class="pred-result-hint" id="prHint">Predicted from this project’s last two months of generated payroll.</div>
-        <div class="pred-result-row" id="prAllocatedRow" hidden>
+        <div class="pred-result-row" id="prAllocatedRow">
             <span id="prAllocatedLabel">Allocated Budget</span>
             <strong id="prAllocated">—</strong>
         </div>
         <div class="pred-result-row">
-            <span id="prDifferenceLabel">Change from last month</span>
+            <span id="prDifferenceLabel">Budget Difference</span>
             <strong id="prDifference">—</strong>
         </div>
+        <div class="pred-result-hint" id="prHint">Predicted from two complete months of approved payroll.</div>
         <div id="prRisk" class="pred-risk" hidden>
             <i class="bi bi-exclamation-triangle-fill"></i>
             <div>
@@ -132,9 +132,10 @@
             list.innerHTML = (page.rows || []).map((row, index) => `
                 <div class="vp-period-card pred-forecast-card">
                     <div class="pred-forecast-head">
-                        <span>Previous Payroll ${row.previousMonth1}</span>
-                        <span>Previous Payroll ${row.previousMonth2}</span>
-                        <span>Predicted Payroll ${row.predictionMonth}</span>
+                        <span>Previous Payroll (${row.previousMonth1 || '—'})</span>
+                        <span>Previous Payroll (${row.previousMonth2 || '—'})</span>
+                        <span>Predicted Payroll (${row.predictionMonth || '—'})</span>
+                        <span>Allocated Budget (${row.predictionMonth || '—'})</span>
                         <span>Action</span>
                     </div>
                     <div class="pred-forecast-body">
@@ -144,6 +145,7 @@
                             ${peso(row.predictedBudget ?? row.predictedPayroll)}
                             ${row.exceedsBudget ? '<span class="pred-anomaly-flag">Anomaly</span>' : ''}
                         </span>
+                        <span>${row.hasAllocatedBudget ? peso(row.allocatedBudget) : '—'}</span>
                         <span>
                             <button type="button" class="pill-btn pill-view" data-row-index="${index}">
                                 <i class="bi bi-eye-fill"></i> View
@@ -158,7 +160,7 @@
             if (page && page.usedPythonApi) {
                 return 'Predicted by the Python payroll model (FastAPI + scikit-learn Linear Regression).';
             }
-            return 'Python prediction API was offline, so the system used the local payroll formula.';
+            return 'Predicted from two complete months of approved payroll.';
         }
 
         function openResult(row, generatedAt, projectName, page) {
@@ -173,20 +175,15 @@
             document.getElementById('prPrevious1').textContent = peso(row.previousAmount1);
             document.getElementById('prPrevious2').textContent = peso(row.previousAmount2);
             document.getElementById('prPredicted').textContent = peso(row.predictedBudget ?? row.predictedPayroll);
-            const allocatedRow = document.getElementById('prAllocatedRow');
-            if (row.hasAllocatedBudget) {
-                document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
-                    ? ('Allocated Budget ' + row.predictionMonth)
-                    : 'Allocated Budget';
-                document.getElementById('prAllocated').textContent = peso(row.allocatedBudget);
-                allocatedRow.hidden = false;
-                document.getElementById('prDifferenceLabel').textContent = row.exceedsBudget
-                    ? 'Over allocated budget'
-                    : 'Vs allocated budget';
-            } else {
-                allocatedRow.hidden = true;
-                document.getElementById('prDifferenceLabel').textContent = 'Change from last month';
-            }
+            document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
+                ? ('Allocated Budget')
+                : 'Allocated Budget';
+            document.getElementById('prAllocated').textContent = row.hasAllocatedBudget
+                ? peso(row.allocatedBudget)
+                : '—';
+            document.getElementById('prDifferenceLabel').textContent = row.hasAllocatedBudget
+                ? 'Budget Difference'
+                : 'Change from last month';
             document.getElementById('prDifference').textContent = peso(row.budgetDifference);
             const risk = document.getElementById('prRisk');
             if (row.riskTitle) {
@@ -197,7 +194,7 @@
             } else {
                 risk.hidden = true;
             }
-            document.getElementById('prGenerated').textContent = generatedAt || '—';
+            document.getElementById('prGenerated').textContent = row.generatedAt || generatedAt || '—';
             const hint = document.getElementById('prHint');
             if (hint) hint.textContent = engineHint(page);
             document.getElementById('predictionOverlay').hidden = false;
@@ -255,6 +252,7 @@
                 renderRows(data);
                 empty.style.display = 'none';
                 section.style.display = 'block';
+                if (data.warning) showToast(data.warning);
             } catch (err) {
                 empty.textContent = 'Could not load budget prediction.';
             }

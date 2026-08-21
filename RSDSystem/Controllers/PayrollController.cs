@@ -180,7 +180,7 @@ namespace RSDSystem.Controllers
                     projectId = named.ProjectId;
             }
 
-            var page = await _predictions.LoadAsync(projectId, HttpContext.RequestAborted);
+            var page = await _predictions.LoadAsync(projectId, persistHistory: true, HttpContext.RequestAborted);
             if (page.Error != null && page.Rows.Count == 0)
             {
                 return Json(new
@@ -196,10 +196,11 @@ namespace RSDSystem.Controllers
                 success = true,
                 projectId = page.ProjectId,
                 projectName = page.ProjectName,
-                generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
+                generatedAt = PhilippinesTime.FormatLongDateTime(page.GeneratedAt),
                 engine = page.Engine,
                 model = page.Model,
                 usedPythonApi = string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase),
+                warning = page.Error,
                 rows = page.Rows.Select(r => new
                 {
                     previousMonth1 = string.IsNullOrWhiteSpace(r.PreviousLabel1)
@@ -222,7 +223,8 @@ namespace RSDSystem.Controllers
                     unusualChange = r.UnusualChange,
                     changePercent = r.ChangePercent,
                     riskTitle = r.RiskTitle,
-                    riskDetail = r.RiskDetail
+                    riskDetail = r.RiskDetail,
+                    generatedAt = PhilippinesTime.FormatLongDateTime(r.GeneratedAt == default ? page.GeneratedAt : r.GeneratedAt)
                 })
             });
         }

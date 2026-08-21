@@ -31,7 +31,8 @@ namespace RSDSystem.Services
             _httpFactory = httpFactory;
         }
 
-        public async Task<PayrollPredictionPage> LoadAsync(int projectId, CancellationToken cancellationToken = default)
+        public async Task<PayrollPredictionPage> LoadAsync(
+            int projectId, bool persistHistory = false, CancellationToken cancellationToken = default)
         {
             var project = await _db.Projects
                 .AsNoTracking()
@@ -51,98 +52,216 @@ namespace RSDSystem.Services
                 .Where(p => p.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            var generated = new SortedDictionary<DateTime, decimal>();
-            foreach (var slip in payrolls)
-            {
-                var month = MonthKey(DateRules.IsUsableDate(slip.PayPeriodEnd)
-                    ? slip.PayPeriodEnd
-                    : slip.PayPeriodStart);
-                generated[month] = generated.TryGetValue(month, out var current)
-                    ? current + slip.NetPay
-                    : slip.NetPay;
-            }
+            var completeMonths = CompleteMonthTotals(payrolls);
+            PayrollPredictionRow? current = null;
+            string? error = null;
 
-            if (generated.Count < 2)
+            if (completeMonths.Count < 2)
             {
-                return new PayrollPredictionPage
+                error = completeMonths.Count == 0
+                    ? "Need two complete months of approved payroll to predict. A month counts only after it has ended, every slip in that month is approved, and the pay periods cover the whole month."
+                    : "Need one more complete month of approved payroll before the next month can be predicted.";
+            }
+            else
+            {
+                var months = completeMonths.Keys.ToList();
+                var month1 = months[^2];
+                var month2 = months[^1];
+                var amount1 = completeMonths[month1];
+                var amount2 = completeMonths[month2];
+                var predictMonth = month2.AddMonths(1);
+                var allocatedRow = budgets.LastOrDefault(b => MonthKey(b.MonthDate) == predictMonth);
+                var hasAllocated = allocatedRow != null;
+                var allocated = hasAllocated ? allocatedRow!.Amount : 0m;
+                var forecast = await ForecastAsync(
+                    amount1, amount2, allocated, AnomalyPercent(), cancellationToken);
+
+                var predicted = forecast.PredictedPayroll;
+                var exceeds = hasAllocated && predicted > allocated;
+                var difference = hasAllocated ? predicted - allocated : predicted - amount2;
+                var predictLabel = hasAllocated
+                    ? BudgetLabel(allocatedRow!, culture)
+                    : predictMonth.ToString("MMMM yyyy", culture);
+
+                string? riskTitle = null;
+                string? riskDetail = null;
+                if (exceeds)
                 {
-                    ProjectId = project.ProjectId,
-                    ProjectName = project.ProjectName ?? "—",
-                    GeneratedAt = DateTime.Now,
-                    Error = generated.Count == 0
-                        ? "This project has no generated payroll yet. Generate payroll for two months first."
-                        : "Need two months of generated payroll before the next month can be predicted."
+                    riskTitle = "Budget Exceeding Risk";
+                    riskDetail = "Predicted payroll exceeds the allocated budget.";
+                }
+                else if (forecast.UnusualChange)
+                {
+                    riskTitle = "Unusual Payroll Change";
+                    riskDetail = amount2 > amount1
+                        ? "Approved payroll rose sharply between the last two complete months."
+                        : "Approved payroll dropped sharply between the last two complete months.";
+                }
+
+                current = new PayrollPredictionRow
+                {
+                    PreviousMonth1 = month1,
+                    PreviousLabel1 = month1.ToString("MMMM yyyy", culture),
+                    PreviousAmount1 = amount1,
+                    PreviousMonth2 = month2,
+                    PreviousLabel2 = month2.ToString("MMMM yyyy", culture),
+                    PreviousAmount2 = amount2,
+                    PredictionMonth = predictMonth,
+                    PredictionLabel = predictLabel,
+                    PredictedPayroll = predicted,
+                    AllocatedBudget = allocated,
+                    HasAllocatedBudget = hasAllocated,
+                    BudgetDifference = Math.Round(difference, 2, MidpointRounding.AwayFromZero),
+                    ExceedsBudget = exceeds,
+                    UnusualChange = forecast.UnusualChange,
+                    ChangePercent = forecast.ChangePercent,
+                    RiskTitle = riskTitle,
+                    RiskDetail = riskDetail,
+                    GeneratedAt = PhilippinesTime.Now,
+                    Engine = forecast.Engine
                 };
+
+                if (persistHistory)
+                    await SaveHistoryAsync(project.ProjectId, current, cancellationToken);
             }
 
-            var months = generated.Keys.ToList();
-            var month1 = months[^2];
-            var month2 = months[^1];
-            var amount1 = generated[month1];
-            var amount2 = generated[month2];
-            var predictMonth = month2.AddMonths(1);
-            var allocatedRow = budgets.LastOrDefault(b => MonthKey(b.MonthDate) == predictMonth);
-            var hasAllocated = allocatedRow != null;
-            var allocated = hasAllocated ? allocatedRow!.Amount : (decimal?)null;
-            var forecast = await ForecastAsync(
-                amount1, amount2, allocated ?? 0, AnomalyPercent(), cancellationToken);
+            var history = await _db.PayrollPredictionHistories.AsNoTracking()
+                .Where(h => h.ProjectId == project.ProjectId)
+                .OrderByDescending(h => h.GeneratedAt)
+                .ToListAsync(cancellationToken);
 
-            var predicted = forecast.PredictedPayroll;
-            var exceeds = hasAllocated && predicted > allocatedRow!.Amount;
-            var difference = hasAllocated
-                ? predicted - allocatedRow!.Amount
-                : predicted - amount2;
-            var predictLabel = hasAllocated
-                ? BudgetLabel(allocatedRow!, culture)
-                : predictMonth.ToString("MMMM yyyy", culture);
-
-            string? riskTitle = null;
-            string? riskDetail = null;
-            if (exceeds)
+            var rows = new List<PayrollPredictionRow>();
+            if (current != null)
+                rows.Add(current);
+            foreach (var saved in history)
             {
-                riskTitle = "Budget Exceeding Risk";
-                riskDetail = "The predicted amount for " + predictLabel
-                    + " exceeds the allocated budget of ₱" + allocatedRow!.Amount.ToString("N2", culture) + ".";
-            }
-            else if (forecast.UnusualChange)
-            {
-                riskTitle = "Unusual Payroll Change";
-                riskDetail = amount2 > amount1
-                    ? "Generated payroll rose sharply between the last two months."
-                    : "Generated payroll dropped sharply between the last two months.";
+                if (current != null
+                    && saved.PredictionMonth.Date == current.PredictionMonth.Date
+                    && saved.PredictedPayroll == current.PredictedPayroll
+                    && saved.AllocatedBudget == current.AllocatedBudget
+                    && Math.Abs((saved.GeneratedAt - current.GeneratedAt).TotalMinutes) < 2)
+                    continue;
+                rows.Add(ToRow(saved, culture));
             }
 
             return new PayrollPredictionPage
             {
                 ProjectId = project.ProjectId,
                 ProjectName = project.ProjectName ?? "—",
-                GeneratedAt = DateTime.Now,
-                Engine = forecast.Engine,
-                Model = forecast.Model,
-                Rows =
-                {
-                    new PayrollPredictionRow
-                    {
-                        PreviousMonth1 = month1,
-                        PreviousLabel1 = month1.ToString("MMMM yyyy", culture),
-                        PreviousAmount1 = amount1,
-                        PreviousMonth2 = month2,
-                        PreviousLabel2 = month2.ToString("MMMM yyyy", culture),
-                        PreviousAmount2 = amount2,
-                        PredictionMonth = predictMonth,
-                        PredictionLabel = predictLabel,
-                        PredictedPayroll = predicted,
-                        AllocatedBudget = allocated ?? 0,
-                        HasAllocatedBudget = hasAllocated,
-                        BudgetDifference = Math.Round(difference, 2, MidpointRounding.AwayFromZero),
-                        ExceedsBudget = exceeds,
-                        UnusualChange = forecast.UnusualChange,
-                        ChangePercent = forecast.ChangePercent,
-                        RiskTitle = riskTitle,
-                        RiskDetail = riskDetail
-                    }
-                }
+                GeneratedAt = PhilippinesTime.Now,
+                Engine = current?.Engine ?? rows.FirstOrDefault()?.Engine ?? "local",
+                Model = current != null ? "linear-trend" : rows.FirstOrDefault()?.Engine,
+                Error = error,
+                Rows = rows
             };
+        }
+
+        private async Task SaveHistoryAsync(int projectId, PayrollPredictionRow row, CancellationToken cancellationToken)
+        {
+            var recent = await _db.PayrollPredictionHistories
+                .Where(h => h.ProjectId == projectId)
+                .OrderByDescending(h => h.GeneratedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (recent != null
+                && recent.PredictionMonth.Date == row.PredictionMonth.Date
+                && recent.PredictedPayroll == row.PredictedPayroll
+                && recent.AllocatedBudget == row.AllocatedBudget
+                && recent.GeneratedAt >= PhilippinesTime.Now.AddMinutes(-2))
+                return;
+
+            _db.PayrollPredictionHistories.Add(new PayrollPredictionHistory
+            {
+                ProjectId = projectId,
+                PreviousMonth1 = row.PreviousMonth1,
+                PreviousAmount1 = row.PreviousAmount1,
+                PreviousMonth2 = row.PreviousMonth2,
+                PreviousAmount2 = row.PreviousAmount2,
+                PredictionMonth = row.PredictionMonth,
+                PredictionLabel = row.PredictionLabel,
+                PredictedPayroll = row.PredictedPayroll,
+                AllocatedBudget = row.AllocatedBudget,
+                HasAllocatedBudget = row.HasAllocatedBudget,
+                BudgetDifference = row.BudgetDifference,
+                ExceedsBudget = row.ExceedsBudget,
+                UnusualChange = row.UnusualChange,
+                ChangePercent = row.ChangePercent,
+                RiskTitle = row.RiskTitle,
+                RiskDetail = row.RiskDetail,
+                Engine = row.Engine,
+                GeneratedAt = row.GeneratedAt
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        private static PayrollPredictionRow ToRow(PayrollPredictionHistory saved, CultureInfo culture)
+        {
+            return new PayrollPredictionRow
+            {
+                PreviousMonth1 = saved.PreviousMonth1,
+                PreviousLabel1 = saved.PreviousMonth1.ToString("MMMM yyyy", culture),
+                PreviousAmount1 = saved.PreviousAmount1,
+                PreviousMonth2 = saved.PreviousMonth2,
+                PreviousLabel2 = saved.PreviousMonth2.ToString("MMMM yyyy", culture),
+                PreviousAmount2 = saved.PreviousAmount2,
+                PredictionMonth = saved.PredictionMonth,
+                PredictionLabel = string.IsNullOrWhiteSpace(saved.PredictionLabel)
+                    ? saved.PredictionMonth.ToString("MMMM yyyy", culture)
+                    : saved.PredictionLabel,
+                PredictedPayroll = saved.PredictedPayroll,
+                AllocatedBudget = saved.AllocatedBudget,
+                HasAllocatedBudget = saved.HasAllocatedBudget,
+                BudgetDifference = saved.BudgetDifference,
+                ExceedsBudget = saved.ExceedsBudget,
+                UnusualChange = saved.UnusualChange,
+                ChangePercent = saved.ChangePercent,
+                RiskTitle = saved.RiskTitle,
+                RiskDetail = saved.RiskDetail,
+                GeneratedAt = saved.GeneratedAt,
+                Engine = saved.Engine
+            };
+        }
+
+        private static SortedDictionary<DateTime, decimal> CompleteMonthTotals(List<Payroll> payrolls)
+        {
+            var currentMonth = new DateTime(PhilippinesTime.Today.Year, PhilippinesTime.Today.Month, 1);
+            var grouped = new SortedDictionary<DateTime, List<Payroll>>();
+            foreach (var slip in payrolls)
+            {
+                var month = MonthKey(DateRules.IsUsableDate(slip.PayPeriodEnd)
+                    ? slip.PayPeriodEnd
+                    : slip.PayPeriodStart);
+                if (!grouped.TryGetValue(month, out var list))
+                {
+                    list = new List<Payroll>();
+                    grouped[month] = list;
+                }
+                list.Add(slip);
+            }
+
+            var complete = new SortedDictionary<DateTime, decimal>();
+            foreach (var pair in grouped)
+            {
+                if (pair.Key >= currentMonth)
+                    continue;
+                if (pair.Value.Any(p => p.Status != PayrollStatusOptions.Approved))
+                    continue;
+                if (!CoversWholeMonth(pair.Value, pair.Key))
+                    continue;
+                var total = pair.Value.Sum(p => p.NetPay);
+                if (total <= 0)
+                    continue;
+                complete[pair.Key] = total;
+            }
+            return complete;
+        }
+
+        private static bool CoversWholeMonth(List<Payroll> slips, DateTime month)
+        {
+            var monthStart = month.Date;
+            var monthEnd = month.AddMonths(1).AddDays(-1).Date;
+            var start = slips.Min(s => s.PayPeriodStart.Date);
+            var end = slips.Max(s => s.PayPeriodEnd.Date);
+            return start <= monthStart.AddDays(6) && end >= monthEnd.AddDays(-6);
         }
 
         public async Task<PayrollForecastResult> ForecastAsync(
@@ -339,7 +458,7 @@ namespace RSDSystem.Services
     {
         public int ProjectId { get; set; }
         public string ProjectName { get; set; } = "—";
-        public DateTime GeneratedAt { get; set; } = DateTime.Now;
+        public DateTime GeneratedAt { get; set; } = PhilippinesTime.Now;
         public string? Error { get; set; }
         public string Engine { get; set; } = "local";
         public string? Model { get; set; }
@@ -365,5 +484,7 @@ namespace RSDSystem.Services
         public decimal ChangePercent { get; set; }
         public string? RiskTitle { get; set; }
         public string? RiskDetail { get; set; }
+        public DateTime GeneratedAt { get; set; }
+        public string Engine { get; set; } = "local";
     }
 }

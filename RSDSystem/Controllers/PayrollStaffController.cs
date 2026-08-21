@@ -770,12 +770,14 @@ namespace RSDSystem.Controllers
                  return Json(new { success = false, message = "Submitted or approved payroll cannot be changed." });
              }
 
+             var resubmitted = payroll.Status == PayrollStatusOptions.Correction;
              payroll.Status = PayrollStatusOptions.Submitted;
-             payroll.SubmittedAt = DateTime.Now;
+             payroll.SubmittedAt = PhilippinesTime.Now;
              await _db.SaveChangesAsync();
 
              if (payroll.Project != null)
-                 await _notifications.NotifyPayrollSubmittedAsync(payroll.Project, payroll.GeneratedBy, HttpContext.RequestAborted);
+                 await _notifications.NotifyPayrollSubmittedAsync(
+                     payroll.Project, payroll.GeneratedBy, resubmitted, HttpContext.RequestAborted);
 
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }

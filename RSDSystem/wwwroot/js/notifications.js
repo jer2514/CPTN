@@ -137,7 +137,7 @@
         if (id) {
             try { await postForm('/Notification/MarkRead', { id: id }); } catch (err) { /* ignore */ }
         }
-        if (isAdmin && kind === 'AttendanceCorrectionRequest' && related) {
+        if (isAdmin && related && (kind === 'AttendanceCorrectionRequest' || kind === 'AttendanceCorrectionResubmitted')) {
             closeAll();
             openCorrectionModal(related);
             return;
@@ -390,19 +390,34 @@
     }
 
     wrapBells();
-    fetch('/Notification/UnreadCount', { headers: { 'Accept': 'application/json' } })
-        .then(function (res) { return res.json(); })
-        .then(function (data) { if (data.success) setBadges(data.unread || 0); })
-        .catch(function () { });
+    function refreshUnread() {
+        fetch('/Notification/UnreadCount', { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) { if (data.success) setBadges(data.unread || 0); })
+            .catch(function () { });
+    }
+    refreshUnread();
+    window.setInterval(refreshUnread, 15000);
 
     const isStaff = document.body.dataset.role === 'PayrollStaff';
 
-    function shownPayslipKey(id) {
-        return 'rsd-payslip-toast-' + id;
+    function shownToastKey(id) {
+        return 'rsd-notif-toast-' + id;
     }
 
-    async function showPayslipDownloadToasts() {
-        if (!isStaff || typeof window.showToast !== 'function') return;
+    function rememberToast(id) {
+        var key = shownToastKey(id);
+        try {
+            if (sessionStorage.getItem(key)) return false;
+            sessionStorage.setItem(key, '1');
+            return true;
+        } catch (err) {
+            return true;
+        }
+    }
+
+    async function showLiveNotificationToasts() {
+        if (typeof window.showToast !== 'function') return;
         if (window.location.pathname.toLowerCase().indexOf('/payrollstaff/downloadpayslips') === 0)
             return;
         try {
@@ -412,34 +427,51 @@
             if (typeof data.unread === 'number') setBadges(data.unread);
             (data.items || []).forEach(function (item) {
                 if (item.isRead) return;
-                if (item.kind !== 'PayslipsSent') return;
-                var key = shownPayslipKey(item.id);
-                try {
-                    if (sessionStorage.getItem(key)) return;
-                    sessionStorage.setItem(key, '1');
-                } catch (err) { /* ignore */ }
-                var href = item.url || '/PayrollStaff/PendingPayroll';
-                window.showToast(item.message || 'Payslips are ready to download.', 'success', {
-                    delay: 14000,
-                    action: {
-                        label: 'Download',
-                        href: href,
-                        onClick: function (e, url) {
-                            if (e) e.preventDefault();
-                            postForm('/Notification/MarkRead', { id: item.id })
-                                .catch(function () { })
-                                .finally(function () {
-                                    window.location.href = url || href;
-                                });
+                if (!rememberToast(item.id)) return;
+
+                if (isStaff && item.kind === 'PayslipsSent') {
+                    var href = item.url || '/PayrollStaff/PendingPayroll';
+                    window.showToast(item.message || 'Payslips are ready to download.', 'success', {
+                        delay: 14000,
+                        action: {
+                            label: 'Download',
+                            href: href,
+                            onClick: function (e, url) {
+                                if (e) e.preventDefault();
+                                postForm('/Notification/MarkRead', { id: item.id })
+                                    .catch(function () { })
+                                    .finally(function () {
+                                        window.location.href = url || href;
+                                    });
+                            }
                         }
-                    }
-                });
+                    });
+                    return;
+                }
+
+                if (isAdmin && (item.kind === 'PayrollResubmitted'
+                    || item.kind === 'AttendanceCorrectionResubmitted'
+                    || item.kind === 'TaskCompletionRequested')) {
+                    window.showToast(item.message || item.title || 'You have a new notification.', 'success', {
+                        delay: 12000,
+                        action: item.url ? {
+                            label: 'Open',
+                            href: item.url,
+                            onClick: function (e, url) {
+                                if (e) e.preventDefault();
+                                postForm('/Notification/MarkRead', { id: item.id })
+                                    .catch(function () { })
+                                    .finally(function () {
+                                        window.location.href = url || item.url;
+                                    });
+                            }
+                        } : null
+                    });
+                }
             });
         } catch (err) { /* ignore */ }
     }
 
-    if (isStaff) {
-        showPayslipDownloadToasts();
-        window.setInterval(showPayslipDownloadToasts, 20000);
-    }
+    showLiveNotificationToasts();
+    window.setInterval(showLiveNotificationToasts, 15000);
 })();

@@ -80,7 +80,7 @@
                         <tr>
                             <td>@p.StaffName</td>
                             <td>@p.ProjectName</td>
-                            <td>@p.Date.ToString("MM-dd-yy")</td>
+                            <td>@PhilippinesTime.FormatDateTime(p.Date)</td>
                             <td>
                                 <a href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })"
                                    class="pill-btn pill-view">Review</a>

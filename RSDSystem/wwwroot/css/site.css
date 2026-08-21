@@ -2534,7 +2534,7 @@ button.badge-btn {
 .pred-forecast-head,
 .pred-forecast-body {
     display: grid;
-    grid-template-columns: 1.2fr 1.2fr 1.2fr 120px;
+    grid-template-columns: 1.1fr 1.1fr 1.1fr 1.1fr 110px;
     gap: 8px;
     align-items: center;
     padding: 10px 16px;
