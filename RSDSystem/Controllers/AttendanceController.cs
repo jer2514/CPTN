@@ -121,12 +121,16 @@ namespace RSDSystem.Controllers
                 if (importedProject != null)
                     await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
 
+                var message = result.ReplacedPrevious
+                    ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                    : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
+                if (result.SkippedLockedCount > 0)
+                    message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+
                 return Json(new
                 {
                     success = true,
-                    message = result.ReplacedPrevious
-                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message,
                     result.ImportId,
                     result.ProjectId,
                     result.RowCount,
@@ -188,6 +192,8 @@ namespace RSDSystem.Controllers
             var recordIds = rows.Select(r => r.AttendanceRecordId).ToList();
             var pendingIds = new HashSet<int>();
             var approvedIds = new HashSet<int>();
+            var closedPayrolls = await PayrollAttendanceLock.LoadClosedAsync(
+                _db, projectId, HttpContext.RequestAborted);
             if (recordIds.Count > 0)
             {
                 var requests = await _db.AttendanceCorrectionRequests.AsNoTracking()
@@ -243,7 +249,9 @@ namespace RSDSystem.Controllers
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
                 }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt,
-                    pendingIds.Contains(r.AttendanceRecordId), approvedIds.Contains(r.AttendanceRecordId)))
+                    pendingIds.Contains(r.AttendanceRecordId),
+                    approvedIds.Contains(r.AttendanceRecordId),
+                    PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate)))
             });
         }
 
@@ -388,6 +396,16 @@ namespace RSDSystem.Controllers
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
 
+            if (await PayrollAttendanceLock.IsLockedAsync(
+                    _db, record.ProjectId, record.EmployeeId, record.WorkDate, HttpContext.RequestAborted))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Payroll for this employee is already approved. Attendance cannot be edited."
+                });
+            }
+
             var alreadyApproved = await _db.AttendanceCorrectionRequests
                 .AnyAsync(c => c.AttendanceRecordId == recordId
                     && c.Status == CorrectionRequestStatuses.Approved);
@@ -505,7 +523,14 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false, bool correctionApproved = false)
+        private static object ToRowJson(
+            AttendancePreviewRow row,
+            int? recordId = null,
+            string? format = null,
+            DateTime? importedAt = null,
+            bool pendingCorrection = false,
+            bool correctionApproved = false,
+            bool payrollLocked = false)
         {
             var computed = new AttendanceRecord
             {
@@ -519,8 +544,9 @@ namespace RSDSystem.Controllers
             };
             AttendanceRules.Apply(computed);
             var status = AttendanceStatuses.Display(computed.Status);
+            var locked = payrollLocked || correctionApproved;
             string actionLabel;
-            if (correctionApproved)
+            if (payrollLocked || correctionApproved)
                 actionLabel = "Approved";
             else if (pendingCorrection)
                 actionLabel = "Pending Review";
@@ -557,8 +583,9 @@ namespace RSDSystem.Controllers
                 importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
                 actionLabel,
                 pendingCorrection,
-                requestEdit = !correctionApproved,
-                locked = correctionApproved
+                payrollLocked,
+                requestEdit = !locked,
+                locked
             };
         }
     }

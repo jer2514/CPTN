@@ -273,9 +273,10 @@ namespace RSDSystem.Services
             var generated = new SortedDictionary<DateTime, decimal>();
             foreach (var slip in payrolls)
             {
-                var month = MonthKey(DateRules.IsUsableDate(slip.PayPeriodEnd)
-                    ? slip.PayPeriodEnd
-                    : slip.PayPeriodStart);
+                var source = DateRules.IsUsableDate(slip.PayPeriodStart)
+                    ? slip.PayPeriodStart
+                    : slip.PayPeriodEnd;
+                var month = DateRules.MonthOfPeriod(source);
                 generated[month] = generated.TryGetValue(month, out var current)
                     ? current + slip.NetPay
                     : slip.NetPay;

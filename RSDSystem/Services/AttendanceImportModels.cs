@@ -76,6 +76,7 @@ namespace RSDSystem.Services
         public int MatchedCount { get; set; }
         public int UnmatchedCount { get; set; }
         public bool ReplacedPrevious { get; set; }
+        public int SkippedLockedCount { get; set; }
     }
 
     public class AttendancePeriodOption

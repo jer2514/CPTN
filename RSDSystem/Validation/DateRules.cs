@@ -60,5 +60,8 @@ namespace RSDSystem.Validation
                     new[] { endField });
             }
         }
+
+        public static DateTime MonthOfPeriod(DateTime payPeriodStart) =>
+            new(payPeriodStart.Year, payPeriodStart.Month, 1);
     }
 }

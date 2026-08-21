@@ -411,7 +411,7 @@ namespace RSDSystem.Controllers
             }
 
             if (month is >= 1 and <= 12)
-                list = list.Where(r => r.StartDate.Month == month || r.EndDate.Month == month);
+                list = list.Where(r => r.StartDate.Month == month);
 
             return list
                 .OrderByDescending(r => r.StartDate)
