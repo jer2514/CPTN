@@ -63,6 +63,7 @@
                             onclick="toggleUserStatus(@Model.UserId)">
                         <i class="bi bi-toggle-on"></i> Active
                     </button>
+                    <div class="slip-schedule-hint" style="margin-top:8px">Inactive users cannot log in.</div>
                 }
                 else
                 {
@@ -70,6 +71,7 @@
                             onclick="toggleUserStatus(@Model.UserId)">
                         <i class="bi bi-toggle-off"></i> Inactive
                     </button>
+                    <div class="slip-schedule-hint" style="margin-top:8px">This user cannot log in until you set them active.</div>
                 }
             </div>
 

@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
+using RSDSystem.Models;
 
 namespace RSDSystem.Filters
 {
@@ -7,6 +9,13 @@ namespace RSDSystem.Filters
     {
         // Controllers reachable without being logged in
         private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
+
+        private readonly PayrollDbContext _db;
+
+        public AuthCheckFilter(PayrollDbContext db)
+        {
+            _db = db;
+        }
 
         public void OnActionExecuting(ActionExecutingContext context)
         {
@@ -20,19 +29,20 @@ namespace RSDSystem.Filters
 
             if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(role))
             {
-                if (WantsJson(context))
+                Reject(context, "Your session expired. Refresh the page and sign in again.");
+                return;
+            }
+
+            if (int.TryParse(userId, out var id))
+            {
+                var active = _db.Users.AsNoTracking()
+                    .Any(u => u.UserId == id && u.IsActive);
+                if (!active)
                 {
-                    context.Result = new JsonResult(new
-                    {
-                        success = false,
-                        message = "Your session expired. Refresh the page and sign in again."
-                    })
-                    { StatusCode = 401 };
+                    context.HttpContext.Session.Clear();
+                    Reject(context, "This account is inactive and cannot log in.", inactive: true);
                     return;
                 }
-
-                context.Result = new RedirectToActionResult("Login", "Account", null);
-                return;
             }
 
             // Keep PayrollStaff out of Admin-only areas
@@ -44,6 +54,22 @@ namespace RSDSystem.Filters
         }
 
         public void OnActionExecuted(ActionExecutedContext context) { }
+
+        private static void Reject(ActionExecutingContext context, string message, bool inactive = false)
+        {
+            if (WantsJson(context))
+            {
+                context.Result = new JsonResult(new { success = false, message })
+                {
+                    StatusCode = 401
+                };
+                return;
+            }
+
+            context.Result = inactive
+                ? new RedirectToActionResult("Login", "Account", new { inactive = 1 })
+                : new RedirectToActionResult("Login", "Account", null);
+        }
 
         private static bool WantsJson(ActionExecutingContext context)
         {
