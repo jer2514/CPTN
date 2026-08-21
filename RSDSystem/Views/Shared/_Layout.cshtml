@@ -206,6 +206,15 @@
                 <button type="button" class="btn-approve" id="corrApprove">Approve</button>
                 <button type="button" class="btn-return" id="corrReturn">Return for Correction</button>
             </div>
+            <div class="corr-return-wrap" id="corrReturnWrap" hidden>
+                <label class="form-lbl" for="corrReturnReason">Reason for returning this correction</label>
+                <textarea id="corrReturnReason" class="form-ctrl" rows="3" maxlength="250"
+                          placeholder="Tell payroll staff why this correction is being returned."></textarea>
+                <div class="corr-actions">
+                    <button type="button" class="btn-outline-blue" id="corrReturnCancel">Cancel</button>
+                    <button type="button" class="btn-return" id="corrReturnSend">Return Request</button>
+                </div>
+            </div>
         </div>
     </div>
 

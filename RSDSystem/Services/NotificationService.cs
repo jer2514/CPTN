@@ -174,6 +174,46 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
+        public async Task NotifyStaffAssignedAsync(Project project, CancellationToken cancellationToken = default)
+        {
+            var staff = project.AssignedPayrollStaff?.Trim();
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.StaffAssigned,
+                "Assigned to a project",
+                $"Admin assigned you to {name}. When a payroll schedule is added, it will appear in To do task.",
+                project.ProjectId,
+                null,
+                "/PayrollStaff/Index",
+                cancellationToken);
+        }
+
+        public async Task NotifyPayslipsSentAsync(
+            Project project, DateTime start, DateTime end, int count,
+            CancellationToken cancellationToken = default)
+        {
+            var staff = project.AssignedPayrollStaff?.Trim();
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            var period = PeriodLabel(start, end);
+            var slips = count == 1 ? "1 payslip" : count + " payslips";
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.PayslipsSent,
+                "Payslips sent",
+                $"Admin sent {slips} for {name} ({period}). Open Pending Payroll to review them.",
+                project.ProjectId,
+                null,
+                "/PayrollStaff/PendingPayroll?projectId=" + project.ProjectId,
+                cancellationToken);
+        }
+
         public async Task NotifyNewTaskAsync(
             Project project, DateTime? periodStart = null, DateTime? periodEnd = null,
             CancellationToken cancellationToken = default)
@@ -290,15 +330,19 @@ namespace RSDSystem.Services
         }
 
         public async Task<(List<AppNotification> Items, int Total, int Unread)> ListAsync(
-            string role, string? fullName, int page, int pageSize, CancellationToken cancellationToken = default)
+            string role, string? fullName, int page, int pageSize, bool unreadOnly = false,
+            CancellationToken cancellationToken = default)
         {
             var query = ForUser(_db.AppNotifications.AsNoTracking(), role, fullName);
-            var total = await query.CountAsync(cancellationToken);
             var unread = await query.CountAsync(n => !n.IsRead, cancellationToken);
+            if (unreadOnly)
+                query = query.Where(n => !n.IsRead);
+            var total = await query.CountAsync(cancellationToken);
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 5, 50);
             var items = await query
-                .OrderByDescending(n => n.CreatedAt)
+                .OrderBy(n => n.IsRead)
+                .ThenByDescending(n => n.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
@@ -309,7 +353,8 @@ namespace RSDSystem.Services
             string role, string? fullName, int take = 7, CancellationToken cancellationToken = default)
         {
             return await ForUser(_db.AppNotifications.AsNoTracking(), role, fullName)
-                .OrderByDescending(n => n.CreatedAt)
+                .OrderBy(n => n.IsRead)
+                .ThenByDescending(n => n.CreatedAt)
                 .Take(Math.Clamp(take, 1, 20))
                 .ToListAsync(cancellationToken);
         }

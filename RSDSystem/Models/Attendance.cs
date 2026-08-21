@@ -125,8 +125,11 @@ namespace RSDSystem.Models
         public static string Display(string? status) =>
             IsHalfDay(status) ? HalfDay : (status ?? "");
 
+        public static bool CountsAsFullDay(string? status) =>
+            status is Complete or Late or EarlyOff or LateEarlyOff;
+
         public static bool CountsAsWorked(string? status) =>
-            status is Complete or Late or EarlyOff or LateEarlyOff || IsHalfDay(status);
+            CountsAsFullDay(status) || IsHalfDay(status);
 
         public static bool CountsAsLate(string? status) =>
             status is Late or LateEarlyOff;

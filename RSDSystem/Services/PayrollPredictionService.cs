@@ -47,53 +47,42 @@ namespace RSDSystem.Services
                 .ThenBy(b => b.Id)
                 .ToList();
 
-            if (budgets.Count < 2)
+            var payrolls = await _db.Payrolls.AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .ToListAsync(cancellationToken);
+
+            var generated = new SortedDictionary<DateTime, decimal>();
+            foreach (var slip in payrolls)
+            {
+                var month = MonthKey(DateRules.IsUsableDate(slip.PayPeriodEnd)
+                    ? slip.PayPeriodEnd
+                    : slip.PayPeriodStart);
+                generated[month] = generated.TryGetValue(month, out var current)
+                    ? current + slip.NetPay
+                    : slip.NetPay;
+            }
+
+            if (generated.Count < 2)
             {
                 return new PayrollPredictionPage
                 {
                     ProjectId = project.ProjectId,
                     ProjectName = project.ProjectName ?? "—",
                     GeneratedAt = DateTime.Now,
-                    Error = budgets.Count == 0
-                        ? "This project has no monthly budget. Set at least two monthly budgets on the project first."
-                        : "Need two months of project budget before the next monthly budget can be predicted."
+                    Error = generated.Count == 0
+                        ? "This project has no generated payroll yet. Generate payroll for two months first."
+                        : "Need two months of generated payroll before the next month can be predicted."
                 };
             }
 
-            var byMonth = new Dictionary<DateTime, ProjectMonthlyBudget>();
-            foreach (var row in budgets)
-                byMonth[MonthKey(row.MonthDate)] = row;
-
-            var nextMonth = MonthKey(DateTime.Today).AddMonths(1);
-            DateTime predictMonth;
-            ProjectMonthlyBudget previous1;
-            ProjectMonthlyBudget previous2;
-            if (TryPreviousPair(byMonth, nextMonth, out previous1, out previous2))
-            {
-                predictMonth = nextMonth;
-            }
-            else
-            {
-                var upcoming = byMonth.Keys
-                    .Where(month => month >= nextMonth && TryPreviousPair(byMonth, month, out _, out _))
-                    .OrderBy(month => month)
-                    .FirstOrDefault();
-                if (upcoming != default)
-                {
-                    predictMonth = upcoming;
-                    TryPreviousPair(byMonth, predictMonth, out previous1, out previous2);
-                }
-                else
-                {
-                    previous1 = budgets[^2];
-                    previous2 = budgets[^1];
-                    predictMonth = MonthKey(previous2.MonthDate).AddMonths(1);
-                }
-            }
-
-            var amount1 = previous1.Amount;
-            var amount2 = previous2.Amount;
-            var hasAllocated = byMonth.TryGetValue(predictMonth, out var allocatedRow);
+            var months = generated.Keys.ToList();
+            var month1 = months[^2];
+            var month2 = months[^1];
+            var amount1 = generated[month1];
+            var amount2 = generated[month2];
+            var predictMonth = month2.AddMonths(1);
+            var allocatedRow = budgets.LastOrDefault(b => MonthKey(b.MonthDate) == predictMonth);
+            var hasAllocated = allocatedRow != null;
             var allocated = hasAllocated ? allocatedRow!.Amount : (decimal?)null;
             var forecast = await ForecastAsync(
                 amount1, amount2, allocated ?? 0, AnomalyPercent(), cancellationToken);
@@ -117,10 +106,10 @@ namespace RSDSystem.Services
             }
             else if (forecast.UnusualChange)
             {
-                riskTitle = "Unusual Budget Change";
+                riskTitle = "Unusual Payroll Change";
                 riskDetail = amount2 > amount1
-                    ? "Monthly budget rose sharply between the last two months."
-                    : "Monthly budget dropped sharply between the last two months.";
+                    ? "Generated payroll rose sharply between the last two months."
+                    : "Generated payroll dropped sharply between the last two months.";
             }
 
             return new PayrollPredictionPage
@@ -132,11 +121,11 @@ namespace RSDSystem.Services
                 {
                     new PayrollPredictionRow
                     {
-                        PreviousMonth1 = MonthKey(previous1.MonthDate),
-                        PreviousLabel1 = BudgetLabel(previous1, culture),
+                        PreviousMonth1 = month1,
+                        PreviousLabel1 = month1.ToString("MMMM yyyy", culture),
                         PreviousAmount1 = amount1,
-                        PreviousMonth2 = MonthKey(previous2.MonthDate),
-                        PreviousLabel2 = BudgetLabel(previous2, culture),
+                        PreviousMonth2 = month2,
+                        PreviousLabel2 = month2.ToString("MMMM yyyy", culture),
                         PreviousAmount2 = amount2,
                         PredictionMonth = predictMonth,
                         PredictionLabel = predictLabel,
@@ -228,21 +217,6 @@ namespace RSDSystem.Services
                 Console.WriteLine("Prediction API fallback: " + ex.Message);
                 return null;
             }
-        }
-
-        private static bool TryPreviousPair(
-            IReadOnlyDictionary<DateTime, ProjectMonthlyBudget> byMonth,
-            DateTime predictMonth,
-            out ProjectMonthlyBudget previous1,
-            out ProjectMonthlyBudget previous2)
-        {
-            if (byMonth.TryGetValue(predictMonth.AddMonths(-2), out previous1!)
-                && byMonth.TryGetValue(predictMonth.AddMonths(-1), out previous2!))
-                return true;
-
-            previous1 = null!;
-            previous2 = null!;
-            return false;
         }
 
         private static string BudgetLabel(ProjectMonthlyBudget row, CultureInfo culture)

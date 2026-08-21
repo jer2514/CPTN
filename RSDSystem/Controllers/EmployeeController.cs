@@ -122,6 +122,7 @@ namespace RSDSystem.Controllers
                 throw new InvalidOperationException("GenerateEmployeeCodeAsync returned an empty code — check the method logic.");
 
             emp.EmployeeCode = newCode;
+            emp.IsActive = emp.ProjectId.HasValue;
 
             if (photo != null && photo.Length > 0)
                 emp.PhotoPath = await SavePhotoAsync(photo);
@@ -197,12 +198,7 @@ namespace RSDSystem.Controllers
             existing.DailyRate = emp.DailyRate;
             existing.RatePerHour = emp.RatePerHour;
             existing.ProjectId = emp.ProjectId;
-
-            // Assigning an inactive employee to a project automatically reactivates them.
-            if (emp.ProjectId.HasValue && !existing.IsActive)
-            {
-                existing.IsActive = true;
-            }
+            existing.IsActive = emp.ProjectId.HasValue;
 
             if (photo != null && photo.Length > 0)
                 existing.PhotoPath = await SavePhotoAsync(photo);
@@ -289,23 +285,9 @@ namespace RSDSystem.Controllers
         // POST /Employee/Delete/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public IActionResult Delete(int id)
         {
-            var emp = await _db.Employees.FindAsync(id);
-            if (emp != null)
-            {
-                try
-                {
-                    _db.Employees.Remove(emp);
-                    await _db.SaveChangesAsync();
-                    TempData["Success"] = "Employee deleted.";
-                }
-                catch (DbUpdateException)
-                {
-                    TempData["Error"] = $"{emp.FullName} cannot be deleted because they have existing payroll records. " +
-                                         "Set their status to Inactive instead to keep payroll history intact.";
-                }
-            }
+            TempData["Error"] = "Employees cannot be deleted. Unassign them from a project to set them inactive.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -350,35 +332,9 @@ namespace RSDSystem.Controllers
         //delete multiple employees
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> BulkDelete(List<int> selectedIds)
+        public IActionResult BulkDelete(List<int> selectedIds)
         {
-            if (selectedIds == null || selectedIds.Count == 0)
-                return RedirectToAction(nameof(Index));
-
-            var employees = _db.Employees
-                               .Where(e => selectedIds.Contains(e.EmployeeId))
-                               .ToList();
-
-            var blocked = new List<string>();
-
-            foreach (var emp in employees)
-            {
-                _db.Employees.Remove(emp);
-                try
-                {
-                    await _db.SaveChangesAsync();
-                }
-                catch (DbUpdateException)
-                {
-                    _db.Entry(emp).State = EntityState.Unchanged;
-                    blocked.Add(emp.FullName);
-                }
-            }
-
-            TempData[blocked.Any() ? "Error" : "Success"] = blocked.Any()
-                ? $"Could not delete: {string.Join(", ", blocked)} — they have existing payroll records."
-                : "Selected employees deleted.";
-
+            TempData["Error"] = "Employees cannot be deleted. Unassign them from a project to set them inactive.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -390,10 +346,14 @@ namespace RSDSystem.Controllers
             var emp = await _db.Employees.FindAsync(id);
             if (emp != null)
             {
-                emp.IsActive = !emp.IsActive;
-                if (!emp.IsActive)
+                if (emp.IsActive)
                 {
+                    emp.IsActive = false;
                     emp.ProjectId = null;
+                }
+                else if (emp.ProjectId.HasValue)
+                {
+                    emp.IsActive = true;
                 }
 
                 await _db.SaveChangesAsync();
@@ -410,9 +370,19 @@ namespace RSDSystem.Controllers
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
 
-            emp.IsActive = !emp.IsActive;
-            if (!emp.IsActive)
+            if (emp.IsActive)
+            {
+                emp.IsActive = false;
                 emp.ProjectId = null;
+            }
+            else if (!emp.ProjectId.HasValue)
+            {
+                return Json(new { success = false, message = "Assign this employee to a project to make them active." });
+            }
+            else
+            {
+                emp.IsActive = true;
+            }
 
             await _db.SaveChangesAsync();
             return Json(new

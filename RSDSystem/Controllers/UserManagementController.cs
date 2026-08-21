@@ -65,9 +65,8 @@ namespace RSDSystem.Controllers
         // GET /UserManagement/Create
         public IActionResult Create()
         {
-            ViewBag.Roles = Roles;
             ViewBag.PageTitle = "Add User";
-            return View(new User());
+            return View(new User { Role = "PayrollStaff" });
         }
 
         // POST /UserManagement/Create
@@ -80,6 +79,7 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
+            user.Role = "PayrollStaff";
 
             if (string.IsNullOrWhiteSpace(Password))
                 ModelState.AddModelError("Password", "Password is required.");
@@ -112,7 +112,8 @@ namespace RSDSystem.Controllers
 
             if (!ModelState.IsValid)
             {
-                ViewBag.Roles = Roles;
+                ViewBag.PageTitle = "Add User";
+                user.Role = "PayrollStaff";
                 return View(user);
             }
 
@@ -151,7 +152,6 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user == null) return NotFound();
 
-            ViewBag.Roles = Roles;
             ViewBag.PageTitle = "Edit User";
             return View(user);
         }
@@ -197,7 +197,7 @@ namespace RSDSystem.Controllers
 
             if (!ModelState.IsValid)
             {
-                ViewBag.Roles = Roles;
+                ViewBag.PageTitle = "Edit User";
                 return View(user);
             }
 
@@ -216,7 +216,6 @@ namespace RSDSystem.Controllers
             existing.Email = email;
             existing.ContactNumber = user.ContactNumber?.Trim();
             existing.Address = user.Address?.Trim();
-            existing.Role = user.Role;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
                 existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
@@ -252,6 +251,11 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user != null)
             {
+                if (await IsLastAdminAsync(user))
+                {
+                    TempData["Error"] = "The system must keep one admin account.";
+                    return RedirectToAction(nameof(Index));
+                }
                 _db.Users.Remove(user);
                 await _db.SaveChangesAsync();
                 TempData["Success"] = "User deleted.";
@@ -278,13 +282,28 @@ namespace RSDSystem.Controllers
             if (selectedIds == null || selectedIds.Count == 0)
                 return RedirectToAction(nameof(Index));
 
-            var users = _db.Users
+            var users = await _db.Users
                            .Where(u => selectedIds.Contains(u.UserId))
-                           .ToList();
+                           .ToListAsync();
 
-            _db.Users.RemoveRange(users);
+            var removable = new List<User>();
+            foreach (var user in users)
+            {
+                if (!await IsLastAdminAsync(user))
+                    removable.Add(user);
+            }
+
+            if (removable.Count == 0)
+            {
+                TempData["Error"] = "The system must keep one admin account.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            _db.Users.RemoveRange(removable);
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Users deleted.";
+            TempData["Success"] = removable.Count == users.Count
+                ? "Users deleted."
+                : "Selected users were deleted. The admin account was kept.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -295,10 +314,25 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user != null)
             {
+                if (user.IsActive && await IsLastAdminAsync(user))
+                {
+                    TempData["Error"] = "The system must keep one active admin account.";
+                    return RedirectToAction(nameof(Index));
+                }
                 user.IsActive = !user.IsActive;
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<bool> IsLastAdminAsync(User user)
+        {
+            if (!string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return !await _db.Users.AnyAsync(u =>
+                u.UserId != user.UserId
+                && u.Role == "Admin"
+                && u.IsActive);
         }
 
         private string GenerateUserCode()

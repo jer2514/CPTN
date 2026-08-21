@@ -95,7 +95,16 @@
     </div>
 </div>
 
-@section Scripts {
+<div class="del-overlay" id="importConfirmOverlay" onclick="closeImportConfirm(arguments[0])">
+    <div class="del-modal">
+        <div class="del-title">Import attendance?</div>
+        <div class="del-msg" id="importConfirmMsg"></div>
+        <div class="del-actions">
+            <button type="button" class="del-btn-cancel" onclick="closeImportConfirm()">Cancel</button>
+            <button type="button" class="btn-primary-blue-block" style="margin-top:0;width:auto;padding:10px 28px" id="importConfirmBtn">Import</button>
+        </div>
+    </div>
+</div>
     <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
     <partial name="_ProjectListData" model="Model" />
     <script>
@@ -420,9 +429,18 @@
             const confirmMsg = unmatched > 0
                 ? `${unmatched} row(s) are still unmatched and will be saved without a linked employee. Continue importing?`
                 : 'Import these attendance rows? If this project already has attendance for the same dates, those rows will be replaced.';
-            if (!confirm(confirmMsg)) return;
+            document.getElementById('importConfirmMsg').textContent = confirmMsg;
+            document.getElementById('importConfirmOverlay').classList.add('open');
+        });
 
-            const btn = this;
+        function closeImportConfirm(e) {
+            if (!e || e.target === document.getElementById('importConfirmOverlay'))
+                document.getElementById('importConfirmOverlay').classList.remove('open');
+        }
+
+        document.getElementById('importConfirmBtn').addEventListener('click', async function () {
+            closeImportConfirm();
+            const btn = document.getElementById('importBtn');
             btn.disabled = true;
             btn.textContent = 'Importing...';
             try {

@@ -300,6 +300,8 @@ namespace RSDSystem.Controllers
                 ? "payroll staff"
                 : project.AssignedPayrollStaff;
 
+            await _notifications.NotifyPayslipsSentAsync(project, start.Date, end.Date, count, HttpContext.RequestAborted);
+
             TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
             return RedirectToAction(nameof(GeneratedPayslips), new
             {
@@ -602,7 +604,8 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> AddSchedule(int ProjectId, string? TypeOfService,
             DateTime StartingDate, DateTime EndDate)
         {
-            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate);
+            var projectType = await ProjectTypeAsync(ProjectId);
+            var error = await ValidateScheduleAsync(ProjectId, projectType, StartingDate, EndDate);
             if (error != null)
             {
                 TempData["Error"] = error;
@@ -612,7 +615,7 @@ namespace RSDSystem.Controllers
             var schedule = new PayrollSchedule
             {
                 ProjectId = ProjectId,
-                TypeOfService = TypeOfService?.Trim(),
+                TypeOfService = projectType,
                 StartingDate = StartingDate.Date,
                 EndDate = EndDate.Date
             };
@@ -638,7 +641,8 @@ namespace RSDSystem.Controllers
             var existing = await _db.Set<PayrollSchedule>().FindAsync(PayrollScheduleId);
             if (existing == null) return NotFound();
 
-            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate, PayrollScheduleId);
+            var projectType = await ProjectTypeAsync(ProjectId);
+            var error = await ValidateScheduleAsync(ProjectId, projectType, StartingDate, EndDate, PayrollScheduleId);
             if (error != null)
             {
                 TempData["Error"] = error;
@@ -646,7 +650,7 @@ namespace RSDSystem.Controllers
             }
 
             existing.ProjectId = ProjectId;
-            existing.TypeOfService = TypeOfService?.Trim();
+            existing.TypeOfService = projectType;
             existing.StartingDate = StartingDate.Date;
             existing.EndDate = EndDate.Date;
 
@@ -703,18 +707,21 @@ namespace RSDSystem.Controllers
             return null;
         }
 
+        private async Task<string> ProjectTypeAsync(int projectId)
+        {
+            var type = await _db.Projects.AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => p.TypeOfService)
+                .FirstOrDefaultAsync();
+            return string.IsNullOrWhiteSpace(type) ? "" : type.Trim();
+        }
+
         // POST /Payroll/DeleteSchedule/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteSchedule(int id)
+        public IActionResult DeleteSchedule(int id)
         {
-            var schedule = await _db.Set<PayrollSchedule>().FindAsync(id);
-            if (schedule != null)
-            {
-                _db.Set<PayrollSchedule>().Remove(schedule);
-                await _db.SaveChangesAsync();
-                TempData["Success"] = "Schedule deleted.";
-            }
+            TempData["Error"] = "Payroll schedules cannot be deleted. Edit the dates instead, or wait until payroll staff mark the task as done.";
             return RedirectToAction("Index", "Home");
         }
     }

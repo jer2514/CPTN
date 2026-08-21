@@ -186,14 +186,25 @@ namespace RSDSystem.Controllers
                 .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
 
             var recordIds = rows.Select(r => r.AttendanceRecordId).ToList();
-            var pendingIds = recordIds.Count == 0
-                ? new HashSet<int>()
-                : (await _db.AttendanceCorrectionRequests.AsNoTracking()
+            var pendingIds = new HashSet<int>();
+            var approvedIds = new HashSet<int>();
+            if (recordIds.Count > 0)
+            {
+                var requests = await _db.AttendanceCorrectionRequests.AsNoTracking()
                     .Where(c => recordIds.Contains(c.AttendanceRecordId)
-                        && c.Status == CorrectionRequestStatuses.Pending)
+                        && (c.Status == CorrectionRequestStatuses.Pending
+                            || c.Status == CorrectionRequestStatuses.Approved))
+                    .Select(c => new { c.AttendanceRecordId, c.Status })
+                    .ToListAsync(HttpContext.RequestAborted);
+                pendingIds = requests
+                    .Where(c => c.Status == CorrectionRequestStatuses.Pending)
                     .Select(c => c.AttendanceRecordId)
-                    .ToListAsync(HttpContext.RequestAborted))
                     .ToHashSet();
+                approvedIds = requests
+                    .Where(c => c.Status == CorrectionRequestStatuses.Approved)
+                    .Select(c => c.AttendanceRecordId)
+                    .ToHashSet();
+            }
 
             return Json(new
             {
@@ -231,7 +242,8 @@ namespace RSDSystem.Controllers
                     Status = r.Status,
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
-                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt, pendingIds.Contains(r.AttendanceRecordId)))
+                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt,
+                    pendingIds.Contains(r.AttendanceRecordId), approvedIds.Contains(r.AttendanceRecordId)))
             });
         }
 
@@ -328,7 +340,7 @@ namespace RSDSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateRecord(
+        public IActionResult UpdateRecord(
             int recordId,
             string? timeIn1,
             string? timeOut1,
@@ -338,36 +350,11 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
-            if (IsAdmin)
+            return Json(new
             {
-                return Json(new
-                {
-                    success = false,
-                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
-                });
-            }
-
-            var record = await _db.AttendanceRecords.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
-            if (record == null)
-                return Json(new { success = false, message = "Attendance row not found." });
-
-            if (record.Status == AttendanceStatuses.Complete)
-            {
-                return Json(new
-                {
-                    success = false,
-                    message = "Complete attendance needs an admin-reviewed correction request."
-                });
-            }
-
-            var error = await _imports.UpdateRecordAsync(
-                recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, status,
-                HttpContext.RequestAborted);
-            if (error != null)
-                return Json(new { success = false, message = error });
-
-            return Json(new { success = true, message = "Attendance row updated." });
+                success = false,
+                message = "Attendance changes must be submitted as a correction request."
+            });
         }
 
         [HttpPost]
@@ -400,6 +387,12 @@ namespace RSDSystem.Controllers
                 .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
+
+            var alreadyApproved = await _db.AttendanceCorrectionRequests
+                .AnyAsync(c => c.AttendanceRecordId == recordId
+                    && c.Status == CorrectionRequestStatuses.Approved);
+            if (alreadyApproved)
+                return Json(new { success = false, message = "This attendance row was already approved and cannot be edited again." });
 
             var pending = await _db.AttendanceCorrectionRequests
                 .FirstOrDefaultAsync(c => c.AttendanceRecordId == recordId
@@ -501,7 +494,7 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
+        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false, bool correctionApproved = false)
         {
             var computed = new AttendanceRecord
             {
@@ -515,14 +508,13 @@ namespace RSDSystem.Controllers
             };
             AttendanceRules.Apply(computed);
             var status = AttendanceStatuses.Display(computed.Status);
-            var requestEdit = AttendanceStatuses.CountsAsWorked(status) && status == AttendanceStatuses.Complete;
             string actionLabel;
-            if (pendingCorrection)
+            if (correctionApproved)
+                actionLabel = "Approved";
+            else if (pendingCorrection)
                 actionLabel = "Pending Review";
-            else if (requestEdit)
-                actionLabel = "Request Edit";
             else
-                actionLabel = "Edit";
+                actionLabel = "Request Edit";
 
             return new
             {
@@ -554,7 +546,8 @@ namespace RSDSystem.Controllers
                 importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
                 actionLabel,
                 pendingCorrection,
-                requestEdit
+                requestEdit = !correctionApproved,
+                locked = correctionApproved
             };
         }
     }

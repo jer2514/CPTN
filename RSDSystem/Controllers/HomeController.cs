@@ -75,6 +75,7 @@ namespace RSDSystem.Controllers
 
             var scheduleRows = await _db.Set<PayrollSchedule>()
                 .AsNoTracking()
+                .Where(s => !s.TaskCompleted)
                 .OrderBy(s => s.StartingDate)
                 .Select(s => new
                 {
