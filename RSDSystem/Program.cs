@@ -193,15 +193,15 @@ END");
 
         var toAdd = new List<User>();
 
-        if (!db.Users.Any(u => u.Username == "demo"))
+        if (!db.Users.Any(u => u.Username == "admin"))
         {
             toAdd.Add(new User
             {
-                FirstName = "Demo",
+                FirstName = "Admin",
                 LastName = "User",
-                Username = "demo",
+                Username = "admin",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Demo@123"),
-                Email = "demo@example.com",
+                Email = "admin@example.com",
                 ContactNumber = "09123456789",
                 Address = "Demo account",
                 Role = "Admin",
@@ -210,22 +210,22 @@ END");
             });
         }
 
-        if (!db.Users.Any(u => u.Username == "payroll"))
-        {
-            toAdd.Add(new User
-            {
-                FirstName = "Payroll",
-                LastName = "Staff",
-                Username = "payroll",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Payroll@123"),
-                Email = "payroll@example.com",
-                ContactNumber = "09987654321",
-                Address = "Payroll demo account",
-                Role = "PayrollStaff",
-                IsActive = true,
-                CreatedAt = DateTime.Now
-            });
-        }
+        //if (!db.Users.Any(u => u.Username == "payroll"))
+        //{
+        //    toAdd.Add(new User
+        //    {
+        //        FirstName = "Payroll",
+        //        LastName = "Staff",
+        //        Username = "payroll",
+        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Payroll@123"),
+        //        Email = "payroll@example.com",
+        //        ContactNumber = "09987654321",
+        //        Address = "Payroll demo account",
+        //        Role = "PayrollStaff",
+        //        IsActive = true,
+        //        CreatedAt = DateTime.Now
+        //    });
+        //}
 
         if (toAdd.Count > 0)
         {
@@ -259,17 +259,5 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");
-
-try
-{
-    Console.WriteLine("On this computer: http://localhost:5114");
-    var host = Dns.GetHostEntry(Dns.GetHostName());
-    foreach (var ip in host.AddressList.Where(a => a.AddressFamily == AddressFamily.InterNetwork))
-        Console.WriteLine("Other computers on this Wi-Fi/network: http://" + ip + ":5114");
-}
-catch
-{
-    // ignore address lookup failures
-}
 
 app.Run();
