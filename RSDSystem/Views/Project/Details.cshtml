@@ -8,6 +8,7 @@
     var statusLabel = ProjectStatusOptions.Normalize(Model.Status);
     var statusClass = ProjectStatusOptions.BadgeClass(Model.Status);
     var isFinished = ProjectStatusOptions.IsFinished(Model.Status);
+    var employeesReadOnly = isFinished || ViewBag.EmployeesReadOnly is true;
 }
 
 
@@ -104,7 +105,7 @@
 
     <div class="proj-view-group mt-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="form-lbl mb-0">Assigned Employees</span>
+            <span class="form-lbl mb-0">@(isFinished ? "Employees on this project" : "Assigned Employees")</span>
             <span class="proj-emp-count">
                 Total Employees: <strong id="empTotalCount">@employees.Count</strong>
             </span>
@@ -160,13 +161,22 @@
                         <td>@emp.JobClassification</td>
                         <td>₱@emp.DailyRate.ToString("N2")</td>
                         <td>
-                            <button type="button"
-                                    class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
-                                    data-id="@emp.EmployeeId"
-                                    data-name="@emp.FullName"
-                                    onclick="handleStatusClick(this)">
-                                @(emp.IsActive ? "Active" : "Inactive")
-                            </button>
+                            @if (employeesReadOnly)
+                            {
+                                <span class="@(emp.IsActive ? "badge-active" : "badge-inactive")">
+                                    @(emp.IsActive ? "Active" : "Inactive")
+                                </span>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
+                                        data-id="@emp.EmployeeId"
+                                        data-name="@emp.FullName"
+                                        onclick="handleStatusClick(this)">
+                                    @(emp.IsActive ? "Active" : "Inactive")
+                                </button>
+                            }
                         </td>
                     </tr>
                 }

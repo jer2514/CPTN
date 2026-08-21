@@ -29,6 +29,7 @@
         <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) – @Model.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
     </div>
     <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
+    <div class="payslip-line"><span>Regular Hours:</span><span class="payslip-val">@PayrollComputation.PaidRegularHours(Model).ToString("0.##") hrs</span></div>
     <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours.ToString("0.##") hours</span></div>
     <div class="payslip-line"><span>Absent:</span><span class="payslip-val">@Model.AbsentDays Days</span></div>
 

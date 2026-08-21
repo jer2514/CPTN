@@ -493,6 +493,7 @@ namespace RSDSystem.Services
                 EmployeeName = first.Employee?.FullName ?? first.EmployeeName,
                 Matched = rows.Any(r => r.Matched),
                 DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsFullDay(r.Status)),
+                DaysPresent = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),

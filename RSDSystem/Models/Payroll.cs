@@ -24,6 +24,9 @@ namespace RSDSystem.Models
         public int RegularDaysWorked { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]
+        public decimal RegularHours { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal OvertimeHours { get; set; }
 
         public int AbsentDays { get; set; }

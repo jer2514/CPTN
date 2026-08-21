@@ -58,9 +58,7 @@ namespace RSDSystem.Controllers
 
             if (project == null) return NotFound();
 
-            var employees = await _db.Employees
-                                     .Where(e => e.ProjectId == id)
-                                     .ToListAsync();
+            var employees = await LoadProjectEmployeesAsync(id, ProjectStatusOptions.IsFinished(project.Status));
 
             var unassignedEmployees = await _db.Employees
                                      .Where(e => e.ProjectId == null)
@@ -69,6 +67,7 @@ namespace RSDSystem.Controllers
 
             ViewBag.Employees = employees;
             ViewBag.UnassignedEmployees = unassignedEmployees;
+            ViewBag.EmployeesReadOnly = ProjectStatusOptions.IsFinished(project.Status);
             ViewBag.PageTitle = "View Project";
             return View(project);
         }
@@ -223,7 +222,7 @@ namespace RSDSystem.Controllers
                 await _notifications.NotifyStaffAssignedAsync(existing, HttpContext.RequestAborted);
 
             TempData["Success"] = becomingFinished
-                ? "Project marked finished. Assigned employees are now inactive."
+                ? "Project marked finished. Assigned employees are now inactive, and the roster is kept for viewing."
                 : "Project updated successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -365,11 +364,71 @@ namespace RSDSystem.Controllers
             var employees = await _db.Employees
                 .Where(e => e.ProjectId == projectId)
                 .ToListAsync();
+            if (employees.Count == 0)
+                return;
+
+            var existingIds = await _db.ProjectEmployeeHistories
+                .Where(h => h.ProjectId == projectId)
+                .Select(h => h.EmployeeId)
+                .ToListAsync();
+            var known = existingIds.ToHashSet();
+
             foreach (var emp in employees)
             {
+                if (!known.Contains(emp.EmployeeId))
+                {
+                    _db.ProjectEmployeeHistories.Add(new ProjectEmployeeHistory
+                    {
+                        ProjectId = projectId,
+                        EmployeeId = emp.EmployeeId,
+                        RecordedAt = DateTime.Now
+                    });
+                    known.Add(emp.EmployeeId);
+                }
+
                 emp.IsActive = false;
                 emp.ProjectId = null;
             }
+        }
+
+        private async Task<List<Employee>> LoadProjectEmployeesAsync(int projectId, bool finished)
+        {
+            if (!finished)
+            {
+                return await _db.Employees
+                    .Where(e => e.ProjectId == projectId)
+                    .OrderBy(e => e.LastName)
+                    .ThenBy(e => e.FirstName)
+                    .ToListAsync();
+            }
+
+            var historyIds = await _db.ProjectEmployeeHistories
+                .Where(h => h.ProjectId == projectId)
+                .Select(h => h.EmployeeId)
+                .ToListAsync();
+            var assignedIds = await _db.Employees
+                .Where(e => e.ProjectId == projectId)
+                .Select(e => e.EmployeeId)
+                .ToListAsync();
+            var payrollIds = await _db.Payrolls
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => p.EmployeeId)
+                .Distinct()
+                .ToListAsync();
+
+            var ids = historyIds
+                .Concat(assignedIds)
+                .Concat(payrollIds)
+                .Distinct()
+                .ToList();
+            if (ids.Count == 0)
+                return new List<Employee>();
+
+            return await _db.Employees
+                .Where(e => ids.Contains(e.EmployeeId))
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
         }
     }
 }

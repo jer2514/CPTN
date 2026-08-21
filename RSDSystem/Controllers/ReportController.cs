@@ -13,6 +13,7 @@ namespace RSDSystem.Controllers
         public static readonly string[] ReportTypes =
         {
             "Payroll Report",
+            "Monthly Payroll Report",
             "Attendance Report",
             "Payslip Report",
             "Payroll Prediction Report",
@@ -65,6 +66,25 @@ namespace RSDSystem.Controllers
                     start = p.Start.ToString("yyyy-MM-dd"),
                     end = p.End.ToString("yyyy-MM-dd"),
                     label = p.Start.ToString("MMMM dd", Dates) + " - " + p.End.ToString("MMMM dd, yyyy", Dates)
+                })
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Months(int projectId)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var months = await LoadMonthsAsync(projectId);
+            return Json(new
+            {
+                success = true,
+                months = months.Select(m => new
+                {
+                    start = m.Start.ToString("yyyy-MM-dd"),
+                    end = m.End.ToString("yyyy-MM-dd"),
+                    label = m.Start.ToString("MMMM yyyy", Dates)
                 })
             });
         }
@@ -126,6 +146,7 @@ namespace RSDSystem.Controllers
             return type switch
             {
                 "Payroll Report" => await PayrollReportAsync(project, start!.Value, end!.Value, periodLabel),
+                "Monthly Payroll Report" => await MonthlyPayrollReportAsync(project, start!.Value, end!.Value),
                 "Attendance Report" => await AttendanceReportAsync(project, start!.Value, end!.Value, periodLabel),
                 "Payslip Report" => await PayslipReportAsync(project, start!.Value, end!.Value, periodLabel),
                 "Payroll Prediction Report" => await PredictionReportAsync(project),
@@ -147,11 +168,11 @@ namespace RSDSystem.Controllers
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Payroll Report", periodLabel));
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Job</th><th>Days</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
+            html.Append("<th>Employee</th><th>Job</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
             html.Append("</tr></thead><tbody>");
             if (slips.Count == 0)
             {
-                html.Append("<tr><td colspan=\"7\">No payroll records for this period.</td></tr>");
+                html.Append("<tr><td colspan=\"8\">No payroll records for this period.</td></tr>");
             }
             else
             {
@@ -161,6 +182,7 @@ namespace RSDSystem.Controllers
                     html.Append($"<td>{Esc(slip.Employee?.FullName)}</td>");
                     html.Append($"<td>{Esc(slip.Employee?.JobClassification)}</td>");
                     html.Append($"<td>{slip.RegularDaysWorked}</td>");
+                    html.Append($"<td>{PayrollComputation.PaidRegularHours(slip):0.##}</td>");
                     html.Append($"<td>{slip.OvertimeHours:0.##}</td>");
                     html.Append($"<td>₱{slip.GrossPay:N2}</td>");
                     html.Append($"<td>₱{slip.NetPay:N2}</td>");
@@ -171,6 +193,56 @@ namespace RSDSystem.Controllers
             html.Append("</tbody></table>");
             html.Append($"<div class=\"report-total\">Total net pay: ₱{slips.Sum(s => s.NetPay):N2}</div>");
             return new ReportBuild { Title = "Payroll Report — " + project.ProjectName, Html = html.ToString() };
+        }
+
+        private async Task<ReportBuild> MonthlyPayrollReportAsync(Project project, DateTime start, DateTime end)
+        {
+            var monthStart = new DateTime(start.Year, start.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var monthLabel = monthStart.ToString("MMMM yyyy", Dates);
+
+            var slips = await _db.Payrolls.AsNoTracking()
+                .Include(p => p.Employee)
+                .Where(p => p.ProjectId == project.ProjectId
+                    && p.PayPeriodStart.Date <= monthEnd
+                    && p.PayPeriodEnd.Date >= monthStart)
+                .OrderBy(p => p.PayPeriodStart)
+                .ThenBy(p => p.Employee!.LastName)
+                .ThenBy(p => p.Employee!.FirstName)
+                .ToListAsync();
+
+            var html = new StringBuilder();
+            html.Append(Header(project.ProjectName, "Monthly Payroll Report", monthLabel));
+            html.Append("<table class=\"report-table\"><thead><tr>");
+            html.Append("<th>Employee</th><th>Job</th><th>Period</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
+            html.Append("</tr></thead><tbody>");
+            if (slips.Count == 0)
+            {
+                html.Append("<tr><td colspan=\"9\">No payroll records for this month.</td></tr>");
+            }
+            else
+            {
+                foreach (var slip in slips)
+                {
+                    var period = slip.PayPeriodStart.ToString("MMM dd", Dates)
+                        + " - " + slip.PayPeriodEnd.ToString("MMM dd, yyyy", Dates);
+                    html.Append("<tr>");
+                    html.Append($"<td>{Esc(slip.Employee?.FullName)}</td>");
+                    html.Append($"<td>{Esc(slip.Employee?.JobClassification)}</td>");
+                    html.Append($"<td>{Esc(period)}</td>");
+                    html.Append($"<td>{slip.RegularDaysWorked}</td>");
+                    html.Append($"<td>{PayrollComputation.PaidRegularHours(slip):0.##}</td>");
+                    html.Append($"<td>{slip.OvertimeHours:0.##}</td>");
+                    html.Append($"<td>₱{slip.GrossPay:N2}</td>");
+                    html.Append($"<td>₱{slip.NetPay:N2}</td>");
+                    html.Append($"<td>{Esc(slip.Status)}</td>");
+                    html.Append("</tr>");
+                }
+            }
+            html.Append("</tbody></table>");
+            html.Append($"<div class=\"report-total\">Total net pay: ₱{slips.Sum(s => s.NetPay):N2}</div>");
+            html.Append($"<div class=\"report-total\">Total regular hours: {slips.Sum(s => PayrollComputation.PaidRegularHours(s)):0.##}</div>");
+            return new ReportBuild { Title = "Monthly Payroll Report — " + project.ProjectName, Html = html.ToString() };
         }
 
         private async Task<ReportBuild> AttendanceReportAsync(Project project, DateTime start, DateTime end, string periodLabel)
@@ -234,6 +306,7 @@ namespace RSDSystem.Controllers
                 html.Append("<table class=\"report-table\"><tbody>");
                 html.Append($"<tr><td>Job</td><td>{Esc(slip.Employee?.JobClassification)}</td></tr>");
                 html.Append($"<tr><td>Regular days</td><td>{slip.RegularDaysWorked}</td></tr>");
+                html.Append($"<tr><td>Regular hours</td><td>{PayrollComputation.PaidRegularHours(slip):0.##}</td></tr>");
                 html.Append($"<tr><td>Overtime</td><td>{slip.OvertimeHours:0.##} hours</td></tr>");
                 html.Append($"<tr><td>Regular pay</td><td>₱{slip.RegularPay:N2}</td></tr>");
                 html.Append($"<tr><td>Overtime pay</td><td>₱{slip.OvertimePay:N2}</td></tr>");
@@ -348,6 +421,42 @@ namespace RSDSystem.Controllers
             return map.Values
                 .OrderByDescending(p => p.Start)
                 .ThenByDescending(p => p.End)
+                .ToList();
+        }
+
+        private async Task<List<(DateTime Start, DateTime End)>> LoadMonthsAsync(int projectId)
+        {
+            var map = new Dictionary<string, (DateTime Start, DateTime End)>(StringComparer.OrdinalIgnoreCase);
+
+            void Add(DateTime date)
+            {
+                var start = new DateTime(date.Year, date.Month, 1);
+                var end = start.AddMonths(1).AddDays(-1);
+                map[start.ToString("yyyy-MM")] = (start, end);
+            }
+
+            var payrolls = await _db.Payrolls.AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd })
+                .ToListAsync();
+            foreach (var payroll in payrolls)
+            {
+                Add(payroll.PayPeriodStart);
+                Add(payroll.PayPeriodEnd);
+            }
+
+            var budgets = await _db.ProjectMonthlyBudgets.AsNoTracking()
+                .Where(m => m.ProjectId == projectId)
+                .Select(m => m.MonthDate)
+                .ToListAsync();
+            foreach (var month in budgets)
+                Add(month);
+
+            if (map.Count == 0)
+                Add(DateTime.Today);
+
+            return map.Values
+                .OrderByDescending(m => m.Start)
                 .ToList();
         }
 

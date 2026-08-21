@@ -55,6 +55,7 @@
                         </div>
                         <div class="fields">
                             <span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span>
+                            <span class="lbl">Regular Hours:</span><span class="val">@PayrollComputation.PaidRegularHours(slip).ToString("0.##") hrs</span>
                             <span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span>
                             <span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span>
                         </div>

@@ -13,6 +13,7 @@
     int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
     int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
     var dateCulture = CultureInfo.InvariantCulture;
+    var isFinished = ViewBag.IsFinished is true;
 }
 
 <div class="pred-topbar">
@@ -38,7 +39,10 @@
            asp-route-end="@end.ToString("yyyy-MM-dd")"
            target="_blank"
            class="pred-btn-pdf">Download PDF</a>
-        <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+        @if (!isFinished)
+        {
+            <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+        }
     </div>
 </div>
 
@@ -77,6 +81,7 @@
                     </div>
                     <div class="mini-fields">
                         <span class="mini-lbl">Regular Days Worked:</span><span class="mini-val">@slip.RegularDaysWorked Days</span>
+                        <span class="mini-lbl">Regular Hours:</span><span class="mini-val">@PayrollComputation.PaidRegularHours(slip).ToString("0.##") hrs</span>
                         <span class="mini-lbl">Overtime:</span><span class="mini-val">@slip.OvertimeHours.ToString("0.##") hours</span>
                         <span class="mini-lbl">Absent:</span><span class="mini-val">@slip.AbsentDays Days</span>
                     </div>
