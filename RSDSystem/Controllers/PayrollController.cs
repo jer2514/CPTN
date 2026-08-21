@@ -224,6 +224,7 @@ namespace RSDSystem.Controllers
                     changePercent = r.ChangePercent,
                     riskTitle = r.RiskTitle,
                     riskDetail = r.RiskDetail,
+                    isPrevious = r.IsPrevious,
                     generatedAt = PhilippinesTime.FormatLongDateTime(r.GeneratedAt == default ? page.GeneratedAt : r.GeneratedAt)
                 })
             });

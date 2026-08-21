@@ -334,11 +334,12 @@ namespace RSDSystem.Controllers
             }
 
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Previous month 1</th><th>Amount</th><th>Previous month 2</th><th>Amount</th><th>Predicted month</th><th>Predicted budget</th><th>Allocated budget</th><th>Anomaly</th>");
+            html.Append("<th>Load</th><th>Previous month 1</th><th>Amount</th><th>Previous month 2</th><th>Amount</th><th>Predicted month</th><th>Predicted budget</th><th>Allocated budget</th><th>Anomaly</th>");
             html.Append("</tr></thead><tbody>");
             foreach (var row in page.Rows)
             {
                 html.Append("<tr>");
+                html.Append(row.IsPrevious ? "<td>Previous load</td>" : "<td>Current</td>");
                 html.Append($"<td>{Esc(row.PreviousLabel1)}</td><td>₱{row.PreviousAmount1:N2}</td>");
                 html.Append($"<td>{Esc(row.PreviousLabel2)}</td><td>₱{row.PreviousAmount2:N2}</td>");
                 html.Append($"<td>{Esc(row.PredictionLabel)}</td><td>₱{row.PredictedPayroll:N2}</td>");
@@ -361,12 +362,12 @@ namespace RSDSystem.Controllers
             html.Append(Header(project.ProjectName, "Payroll Anomaly Report", string.IsNullOrEmpty(periodLabel) ? page.GeneratedAt.ToString("MMMM dd, yyyy", Dates) : periodLabel));
 
             var flags = new List<string>();
-            foreach (var row in page.Rows)
+            foreach (var row in page.Rows.Where(r => !r.IsPrevious))
             {
                 if (row.ExceedsBudget)
                     flags.Add($"The predicted amount for {row.PredictionLabel} (₱{row.PredictedPayroll:N2}) exceeds the allocated budget (₱{row.AllocatedBudget:N2}).");
                 if (row.UnusualChange)
-                    flags.Add("A significant change was detected compared with the usual payroll pattern.");
+                    flags.Add($"A significant change was detected for {row.PredictionLabel} compared with the usual payroll pattern.");
             }
 
             if (start.HasValue && end.HasValue)

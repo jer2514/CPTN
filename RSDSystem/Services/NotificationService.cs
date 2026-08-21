@@ -103,7 +103,9 @@ namespace RSDSystem.Services
             try
             {
                 var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: cancellationToken);
-                var current = page.Error == null ? page.Rows.FirstOrDefault() : null;
+                var current = page.Error == null
+                    ? page.Rows.LastOrDefault(r => !r.IsPrevious) ?? page.Rows.LastOrDefault()
+                    : null;
                 if (current != null)
                 {
                     await NotifyAdminsAsync(
