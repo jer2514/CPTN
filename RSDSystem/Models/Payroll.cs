@@ -68,6 +68,12 @@ namespace RSDSystem.Models
         public const string Submitted = "Submitted";
         public const string Approved = "Approved";
 
+        public static bool IsApproved(string? status) =>
+            string.Equals((status ?? "").Trim(), Approved, StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsSubmitted(string? status) =>
+            string.Equals((status ?? "").Trim(), Submitted, StringComparison.OrdinalIgnoreCase);
+
         // Correction first, then Draft, then Submitted, then anything else
         public static int SortRank(string status) => status switch
         {

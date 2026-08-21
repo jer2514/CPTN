@@ -112,6 +112,11 @@
             if (rule === 'minlen8' && value.length < 8) {
                 return 'Password must be at least 8 characters.';
             }
+            if (rule === 'staffPassword') {
+                if (value.length < 8 || !/[A-Z]/.test(value) || !/[0-9]/.test(value) || !/[^A-Za-z0-9]/.test(value)) {
+                    return 'Password must be at least 8 characters and include 1 capital letter, 1 number, and 1 special character.';
+                }
+            }
             if (rule === 'projectName' && !PROJECT_NAME_RE.test(value)) {
                 return 'Enter a valid project name.';
             }
