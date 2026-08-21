@@ -10,7 +10,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=35" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css?v=36" rel="stylesheet" asp-append-version="true" />
 </head>
 
 <body data-role="@(Context.Session.GetString("Role") ?? "")">
@@ -209,7 +209,7 @@
             <div class="corr-return-wrap" id="corrReturnWrap" hidden>
                 <label class="form-lbl" for="corrReturnReason">Reason for returning this correction</label>
                 <textarea id="corrReturnReason" class="form-ctrl" rows="3" maxlength="250"
-                          placeholder="Tell payroll staff why this correction is being returned."></textarea>
+                          placeholder="The submitted correction could not be verified."></textarea>
                 <div class="corr-actions">
                     <button type="button" class="btn-outline-blue" id="corrReturnCancel">Cancel</button>
                     <button type="button" class="btn-return" id="corrReturnSend">Return Request</button>
@@ -235,7 +235,7 @@
             <div class="corr-return-wrap" id="taskReturnWrap" hidden>
                 <label class="form-lbl" for="taskReturnReason">Reason for returning this task</label>
                 <textarea id="taskReturnReason" class="form-ctrl" rows="3" maxlength="250"
-                          placeholder="Tell payroll staff what to correct before they mark this task done again."></textarea>
+                          placeholder="Please correct this payroll task and mark it done again."></textarea>
                 <div class="corr-actions">
                     <button type="button" class="btn-outline-blue" id="taskReturnCancel">Cancel</button>
                     <button type="button" class="btn-return" id="taskReturnSend">Return Task</button>

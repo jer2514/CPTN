@@ -7,14 +7,14 @@
         const wrap = document.getElementById('corrReturnWrap');
         const reason = document.getElementById('corrReturnReason');
         if (wrap) wrap.hidden = true;
-        if (reason) reason.value = 'The submitted correction could not be verified.';
+        if (reason) reason.value = '';
     }
 
     function hideTaskReturnReason() {
         const wrap = document.getElementById('taskReturnWrap');
         const reason = document.getElementById('taskReturnReason');
         if (wrap) wrap.hidden = true;
-        if (reason) reason.value = 'Please correct this payroll task and mark it done again.';
+        if (reason) reason.value = '';
     }
 
     function wrapBells() {
@@ -293,7 +293,7 @@
             if (corrActions) corrActions.style.display = 'none';
             if (returnWrap) returnWrap.hidden = false;
             if (returnReason) {
-                returnReason.value = 'The submitted correction could not be verified.';
+                returnReason.value = '';
                 returnReason.focus();
             }
         }
@@ -346,7 +346,7 @@
             if (taskActions) taskActions.style.display = 'none';
             if (taskReturnWrap) taskReturnWrap.hidden = false;
             if (taskReturnReason) {
-                taskReturnReason.value = 'Please correct this payroll task and mark it done again.';
+                taskReturnReason.value = '';
                 taskReturnReason.focus();
             }
         }

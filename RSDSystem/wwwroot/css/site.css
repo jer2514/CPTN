@@ -826,6 +826,10 @@ body {
     box-sizing: border-box;
 }
 
+    .form-ctrl::placeholder {
+        color: #9aa8c3;
+    }
+
     .form-ctrl:focus {
         border-color: #266DF1;
         box-shadow: 0 0 0 3px rgba(38, 109, 241, .1);
