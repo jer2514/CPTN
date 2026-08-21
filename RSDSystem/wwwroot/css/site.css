@@ -3366,7 +3366,10 @@ button.badge-btn {
 }
 
 .att-quick-cell {
-    white-space: nowrap;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    white-space: normal;
 }
 
 .att-row-edited td {

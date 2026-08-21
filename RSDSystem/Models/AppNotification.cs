@@ -54,6 +54,7 @@ namespace RSDSystem.Models
         public const string NewTask = "NewTask";
         public const string TaskCompletionRequested = "TaskCompletionRequested";
         public const string TaskCompletionApproved = "TaskCompletionApproved";
+        public const string TaskCompletionReturned = "TaskCompletionReturned";
         public const string PayrollApproved = "PayrollApproved";
         public const string AttendanceCorrectionApproved = "AttendanceCorrectionApproved";
         public const string AttendanceCorrectionRejected = "AttendanceCorrectionRejected";
@@ -72,6 +73,7 @@ namespace RSDSystem.Models
             NewTask => "bi-file-earmark-fill",
             TaskCompletionRequested => "bi-clipboard-check-fill",
             TaskCompletionApproved => "bi-check-circle-fill",
+            TaskCompletionReturned => "bi-arrow-return-left",
             PayrollApproved => "bi-check-circle-fill",
             AttendanceCorrectionApproved => "bi-file-earmark-text-fill",
             AttendanceCorrectionRejected => "bi-file-earmark-excel-fill",
@@ -92,6 +94,7 @@ namespace RSDSystem.Models
             NewTask => "notif-icon-task",
             TaskCompletionRequested => "notif-icon-doc",
             TaskCompletionApproved => "notif-icon-ok",
+            TaskCompletionReturned => "notif-icon-warn",
             PayrollApproved => "notif-icon-ok",
             AttendanceCorrectionApproved => "notif-icon-task",
             AttendanceCorrectionRejected => "notif-icon-reject",
