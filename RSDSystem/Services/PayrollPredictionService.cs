@@ -52,23 +52,23 @@ namespace RSDSystem.Services
                 .Where(p => p.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
 
-            var completeMonths = CompleteMonthTotals(payrolls);
+            var generated = MonthTotals(payrolls);
             PayrollPredictionRow? current = null;
             string? error = null;
 
-            if (completeMonths.Count < 2)
+            if (generated.Count < 2)
             {
-                error = completeMonths.Count == 0
-                    ? "Need two complete months of approved payroll to predict. A month counts only after it has ended, every slip in that month is approved, and the pay periods cover the whole month."
-                    : "Need one more complete month of approved payroll before the next month can be predicted.";
+                error = generated.Count == 0
+                    ? "This project has no generated payroll yet. Generate payroll for two months first."
+                    : "Need two months of generated payroll before the next month can be predicted.";
             }
             else
             {
-                var months = completeMonths.Keys.ToList();
+                var months = generated.Keys.ToList();
                 var month1 = months[^2];
                 var month2 = months[^1];
-                var amount1 = completeMonths[month1];
-                var amount2 = completeMonths[month2];
+                var amount1 = generated[month1];
+                var amount2 = generated[month2];
                 var predictMonth = month2.AddMonths(1);
                 var allocatedRow = budgets.LastOrDefault(b => MonthKey(b.MonthDate) == predictMonth);
                 var hasAllocated = allocatedRow != null;
@@ -94,8 +94,8 @@ namespace RSDSystem.Services
                 {
                     riskTitle = "Unusual Payroll Change";
                     riskDetail = amount2 > amount1
-                        ? "Approved payroll rose sharply between the last two complete months."
-                        : "Approved payroll dropped sharply between the last two complete months.";
+                        ? "Generated payroll rose sharply between the last two months."
+                        : "Generated payroll dropped sharply between the last two months.";
                 }
 
                 current = new PayrollPredictionRow
@@ -221,47 +221,19 @@ namespace RSDSystem.Services
             };
         }
 
-        private static SortedDictionary<DateTime, decimal> CompleteMonthTotals(List<Payroll> payrolls)
+        private static SortedDictionary<DateTime, decimal> MonthTotals(List<Payroll> payrolls)
         {
-            var currentMonth = new DateTime(PhilippinesTime.Today.Year, PhilippinesTime.Today.Month, 1);
-            var grouped = new SortedDictionary<DateTime, List<Payroll>>();
+            var generated = new SortedDictionary<DateTime, decimal>();
             foreach (var slip in payrolls)
             {
                 var month = MonthKey(DateRules.IsUsableDate(slip.PayPeriodEnd)
                     ? slip.PayPeriodEnd
                     : slip.PayPeriodStart);
-                if (!grouped.TryGetValue(month, out var list))
-                {
-                    list = new List<Payroll>();
-                    grouped[month] = list;
-                }
-                list.Add(slip);
+                generated[month] = generated.TryGetValue(month, out var current)
+                    ? current + slip.NetPay
+                    : slip.NetPay;
             }
-
-            var complete = new SortedDictionary<DateTime, decimal>();
-            foreach (var pair in grouped)
-            {
-                if (pair.Key >= currentMonth)
-                    continue;
-                if (pair.Value.Any(p => p.Status != PayrollStatusOptions.Approved))
-                    continue;
-                if (!CoversWholeMonth(pair.Value, pair.Key))
-                    continue;
-                var total = pair.Value.Sum(p => p.NetPay);
-                if (total <= 0)
-                    continue;
-                complete[pair.Key] = total;
-            }
-            return complete;
-        }
-
-        private static bool CoversWholeMonth(List<Payroll> slips, DateTime month)
-        {
-            var monthStart = month.Date;
-            var monthEnd = month.AddMonths(1).AddDays(-1).Date;
-            var start = slips.Min(s => s.PayPeriodStart.Date);
-            var end = slips.Max(s => s.PayPeriodEnd.Date);
-            return start <= monthStart.AddDays(6) && end >= monthEnd.AddDays(-6);
+            return generated;
         }
 
         public async Task<PayrollForecastResult> ForecastAsync(

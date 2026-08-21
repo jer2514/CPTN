@@ -30,7 +30,7 @@
     </div>
 
     <div id="predictionEmpty" class="text-center text-muted py-5">
-        Select a project and click Load Prediction. The next month is predicted from two complete months of approved payroll. Allocated budget is shown beside each forecast, and every load is saved for this project.
+        Select a project and click Load Prediction. Next-month payroll is predicted from the last two months of generated payroll. The allocated budget for that predicted month is shown beside the forecast.
     </div>
 </div>
 
@@ -65,7 +65,7 @@
             <span id="prDifferenceLabel">Budget Difference</span>
             <strong id="prDifference">—</strong>
         </div>
-        <div class="pred-result-hint" id="prHint">Predicted from two complete months of approved payroll.</div>
+        <div class="pred-result-hint" id="prHint">Predicted from this project’s last two months of generated payroll.</div>
         <div id="prRisk" class="pred-risk" hidden>
             <i class="bi bi-exclamation-triangle-fill"></i>
             <div>
@@ -160,7 +160,7 @@
             if (page && page.usedPythonApi) {
                 return 'Predicted by the Python payroll model (FastAPI + scikit-learn Linear Regression).';
             }
-            return 'Predicted from two complete months of approved payroll.';
+            return 'Predicted from this project’s last two months of generated payroll.';
         }
 
         function openResult(row, generatedAt, projectName, page) {
@@ -176,7 +176,7 @@
             document.getElementById('prPrevious2').textContent = peso(row.previousAmount2);
             document.getElementById('prPredicted').textContent = peso(row.predictedBudget ?? row.predictedPayroll);
             document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
-                ? ('Allocated Budget')
+                ? ('Allocated Budget (' + row.predictionMonth + ')')
                 : 'Allocated Budget';
             document.getElementById('prAllocated').textContent = row.hasAllocatedBudget
                 ? peso(row.allocatedBudget)
