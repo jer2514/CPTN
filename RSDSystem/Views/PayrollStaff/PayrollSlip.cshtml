@@ -31,7 +31,7 @@
         employeeId = Model.EmployeeId,
         projectId = project?.ProjectId ?? 0,
         dailyRate = Model.DailyRate,
-        hourlyRate = Model.RatePerHour,
+        hourlyRate = EmployeeRates.HourlyFromDaily(Model.DailyRate),
         boundMin = minDate,
         boundMax = maxDate,
         hasSchedule = ViewBag.HasPayrollSchedule is true,
@@ -110,7 +110,7 @@ else
             </div>
             <div>
                 <div class="form-lbl">Rate per hour</div>
-                <div class="slip-value">₱@Model.RatePerHour.ToString("N2")</div>
+                <div class="slip-value">₱@EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("N2")</div>
             </div>
         </div>
 

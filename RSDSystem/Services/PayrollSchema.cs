@@ -88,6 +88,27 @@ BEGIN
     CREATE UNIQUE INDEX IX_ProjectEmployeeHistories_ProjectId_EmployeeId
         ON dbo.ProjectEmployeeHistories(ProjectId, EmployeeId);
 END");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'SubmittedAt') IS NULL
+    ALTER TABLE dbo.Payrolls ADD SubmittedAt datetime2 NULL;");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Payrolls', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Payrolls', N'SubmittedAt') IS NOT NULL
+    UPDATE dbo.Payrolls
+    SET SubmittedAt = GeneratedDate
+    WHERE SubmittedAt IS NULL
+      AND (Status = N'Submitted' OR Status = N'Approved');");
+
+            db.Database.ExecuteSqlRaw(@"
+IF OBJECT_ID(N'dbo.Employees', N'U') IS NOT NULL
+AND COL_LENGTH(N'dbo.Employees', N'DailyRate') IS NOT NULL
+AND COL_LENGTH(N'dbo.Employees', N'RatePerHour') IS NOT NULL
+    UPDATE dbo.Employees
+    SET RatePerHour = ROUND(DailyRate / 8.0, 2)
+    WHERE DailyRate > 0;");
         }
     }
 }

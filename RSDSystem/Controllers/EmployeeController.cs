@@ -90,8 +90,10 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("Project");
             ModelState.Remove("EmployeeCode");
+            ModelState.Remove("RatePerHour");
 
             NormalizeEmployee(emp);
+            emp.RatePerHour = EmployeeRates.HourlyFromDaily(emp.DailyRate);
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
 
@@ -158,8 +160,10 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("Project");
             ModelState.Remove("EmployeeCode");
+            ModelState.Remove("RatePerHour");
 
             NormalizeEmployee(emp);
+            emp.RatePerHour = EmployeeRates.HourlyFromDaily(emp.DailyRate);
 
             if (string.IsNullOrWhiteSpace(emp.Email))
                 ModelState.Remove("Email");
@@ -196,7 +200,7 @@ namespace RSDSystem.Controllers
             existing.ContactNumber = emp.ContactNumber;
             existing.JobClassification = emp.JobClassification;
             existing.DailyRate = emp.DailyRate;
-            existing.RatePerHour = emp.RatePerHour;
+            existing.RatePerHour = EmployeeRates.HourlyFromDaily(emp.DailyRate);
             existing.ProjectId = emp.ProjectId;
             existing.IsActive = emp.ProjectId.HasValue;
 
@@ -240,7 +244,7 @@ namespace RSDSystem.Controllers
 
         private static void ClarifyNumericErrors(ModelStateDictionary modelState)
         {
-            foreach (var key in new[] { "DailyRate", "RatePerHour" })
+            foreach (var key in new[] { "DailyRate" })
             {
                 if (!modelState.TryGetValue(key, out var entry)) continue;
 
@@ -252,8 +256,7 @@ namespace RSDSystem.Controllers
                 if (!hasBindingError) continue;
 
                 entry.Errors.Clear();
-                var label = key == "DailyRate" ? "Rate per day" : "Rate per hour";
-                entry.Errors.Add($"{label} is required.");
+                entry.Errors.Add("Rate per day is required.");
             }
         }
 

@@ -81,7 +81,6 @@ namespace RSDSystem.Models
         [Display(Name = "Rate per Day")]
         public decimal DailyRate { get; set; } = 0;
 
-        [Range(0.01, 999999.99, ErrorMessage = "Rate per hour must be greater than 0.")]
         [Column(TypeName = "decimal(10,2)")]
         [Display(Name = "Rate per Hour")]
         public decimal RatePerHour { get; set; } = 0;

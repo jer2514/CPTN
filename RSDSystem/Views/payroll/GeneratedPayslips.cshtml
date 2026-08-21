@@ -72,7 +72,7 @@
                         <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
                         <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
                         <div><span class="mini-lbl">Job Classification: </span><span class="mini-val">@(slip.Employee?.JobClassification)</span></div>
-                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@EmployeeRates.HourlyFromDaily(slip.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
                     </div>
 
                     <div class="mini-section">

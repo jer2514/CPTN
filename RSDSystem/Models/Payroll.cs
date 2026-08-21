@@ -55,6 +55,8 @@ namespace RSDSystem.Models
 
         public DateTime GeneratedDate { get; set; } = DateTime.Now;
 
+        public DateTime? SubmittedAt { get; set; }
+
         [MaxLength(500)]
         public string? CorrectionReason { get; set; }
     }

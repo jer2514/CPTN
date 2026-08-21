@@ -155,7 +155,7 @@ namespace RSDSystem.Controllers
                     Name = e.FullName,
                     e.JobClassification,
                     e.DailyRate,
-                    e.RatePerHour,
+                    RatePerHour = EmployeeRates.HourlyFromDaily(e.DailyRate),
                     e.IsActive,
                     AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId),
                     PendingCorrection = pendingCorrectionIds.Contains(e.EmployeeId)
@@ -545,7 +545,7 @@ namespace RSDSystem.Controllers
                 errors["cashAdvance"] = "Cash advance cannot be negative.";
 
             var (regularPay, overtimePay, gross, net) = PayrollComputation.Compute(
-                emp.RatePerHour, regularHours, overtimeHours, cashAdvance);
+                EmployeeRates.HourlyFromDaily(emp.DailyRate), regularHours, overtimeHours, cashAdvance);
 
             if (cashAdvance > gross)
                 errors["cashAdvance"] = "Cash advance cannot be greater than gross pay.";
@@ -714,6 +714,45 @@ namespace RSDSystem.Controllers
             return View(payroll);
         }
 
+        // GET /PayrollStaff/DownloadPayslips
+        public async Task<IActionResult> DownloadPayslips(int projectId, DateTime start, DateTime end)
+        {
+            var staffName = StaffName();
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null) return NotFound();
+
+            if (!StaffNames.IsAssigned(project.AssignedPayrollStaff, staffName))
+            {
+                TempData["Error"] = "You can only download payslips for projects assigned to you.";
+                return RedirectToAction(nameof(PendingPayroll), new { projectId });
+            }
+
+            var slips = (await _db.Set<Payroll>()
+                .Include(p => p.Employee)
+                .Include(p => p.Project)
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .ToListAsync())
+                .OrderBy(p => p.Employee?.LastName)
+                .ThenBy(p => p.Employee?.FirstName)
+                .ToList();
+
+            var dateCulture = System.Globalization.CultureInfo.InvariantCulture;
+            var safe = new string((project.ProjectName ?? "Project").Where(char.IsLetterOrDigit).ToArray());
+            if (string.IsNullOrEmpty(safe)) safe = "Project";
+
+            ViewBag.ProjectName = project.ProjectName;
+            ViewBag.FileName = safe + "_Payslip_"
+                + start.ToString("MMMdd", dateCulture)
+                + "-"
+                + end.ToString("MMMdd", dateCulture)
+                + ".pdf";
+            ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", dateCulture);
+            ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", dateCulture);
+            return View("~/Views/payroll/PrintPayslips.cshtml", slips);
+        }
+
         // POST /PayrollStaff/SubmitPayroll/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -732,6 +771,7 @@ namespace RSDSystem.Controllers
              }
 
              payroll.Status = PayrollStatusOptions.Submitted;
+             payroll.SubmittedAt = DateTime.Now;
              await _db.SaveChangesAsync();
 
              if (payroll.Project != null)
