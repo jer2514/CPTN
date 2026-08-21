@@ -259,6 +259,35 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Task approved. It has been removed from To do task." });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReturnTask(int id, string? reason)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var note = string.IsNullOrWhiteSpace(reason)
+                ? "Please correct this payroll task and mark it done again."
+                : reason.Trim();
+
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+            if (!schedule.TaskCompleted)
+                return Json(new { success = false, message = "Payroll staff have not marked this task as done." });
+            if (schedule.TaskApproved)
+                return Json(new { success = false, message = "This task was already approved." });
+
+            schedule.TaskCompleted = false;
+            schedule.TaskApproved = false;
+            await _db.SaveChangesAsync();
+            await _notifications.NotifyTaskCompletionReturnedAsync(schedule, note, HttpContext.RequestAborted);
+
+            return Json(new { success = true, message = "Task returned for correction." });
+        }
+
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 

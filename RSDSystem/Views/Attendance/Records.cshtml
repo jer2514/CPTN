@@ -144,6 +144,8 @@
         <div class="att-preview-footer">
             <div class="att-edit-actions">
                 <button type="button" class="att-quick-btn" id="reStandard">8–5</button>
+                <button type="button" class="att-quick-btn" id="reMorning">8–12</button>
+                <button type="button" class="att-quick-btn" id="reAfternoon">1–5</button>
                 <button type="button" class="att-quick-btn" id="reClear">Clear</button>
             </div>
             <div class="att-edit-actions">
@@ -537,12 +539,22 @@
         document.getElementById('recordEditOverlay').addEventListener('click', function (e) {
             if (e.target.id === 'recordEditOverlay') closeRecordEdit();
         });
-        document.getElementById('reStandard').addEventListener('click', function () {
-            document.getElementById('reIn1').value = '08:00';
-            document.getElementById('reOut1').value = '12:00';
-            document.getElementById('reIn2').value = '13:00';
-            document.getElementById('reOut2').value = '17:00';
+        function fillRegularHours(in1, out1, in2, out2) {
+            document.getElementById('reIn1').value = in1;
+            document.getElementById('reOut1').value = out1;
+            document.getElementById('reIn2').value = in2;
+            document.getElementById('reOut2').value = out2;
             refreshRecordEditMeta();
+        }
+
+        document.getElementById('reStandard').addEventListener('click', function () {
+            fillRegularHours('08:00', '12:00', '13:00', '17:00');
+        });
+        document.getElementById('reMorning').addEventListener('click', function () {
+            fillRegularHours('08:00', '12:00', '', '');
+        });
+        document.getElementById('reAfternoon').addEventListener('click', function () {
+            fillRegularHours('', '', '13:00', '17:00');
         });
         document.getElementById('reClear').addEventListener('click', function () {
             ['reIn1', 'reOut1', 'reIn2', 'reOut2', 'reOtIn', 'reOtOut'].forEach(id => {

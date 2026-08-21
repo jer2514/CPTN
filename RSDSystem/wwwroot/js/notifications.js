@@ -10,6 +10,13 @@
         if (reason) reason.value = 'The submitted correction could not be verified.';
     }
 
+    function hideTaskReturnReason() {
+        const wrap = document.getElementById('taskReturnWrap');
+        const reason = document.getElementById('taskReturnReason');
+        if (wrap) wrap.hidden = true;
+        if (reason) reason.value = 'Please correct this payroll task and mark it done again.';
+    }
+
     function wrapBells() {
         document.querySelectorAll('.bell-btn').forEach(function (btn) {
             if (btn.closest('.notif-bell-wrap')) return;
@@ -194,6 +201,7 @@
         }
         overlay.classList.add('open');
         overlay.dataset.id = id;
+        hideTaskReturnReason();
         document.getElementById('taskStaff').textContent = '…';
         document.getElementById('taskProject').textContent = '…';
         document.getElementById('taskType').textContent = '…';
@@ -214,6 +222,7 @@
             document.getElementById('taskPeriod').textContent = data.period || '—';
             const actions = document.getElementById('taskActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
+            if (!data.pending) hideTaskReturnReason();
         } catch (err) {
             showToast('Could not load the task.');
             overlay.classList.remove('open');
@@ -320,15 +329,61 @@
     const taskOverlay = document.getElementById('taskApprovalOverlay');
     if (taskOverlay) {
         taskOverlay.addEventListener('click', function (e) {
-            if (e.target === taskOverlay) taskOverlay.classList.remove('open');
+            if (e.target === taskOverlay) {
+                taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
+            }
         });
         const taskApproveBtn = document.getElementById('taskApprove');
+        const taskReturnBtn = document.getElementById('taskReturn');
+        const taskReturnWrap = document.getElementById('taskReturnWrap');
+        const taskReturnReason = document.getElementById('taskReturnReason');
+        const taskReturnCancel = document.getElementById('taskReturnCancel');
+        const taskReturnSend = document.getElementById('taskReturnSend');
+        const taskActions = document.getElementById('taskActions');
+
+        function showTaskReturnReason() {
+            if (taskActions) taskActions.style.display = 'none';
+            if (taskReturnWrap) taskReturnWrap.hidden = false;
+            if (taskReturnReason) {
+                taskReturnReason.value = 'Please correct this payroll task and mark it done again.';
+                taskReturnReason.focus();
+            }
+        }
+
         if (taskApproveBtn) {
             taskApproveBtn.addEventListener('click', async function () {
                 const id = taskOverlay.dataset.id;
                 const data = await postForm('/Notification/ApproveTask', { id: id });
                 if (!data.success) { showToast(data.message || 'Could not approve the task.'); return; }
                 taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
+                window.location.reload();
+            });
+        }
+        if (taskReturnBtn) {
+            taskReturnBtn.addEventListener('click', function () {
+                showTaskReturnReason();
+            });
+        }
+        if (taskReturnCancel) {
+            taskReturnCancel.addEventListener('click', function () {
+                hideTaskReturnReason();
+                if (taskActions) taskActions.style.display = 'flex';
+            });
+        }
+        if (taskReturnSend) {
+            taskReturnSend.addEventListener('click', async function () {
+                const id = taskOverlay.dataset.id;
+                const reason = taskReturnReason ? taskReturnReason.value.trim() : '';
+                if (!reason) {
+                    showToast('Enter a reason for returning this task.');
+                    return;
+                }
+                const data = await postForm('/Notification/ReturnTask', { id: id, reason: reason });
+                if (!data.success) { showToast(data.message || 'Could not return the task.'); return; }
+                taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
                 window.location.reload();
             });
         }

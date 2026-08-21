@@ -250,7 +250,7 @@ namespace RSDSystem.Services
             await NotifyAdminsAsync(
                 NotificationKinds.TaskCompletionRequested,
                 "Task marked done — approval needed",
-                $"{staff} marked the payroll task for {name} ({period}) as done. Open the notification to approve and close the task.",
+                $"{staff} marked the payroll task for {name} ({period}) as done. Open the notification to approve it or return it for correction.",
                 schedule.ProjectId,
                 schedule.PayrollScheduleId,
                 "/Notification/Index",
@@ -272,6 +272,30 @@ namespace RSDSystem.Services
                 NotificationKinds.TaskCompletionApproved,
                 "Task approved",
                 $"Admin approved your completed task for {name} ({period}). It has been removed from To do task.",
+                schedule.ProjectId,
+                schedule.PayrollScheduleId,
+                "/PayrollStaff/Index",
+                cancellationToken);
+        }
+
+        public async Task NotifyTaskCompletionReturnedAsync(
+            PayrollSchedule schedule, string reason, CancellationToken cancellationToken = default)
+        {
+            var project = schedule.Project;
+            var staff = await ResolveStaffRecipientAsync(project?.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            var period = PeriodLabel(schedule.StartingDate, schedule.EndDate);
+            var note = string.IsNullOrWhiteSpace(reason)
+                ? "Please correct this payroll task and mark it done again."
+                : reason.Trim();
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.TaskCompletionReturned,
+                "Task returned for correction",
+                $"Admin returned your completed task for {name} ({period}). Reason: {note}. Open To do task to correct it and mark it done again.",
                 schedule.ProjectId,
                 schedule.PayrollScheduleId,
                 "/PayrollStaff/Index",

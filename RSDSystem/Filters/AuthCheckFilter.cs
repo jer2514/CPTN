@@ -105,7 +105,8 @@ namespace RSDSystem.Filters
                         || string.Equals(action, "ApproveCorrection", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "ReturnCorrection", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "GetTask", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(action, "ApproveTask", StringComparison.OrdinalIgnoreCase)))
+                        || string.Equals(action, "ApproveTask", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "ReturnTask", StringComparison.OrdinalIgnoreCase)))
                 || (string.Equals(controller, "Report", StringComparison.OrdinalIgnoreCase)
                     && (string.Equals(action, "Periods", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "Generate", StringComparison.OrdinalIgnoreCase)));

@@ -10,7 +10,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=34" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css?v=35" rel="stylesheet" asp-append-version="true" />
 </head>
 
 <body data-role="@(Context.Session.GetString("Role") ?? "")">
@@ -227,9 +227,19 @@
                 <div><strong>Type of Project:</strong> <span id="taskType">—</span></div>
                 <div><strong>Period:</strong> <span id="taskPeriod">—</span></div>
             </div>
-            <div class="corr-reason">Staff marked this payroll task as done. Approve to close it and remove it from To do task.</div>
+            <div class="corr-reason">Staff marked this payroll task as done. Approve to close it, or return it for correction so it stays on To do task.</div>
             <div class="corr-actions" id="taskActions">
                 <button type="button" class="btn-approve" id="taskApprove">Approve</button>
+                <button type="button" class="btn-return" id="taskReturn">Return for Correction</button>
+            </div>
+            <div class="corr-return-wrap" id="taskReturnWrap" hidden>
+                <label class="form-lbl" for="taskReturnReason">Reason for returning this task</label>
+                <textarea id="taskReturnReason" class="form-ctrl" rows="3" maxlength="250"
+                          placeholder="Tell payroll staff what to correct before they mark this task done again."></textarea>
+                <div class="corr-actions">
+                    <button type="button" class="btn-outline-blue" id="taskReturnCancel">Cancel</button>
+                    <button type="button" class="btn-return" id="taskReturnSend">Return Task</button>
+                </div>
             </div>
         </div>
     </div>
