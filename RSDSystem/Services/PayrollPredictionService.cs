@@ -102,9 +102,9 @@ namespace RSDSystem.Services
             }
 
             rows = rows
-                .OrderBy(r => r.PredictionMonth)
-                .ThenBy(r => r.IsPrevious ? 0 : 1)
-                .ThenBy(r => r.GeneratedAt)
+                .OrderByDescending(r => r.PredictionMonth)
+                .ThenBy(r => r.IsPrevious)
+                .ThenByDescending(r => r.GeneratedAt)
                 .ToList();
 
             var latestCurrent = currentRows.LastOrDefault();
