@@ -191,47 +191,57 @@ END");
             Console.WriteLine("Notification schema fix error: " + ex.Message);
         }
 
-        var toAdd = new List<User>();
+        // Change these two values, then restart the app. The existing Admin
+        // row is updated so login matches Program.cs (not only first-time seed).
+        const string seedAdminUsername = "admin";
+        const string seedAdminPassword = "Demo@123";
 
-        if (!db.Users.Any(u => u.Username == "admin"))
+        var admin = db.Users.FirstOrDefault(u => u.Role == "Admin")
+            ?? db.Users.FirstOrDefault(u => u.Username == seedAdminUsername);
+
+        if (admin == null)
         {
-            toAdd.Add(new User
+            var year = DateTime.Now.ToString("yy");
+            db.Users.Add(new User
             {
                 FirstName = "Admin",
                 LastName = "User",
-                Username = "admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Demo@123"),
+                Username = seedAdminUsername,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword),
                 Email = "admin@example.com",
                 ContactNumber = "09123456789",
                 Address = "Demo account",
                 Role = "Admin",
+                UserCode = year + "0001",
                 IsActive = true,
                 CreatedAt = DateTime.Now
             });
-        }
-
-        //if (!db.Users.Any(u => u.Username == "payroll"))
-        //{
-        //    toAdd.Add(new User
-        //    {
-        //        FirstName = "Payroll",
-        //        LastName = "Staff",
-        //        Username = "payroll",
-        //        PasswordHash = BCrypt.Net.BCrypt.HashPassword("Payroll@123"),
-        //        Email = "payroll@example.com",
-        //        ContactNumber = "09987654321",
-        //        Address = "Payroll demo account",
-        //        Role = "PayrollStaff",
-        //        IsActive = true,
-        //        CreatedAt = DateTime.Now
-        //    });
-        //}
-
-        if (toAdd.Count > 0)
-        {
-            db.Users.AddRange(toAdd);
             db.SaveChanges();
-            Console.WriteLine($"Seeded {toAdd.Count} demo user(s).");
+            Console.WriteLine("Seeded admin user from Program.cs.");
+        }
+        else
+        {
+            var usernameTaken = db.Users.Any(u =>
+                u.UserId != admin.UserId && u.Username == seedAdminUsername);
+            if (!usernameTaken && admin.Username != seedAdminUsername)
+                admin.Username = seedAdminUsername;
+
+            var passwordMatches = false;
+            try
+            {
+                passwordMatches = BCrypt.Net.BCrypt.Verify(seedAdminPassword, admin.PasswordHash);
+            }
+            catch
+            {
+                passwordMatches = false;
+            }
+
+            if (!passwordMatches)
+                admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(seedAdminPassword);
+
+            admin.IsActive = true;
+            db.SaveChanges();
+            Console.WriteLine("Applied Program.cs admin username and password to the database.");
         }
     }
     catch (Exception ex)
