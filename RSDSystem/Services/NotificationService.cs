@@ -104,7 +104,7 @@ namespace RSDSystem.Services
             {
                 var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: cancellationToken);
                 var current = page.Error == null
-                    ? page.Rows.LastOrDefault(r => !r.IsPrevious) ?? page.Rows.LastOrDefault()
+                    ? page.Rows.FirstOrDefault(r => !r.IsPrevious) ?? page.Rows.FirstOrDefault()
                     : null;
                 if (current != null)
                 {
