@@ -45,12 +45,16 @@ namespace RSDSystem.Controllers
             if (blocked != null) return blocked;
 
             await BindProjectSuggestionsAsync();
-            var periods = await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true);
+            var hasProject = (projectId ?? 0) > 0 || !string.IsNullOrWhiteSpace(projectName);
+            var periods = hasProject
+                ? await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true)
+                : new List<PayrollPeriodRow>();
             ViewBag.PageTitle = "View Payroll";
             ViewBag.ProjectName = projectName ?? "";
             ViewBag.SelectedProjectId = projectId;
             ViewBag.Month = month;
             ViewBag.Months = MonthOptions();
+            ViewBag.NeedsProject = !hasProject;
             return View(periods);
         }
 

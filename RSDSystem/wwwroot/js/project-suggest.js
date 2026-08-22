@@ -33,7 +33,7 @@
     }
 
     function matchesFor(query) {
-        if (!query) return projects.slice(0, 12);
+        if (!query) return [];
         return projects.filter(function (project) {
             var name = (project.name || '').toLowerCase();
             var location = (project.location || '').toLowerCase();
@@ -72,7 +72,12 @@
     });
 
     input.addEventListener('focus', function () {
-        render(input.value.trim().toLowerCase());
+        var query = input.value.trim().toLowerCase();
+        if (!query) {
+            list.style.display = 'none';
+            return;
+        }
+        render(query);
     });
 
     list.addEventListener('click', function (event) {

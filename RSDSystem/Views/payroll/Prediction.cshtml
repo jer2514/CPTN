@@ -109,7 +109,8 @@
         });
         projectInput.addEventListener('focus', function () {
             const q = projectInput.value.trim().toLowerCase();
-            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
         });
         suggestList.addEventListener('click', function (e) {
             const li = e.target.closest('li[data-id]');

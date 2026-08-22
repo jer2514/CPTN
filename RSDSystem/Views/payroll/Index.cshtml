@@ -43,7 +43,11 @@
         </div>
     </form>
 
-    @if (!Model.Any())
+    @if (ViewBag.NeedsProject is true)
+    {
+        <div class="text-center text-muted py-5">Select a project name first.</div>
+    }
+    else if (!Model.Any())
     {
         <div class="text-center text-muted py-5">No approved payrolls found.</div>
     }

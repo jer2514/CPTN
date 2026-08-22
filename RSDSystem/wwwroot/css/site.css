@@ -2542,6 +2542,12 @@ button.badge-btn {
     align-items: end;
     margin-bottom: 22px;
     overflow: visible;
+    text-align: left;
+}
+
+.vp-filters .form-lbl {
+    display: block;
+    text-align: left;
 }
 
 .vp-filter-submit {
@@ -2567,6 +2573,18 @@ button.badge-btn {
     gap: 8px;
     align-items: center;
     padding: 10px 16px;
+    text-align: left;
+}
+
+.vp-period-head span,
+.vp-period-body span {
+    text-align: left;
+    min-width: 0;
+}
+
+.vp-period-head span:last-child,
+.vp-period-body span:last-child {
+    text-align: center;
 }
 
 .vp-period-head {
@@ -2588,6 +2606,7 @@ button.badge-btn {
     gap: 8px;
     align-items: center;
     padding: 10px 16px;
+    text-align: left;
 }
 
 .pred-forecast-head {
