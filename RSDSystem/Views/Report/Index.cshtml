@@ -64,7 +64,9 @@
 
         function needsPeriod() {
             const type = typeEl.value;
-            return type !== 'Payroll Prediction Report' && type !== 'Payroll Anomaly Report';
+            return type !== 'Project Report'
+                && type !== 'Payroll Prediction Report'
+                && type !== 'Payroll Anomaly Report';
         }
 
         async function loadPeriods() {
