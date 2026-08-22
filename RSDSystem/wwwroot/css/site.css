@@ -402,7 +402,7 @@ body {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex: 0 1 auto;
     min-width: 0;
 }
@@ -419,6 +419,7 @@ body {
     flex: 0 0 auto;
     width: auto;
     max-width: none;
+    margin: 0;
 }
 
 .list-controls-actions {
