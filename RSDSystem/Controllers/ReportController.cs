@@ -203,7 +203,7 @@ namespace RSDSystem.Controllers
                 }
             }
 
-            var employeeCount = await CountProjectEmployeesAsync(project.ProjectId);
+            var employees = await LoadProjectEmployeesAsync(project.ProjectId);
 
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Project Report", PhilippinesTime.FormatLongDate(PhilippinesTime.Today)));
@@ -217,9 +217,29 @@ namespace RSDSystem.Controllers
             html.Append(InfoField("Estimate End Date", DateLabel(project.EstimateEndDate)));
             html.Append(InfoField("Assigned Payroll Staff", project.AssignedPayrollStaff));
             html.Append(InfoField("Payroll Distribution", project.PayrollDistribution));
-            html.Append(InfoField("Employees", employeeCount.ToString(Dates)));
             html.Append(InfoField("Payroll Budget", Money(project.PayrollBudget)));
             html.Append("</div>");
+
+            html.Append("<div class=\"report-section-title\">Assigned Employees</div>");
+            html.Append("<table class=\"report-table\"><thead><tr>");
+            html.Append("<th>Employee ID</th><th>Employee Name</th><th>Job</th>");
+            html.Append("</tr></thead><tbody>");
+            if (employees.Count == 0)
+            {
+                html.Append("<tr><td colspan=\"3\">No employees are assigned to this project.</td></tr>");
+            }
+            else
+            {
+                foreach (var emp in employees)
+                {
+                    html.Append("<tr>");
+                    html.Append($"<td>{Esc(EmployeeIds.Format(emp.EmployeeCode))}</td>");
+                    html.Append($"<td>{Esc(emp.FullName)}</td>");
+                    html.Append($"<td>{Esc(emp.JobClassification)}</td>");
+                    html.Append("</tr>");
+                }
+            }
+            html.Append("</tbody></table>");
 
             html.Append("<div class=\"report-section-title\">Monthly Payroll and Budget</div>");
             html.Append("<table class=\"report-table\"><thead><tr>");
@@ -518,7 +538,7 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Payroll Anomaly Report — " + project.ProjectName, Html = html.ToString() };
         }
 
-        private async Task<int> CountProjectEmployeesAsync(int projectId)
+        private async Task<List<Employee>> LoadProjectEmployeesAsync(int projectId)
         {
             var assigned = _db.Employees.AsNoTracking()
                 .Where(e => e.ProjectId == projectId)
@@ -530,7 +550,15 @@ namespace RSDSystem.Controllers
                 .Where(p => p.ProjectId == projectId)
                 .Select(p => p.EmployeeId);
 
-            return await assigned.Union(history).Union(payroll).CountAsync();
+            var ids = await assigned.Union(history).Union(payroll).ToListAsync();
+            if (ids.Count == 0)
+                return new List<Employee>();
+
+            return await _db.Employees.AsNoTracking()
+                .Where(e => ids.Contains(e.EmployeeId))
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
         }
 
         private async Task<List<(DateTime Start, DateTime End)>> LoadPeriodsAsync(int projectId)
