@@ -3111,6 +3111,19 @@ button.badge-btn {
     margin-bottom: 18px;
 }
 
+.att-list-toolbar {
+    justify-content: flex-start;
+    margin-top: 8px;
+}
+
+.att-list-toolbar .btn-outline-blue,
+.att-list-toolbar .btn-outline-blue:focus,
+.att-list-toolbar .btn-outline-blue:active {
+    background: #2654F2;
+    color: #ffffff;
+    border: none;
+}
+
 .att-import-row {
     margin-bottom: 14px;
 }
