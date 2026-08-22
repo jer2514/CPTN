@@ -8,6 +8,8 @@ namespace RSDSystem.Controllers
 {
     public class AttendanceController : Controller
     {
+        private const string FinishedAttendanceMessage =
+            "Finished projects cannot be opened in Attendance Records.";
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };
 
         private readonly PayrollDbContext _db;
@@ -164,15 +166,15 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPeriods(int projectId)
         {
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var periods = await _imports.ListPeriodsAsync(projectId, HttpContext.RequestAborted);
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periods = periods.Select(p => new
                 {
                     key = p.Key,
@@ -189,9 +191,9 @@ namespace RSDSystem.Controllers
             int projectId, string? search, string? status, int page = 1,
             string? periodStart = null, string? periodEnd = null)
         {
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
@@ -228,7 +230,7 @@ namespace RSDSystem.Controllers
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periodLabel = start.HasValue && end.HasValue
                     ? AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end)
                     : null,
@@ -276,9 +278,9 @@ namespace RSDSystem.Controllers
             if (!IsAdmin)
                 return Json(new { success = false, message = "Attendance summary is available to admin only." });
 
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
@@ -292,7 +294,7 @@ namespace RSDSystem.Controllers
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periodLabel = AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end),
                 importedBy = summary.ImportedBy,
                 total = summary.Total,
@@ -332,6 +334,10 @@ namespace RSDSystem.Controllers
         {
             if (!IsAdmin)
                 return Json(new { success = false, message = "Only admin can delete imported attendance." });
+
+            var (_, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
@@ -408,6 +414,10 @@ namespace RSDSystem.Controllers
                 .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
+
+            var (_, blocked) = await RequireOngoingProjectAsync(record.ProjectId);
+            if (blocked != null)
+                return blocked;
 
             if (await PayrollAttendanceLock.IsLockedAsync(
                     _db, record.ProjectId, record.EmployeeId, record.WorkDate, HttpContext.RequestAborted))
@@ -503,6 +513,17 @@ namespace RSDSystem.Controllers
                 .Where(p => p.AssignedPayrollStaff != null && p.AssignedPayrollStaff.Trim().ToLower() == key)
                 .OrderBy(p => p.ProjectName)
                 .ToListAsync();
+        }
+
+        private async Task<(Project? Project, IActionResult? Error)> RequireOngoingProjectAsync(int projectId)
+        {
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId);
+            if (project == null)
+                return (null, Json(new { success = false, message = "Project not found." }));
+            if (ProjectStatusOptions.IsFinished(project.Status))
+                return (null, Json(new { success = false, message = FinishedAttendanceMessage }));
+            return (project, null);
         }
 
         private string? StaffScope()

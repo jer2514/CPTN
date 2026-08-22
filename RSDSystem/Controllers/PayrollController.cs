@@ -15,18 +15,21 @@ namespace RSDSystem.Controllers
         private readonly PayrollPredictionService _predictions;
         private readonly NotificationService _notifications;
         private readonly ActivityLogService _logs;
+        private readonly AttendanceImportService _attendance;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
         public PayrollController(
             PayrollDbContext db,
             PayrollPredictionService predictions,
             NotificationService notifications,
-            ActivityLogService logs)
+            ActivityLogService logs,
+            AttendanceImportService attendance)
         {
             _db = db;
             _predictions = predictions;
             _notifications = notifications;
             _logs = logs;
+            _attendance = attendance;
         }
 
         private IActionResult? RequireAdmin()
@@ -107,9 +110,9 @@ namespace RSDSystem.Controllers
                 await _db.Set<PayrollSchedule>().Where(s => s.ProjectId == projectId).ToListAsync(),
                 start.Date, end.Date);
 
-            var daysWorked = Math.Max(1, DateRules.CountWeekdays(start.Date, end.Date));
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
+            var skippedNoAttendance = 0;
 
             foreach (var emp in employees)
             {
@@ -118,8 +121,22 @@ namespace RSDSystem.Controllers
                 if (covering != null && existing.Any(p => PayrollPeriods.BelongsTo(p, covering) && p.EmployeeId == emp.EmployeeId))
                     continue;
 
-                var regularPay = emp.DailyRate * daysWorked;
-                var regularHours = daysWorked * 8m;
+                var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
+                    projectId, emp.EmployeeId, start.Date, end.Date, HttpContext.RequestAborted);
+                if (attendance == null)
+                {
+                    skippedNoAttendance++;
+                    continue;
+                }
+
+                var regularDaysWorked = attendance.DaysPresent > 0
+                    ? attendance.DaysPresent
+                    : attendance.DaysWorked;
+                var regularHours = attendance.RegularHours;
+                var overtimeHours = attendance.OvertimeHours;
+                var (regularPay, overtimePay, gross, net) = PayrollComputation.Compute(
+                    EmployeeRates.HourlyFromDaily(emp.DailyRate), regularHours, overtimeHours, 0);
+
                 _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
@@ -127,15 +144,15 @@ namespace RSDSystem.Controllers
                     PayrollScheduleId = covering?.PayrollScheduleId,
                     PayPeriodStart = start.Date,
                     PayPeriodEnd = end.Date,
-                    RegularDaysWorked = daysWorked,
+                    RegularDaysWorked = regularDaysWorked,
                     RegularHours = regularHours,
-                    OvertimeHours = 0,
-                    AbsentDays = 0,
+                    OvertimeHours = overtimeHours,
+                    AbsentDays = attendance.DaysAbsent,
                     RegularPay = regularPay,
-                    OvertimePay = 0,
-                    GrossPay = regularPay,
+                    OvertimePay = overtimePay,
+                    GrossPay = gross,
                     CashAdvance = 0,
-                    NetPay = regularPay,
+                    NetPay = net,
                     Status = PayrollStatusOptions.Draft,
                     GeneratedBy = generatedBy,
                     GeneratedDate = PhilippinesTime.Now
@@ -146,9 +163,20 @@ namespace RSDSystem.Controllers
             if (created > 0)
                 await _db.SaveChangesAsync();
 
-            TempData["Success"] = created > 0
-                ? $"Generated {created} payslip(s) for {project.ProjectName}."
-                : "Payslips for this period already exist.";
+            if (created > 0)
+            {
+                TempData["Success"] = skippedNoAttendance > 0
+                    ? $"Generated {created} payslip(s) for {project.ProjectName}. Skipped {skippedNoAttendance} employee(s) with no matched attendance."
+                    : $"Generated {created} payslip(s) for {project.ProjectName}.";
+            }
+            else if (skippedNoAttendance > 0)
+            {
+                TempData["Error"] = "No payslips generated. Import attendance that matches each employee ID first.";
+            }
+            else
+            {
+                TempData["Success"] = "Payslips for this period already exist.";
+            }
 
             return RedirectToAction(nameof(GeneratedPayslips), new
             {

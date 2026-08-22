@@ -201,11 +201,14 @@
             tbody.innerHTML = list.map(e => {
                 const generated = e.alreadyGenerated === true;
                 const pending = e.pendingCorrection === true;
+                const hasAttendance = e.hasAttendance !== false;
                 let action;
                 if (generated) {
                     action = `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`;
                 } else if (pending) {
                     action = `<span class="btn-generate-pill btn-generate-disabled" title="Pending attendance correction">Pending</span>`;
+                } else if (!hasAttendance) {
+                    action = `<span class="btn-generate-pill btn-generate-disabled" title="No attendance matched to this employee ID">No attendance</span>`;
                 } else {
                     action = `<a class="btn-generate-pill"
                            href="/PayrollStaff/PayrollSlip?employeeId=${e.employeeId}&projectId=${currentProjectId}${currentScheduleId ? '&scheduleId=' + currentScheduleId : ''}">
