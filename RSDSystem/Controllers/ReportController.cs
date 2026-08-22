@@ -203,8 +203,7 @@ namespace RSDSystem.Controllers
                 }
             }
 
-            var employeeCount = await _db.Employees.AsNoTracking()
-                .CountAsync(e => e.ProjectId == project.ProjectId && e.IsActive);
+            var employeeCount = await CountProjectEmployeesAsync(project.ProjectId);
 
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Project Report", PhilippinesTime.FormatLongDate(PhilippinesTime.Today)));
@@ -218,7 +217,7 @@ namespace RSDSystem.Controllers
             html.Append(InfoField("Estimate End Date", DateLabel(project.EstimateEndDate)));
             html.Append(InfoField("Assigned Payroll Staff", project.AssignedPayrollStaff));
             html.Append(InfoField("Payroll Distribution", project.PayrollDistribution));
-            html.Append(InfoField("Active Employees", employeeCount.ToString(Dates)));
+            html.Append(InfoField("Employees", employeeCount.ToString(Dates)));
             html.Append(InfoField("Payroll Budget", Money(project.PayrollBudget)));
             html.Append("</div>");
 
@@ -517,6 +516,21 @@ namespace RSDSystem.Controllers
             }
 
             return new ReportBuild { Title = "Payroll Anomaly Report — " + project.ProjectName, Html = html.ToString() };
+        }
+
+        private async Task<int> CountProjectEmployeesAsync(int projectId)
+        {
+            var assigned = _db.Employees.AsNoTracking()
+                .Where(e => e.ProjectId == projectId)
+                .Select(e => e.EmployeeId);
+            var history = _db.ProjectEmployeeHistories.AsNoTracking()
+                .Where(h => h.ProjectId == projectId)
+                .Select(h => h.EmployeeId);
+            var payroll = _db.Payrolls.AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => p.EmployeeId);
+
+            return await assigned.Union(history).Union(payroll).CountAsync();
         }
 
         private async Task<List<(DateTime Start, DateTime End)>> LoadPeriodsAsync(int projectId)
