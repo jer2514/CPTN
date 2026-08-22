@@ -152,7 +152,8 @@ namespace RSDSystem.Services
                 return;
 
             var latest = await _db.Payrolls.AsNoTracking()
-                .Where(p => p.ProjectId == project.ProjectId)
+                .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved)
                 .OrderByDescending(p => p.PayPeriodEnd)
                 .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -161,6 +162,7 @@ namespace RSDSystem.Services
 
             var periodTotal = await _db.Payrolls.AsNoTracking()
                 .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart == latest.PayPeriodStart
                     && p.PayPeriodEnd == latest.PayPeriodEnd)
                 .SumAsync(p => (decimal?)p.NetPay, cancellationToken) ?? 0;

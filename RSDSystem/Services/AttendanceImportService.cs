@@ -125,7 +125,7 @@ namespace RSDSystem.Services
                 PeriodStart = AttendanceDisplay.UsableDate(preview.PeriodStart),
                 PeriodEnd = AttendanceDisplay.UsableDate(preview.PeriodEnd),
                 ImportedBy = Clip(importedBy, 150),
-                ImportedAt = DateTime.Now,
+                ImportedAt = PhilippinesTime.Now,
                 RowCount = preview.Rows.Count
             };
 

@@ -27,7 +27,7 @@ namespace RSDSystem.Models
         [MaxLength(150)]
         public string? ImportedBy { get; set; }
 
-        public DateTime ImportedAt { get; set; } = DateTime.Now;
+        public DateTime ImportedAt { get; set; } = Helpers.PhilippinesTime.Now;
 
         public int RowCount { get; set; }
 

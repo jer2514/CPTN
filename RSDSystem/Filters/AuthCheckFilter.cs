@@ -46,7 +46,7 @@ namespace RSDSystem.Filters
             }
 
             // Keep PayrollStaff out of Admin-only areas
-            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll" };
+            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll", "ActivityLog" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
                 context.Result = new RedirectToActionResult("Index", "PayrollStaff", null);

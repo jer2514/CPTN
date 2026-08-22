@@ -49,7 +49,7 @@ namespace RSDSystem.Services
                 .ToList();
 
             var payrolls = await _db.Payrolls.AsNoTracking()
-                .Where(p => p.ProjectId == projectId)
+                .Where(p => p.ProjectId == projectId && p.Status == PayrollStatusOptions.Approved)
                 .ToListAsync(cancellationToken);
 
             var generated = MonthTotals(payrolls);
@@ -59,8 +59,8 @@ namespace RSDSystem.Services
             if (generated.Count < 2)
             {
                 error = generated.Count == 0
-                    ? "This project has no generated payroll yet. Generate payroll for two months first."
-                    : "Need two months of generated payroll before the next month can be predicted.";
+                    ? "This project has no approved payroll yet. Approve payroll for two months first."
+                    : "Need two months of approved payroll before the next month can be predicted.";
             }
             else
             {

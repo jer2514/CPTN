@@ -159,6 +159,7 @@ namespace RSDSystem.Controllers
             var slips = await _db.Payrolls.AsNoTracking()
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
                 .OrderBy(p => p.Employee!.LastName)
@@ -204,6 +205,7 @@ namespace RSDSystem.Controllers
             var slips = await _db.Payrolls.AsNoTracking()
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart.Date >= monthStart
                     && p.PayPeriodStart.Date <= monthEnd)
                 .OrderBy(p => p.PayPeriodStart)
@@ -285,6 +287,7 @@ namespace RSDSystem.Controllers
             var slips = await _db.Payrolls.AsNoTracking()
                 .Include(p => p.Employee)
                 .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart.Date == start.Date
                     && p.PayPeriodEnd.Date == end.Date)
                 .OrderBy(p => p.Employee!.LastName)
@@ -323,7 +326,7 @@ namespace RSDSystem.Controllers
         {
             var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: HttpContext.RequestAborted);
             var html = new StringBuilder();
-            html.Append(Header(project.ProjectName, "Payroll Prediction Report", page.GeneratedAt.ToString("MMMM dd, yyyy", Dates)));
+            html.Append(Header(project.ProjectName, "Payroll Prediction Report", PhilippinesTime.FormatLongDate(page.GeneratedAt)));
             html.Append(string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase)
                 ? "<p>Predicted by the Python payroll model (scikit-learn Linear Regression).</p>"
                 : "<p>Predicted with the local payroll formula (Python API offline).</p>");
@@ -359,7 +362,7 @@ namespace RSDSystem.Controllers
         {
             var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: HttpContext.RequestAborted);
             var html = new StringBuilder();
-            html.Append(Header(project.ProjectName, "Payroll Anomaly Report", string.IsNullOrEmpty(periodLabel) ? page.GeneratedAt.ToString("MMMM dd, yyyy", Dates) : periodLabel));
+            html.Append(Header(project.ProjectName, "Payroll Anomaly Report", string.IsNullOrEmpty(periodLabel) ? PhilippinesTime.FormatLongDate(page.GeneratedAt) : periodLabel));
 
             var flags = new List<string>();
             foreach (var row in page.Rows.Where(r => !r.IsPrevious))
@@ -374,6 +377,7 @@ namespace RSDSystem.Controllers
             {
                 var total = await _db.Payrolls.AsNoTracking()
                     .Where(p => p.ProjectId == project.ProjectId
+                        && p.Status == PayrollStatusOptions.Approved
                         && p.PayPeriodStart.Date == start.Value.Date
                         && p.PayPeriodEnd.Date == end.Value.Date)
                     .SumAsync(p => (decimal?)p.NetPay) ?? 0;

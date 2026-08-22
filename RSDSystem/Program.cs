@@ -41,6 +41,8 @@ builder.Services.AddHttpClient("PayrollPrediction", client =>
     client.Timeout = TimeSpan.FromSeconds(8);
 });
 builder.Services.AddScoped<PayrollPredictionService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ActivityLogService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
@@ -189,6 +191,15 @@ END");
         catch (Exception ex)
         {
             Console.WriteLine("Notification schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            ActivityLogSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Activity log schema fix error: " + ex.Message);
         }
 
         // Change these two values, then restart the app. The existing Admin

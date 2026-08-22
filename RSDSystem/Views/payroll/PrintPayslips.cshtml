@@ -73,7 +73,7 @@
                             <span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span>
                         </div>
 
-                        <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                        <div class="footer">Generated Date: @PhilippinesTime.FormatLongDate(slip.GeneratedDate)</div>
                     </div>
                 }
             </div>

@@ -53,6 +53,6 @@ namespace RSDSystem.Models
         [MaxLength(20)]
         public string Engine { get; set; } = "local";
 
-        public DateTime GeneratedAt { get; set; } = DateTime.Now;
+        public DateTime GeneratedAt { get; set; } = Helpers.PhilippinesTime.Now;
     }
 }
