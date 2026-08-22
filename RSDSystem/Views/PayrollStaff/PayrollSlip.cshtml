@@ -2,7 +2,9 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Generate Payroll Slip";
-    Layout = "_PayrollStaffLayout";
+    Layout = string.Equals(Context.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase)
+        ? "_Layout"
+        : "_PayrollStaffLayout";
     var project = ViewBag.Project as RSDSystem.Models.Project;
     var schedules = (ViewBag.Schedules as IEnumerable<RSDSystem.Models.PayrollSchedule>)?.ToList()
         ?? new List<RSDSystem.Models.PayrollSchedule>();

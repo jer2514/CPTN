@@ -1,7 +1,9 @@
 ﻿@model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Generate Payroll";
-    Layout = "_PayrollStaffLayout";
+    Layout = string.Equals(Context.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase)
+        ? "_Layout"
+        : "_PayrollStaffLayout";
 }
 
 <div class="content-topbar">

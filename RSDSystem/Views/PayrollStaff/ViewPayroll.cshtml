@@ -2,7 +2,9 @@
 @using RSDSystem.Helpers
 @{
     ViewData["Title"] = "View Payroll";
-    Layout = "_PayrollStaffLayout";
+    Layout = string.Equals(Context.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase)
+        ? "_Layout"
+        : "_PayrollStaffLayout";
 }
 
 
