@@ -130,7 +130,7 @@ body {
 /* ── Dashboard ────────────────────────────────────────── */
 .dash-header {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
@@ -242,7 +242,7 @@ body {
 .content-topbar {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: flex-start;
 }
 
 .content-topbar .bell-btn {
@@ -392,7 +392,7 @@ body {
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 24px;
 }
@@ -419,7 +419,7 @@ body {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    justify-content: flex-end;
+    margin-left: auto;
     gap: 10px;
     flex-shrink: 0;
     white-space: nowrap;
@@ -2859,7 +2859,7 @@ button.badge-btn {
 
 .pred-topbar {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: space-between;
 }
 
@@ -3534,13 +3534,13 @@ button.badge-btn {
     top: 0;
     z-index: 80;
     box-sizing: border-box;
-    /* 10px logo margin + 120px logo + 2px border: Back starts at the logo bottom */
-    height: 132px;
-    min-height: 132px;
+    height: auto;
+    min-height: 0;
     background: #163F8B;
     border-bottom: none;
-    margin: 0 -28px 16px;
-    padding: 0 28px;
+    /* Logo block is 10 + 120 + 2 = 132px. Top of Back/bell starts on that line. */
+    margin: 132px -28px 16px;
+    padding: 0 28px 12px;
     overflow: visible;
 }
 
