@@ -12,13 +12,12 @@
     var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
 }
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data" class="js-validate" novalidate>

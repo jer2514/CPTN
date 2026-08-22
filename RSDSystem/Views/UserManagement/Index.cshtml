@@ -15,13 +15,7 @@
     <div class="emp-title mb-3">All Users</div>
 
     <div class="list-controls-row">
-        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
-            <i class="bi bi-search"></i>
-            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
-            <input type="hidden" name="sortBy" value="@sortBy" />
-        </form>
-
-        <div class="list-controls-actions">
+        <div class="list-controls-left">
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -34,23 +28,20 @@
                            asp-route-search="@ViewBag.Search">Last Name</a>
                     </li>
                     <li>
-                        <a class="dropdown-item @(sortBy == "role" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="role"
-                           asp-route-search="@ViewBag.Search">Role</a>
-                    </li>
-                    <li>
-                        <a class="dropdown-item @(sortBy == "email" ? "active" : "")"
-                           asp-action="Index" asp-route-sortBy="email"
-                           asp-route-search="@ViewBag.Search">Email</a>
-                    </li>
-                    <li>
                         <a class="dropdown-item @(sortBy == "status" ? "active" : "")"
                            asp-action="Index" asp-route-sortBy="status"
                            asp-route-search="@ViewBag.Search">Status</a>
                     </li>
                 </ul>
             </div>
+            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
+                <input type="hidden" name="sortBy" value="@sortBy" />
+            </form>
+        </div>
 
+        <div class="list-controls-actions">
             <a asp-action="Create" class="btn-primary-blue">Add User</a>
         </div>
     </div>

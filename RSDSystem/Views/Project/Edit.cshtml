@@ -18,13 +18,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Edit" method="post" class="js-validate" novalidate>
@@ -215,9 +214,6 @@
                         }
                     }
                 </select>
-                <div class="slip-schedule-hint" style="margin-top:6px">
-                    Marking Finished unassigns employees, sets them inactive, and locks this project from further edits.
-                </div>
             </div>
         </div>
 
