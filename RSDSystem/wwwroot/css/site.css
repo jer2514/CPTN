@@ -390,7 +390,7 @@ body {
 .list-controls-row {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -400,9 +400,10 @@ body {
 .list-controls-left {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 10px;
+    flex: 0 1 auto;
     min-width: 0;
 }
 
@@ -410,8 +411,13 @@ body {
     flex-shrink: 0;
 }
 
+.list-controls-left .search-wrap,
 .list-controls-left .search-wrap-wide {
-    flex: 0 1 320px;
+    display: flex;
+    align-items: center;
+    flex: 0 0 260px;
+    width: 260px;
+    max-width: 260px;
 }
 
 .list-controls-actions {
@@ -426,15 +432,14 @@ body {
 }
 
     .list-controls-actions .dropdown,
-    .list-controls-actions .btn-primary-blue,
-    .list-controls-actions .search-wrap-wide {
+    .list-controls-actions .btn-primary-blue {
         flex-shrink: 0;
     }
 
 .search-wrap-wide {
-    flex: 1 1 200px;
-    max-width: 320px;
-    min-width: 160px;
+    flex: 0 0 260px;
+    width: 260px;
+    max-width: 260px;
 }
 
     .search-wrap-wide input {
@@ -449,6 +454,9 @@ body {
 /* ── Search box (base) ───────────────────────────────────── */
 .search-wrap {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
 }
 
     .search-wrap input {
