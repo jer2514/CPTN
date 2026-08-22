@@ -7,29 +7,28 @@
 
 
 <div class="content-topbar">
+    @if (fromPayslips)
+    {
+        <a asp-action="GeneratedPayslips"
+           asp-route-projectId="@Model.ProjectId"
+           asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
+           asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
+           class="btn-back">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    }
+    else
+    {
+        <a asp-action="Period"
+           asp-route-projectId="@Model.ProjectId"
+           asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
+           asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
+           class="btn-back">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    }
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-@if (fromPayslips)
-{
-    <a asp-action="GeneratedPayslips"
-       asp-route-projectId="@Model.ProjectId"
-       asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
-       asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
-       class="btn-back">
-        <i class="bi bi-arrow-left"></i> Back
-    </a>
-}
-else
-{
-    <a asp-action="Period"
-       asp-route-projectId="@Model.ProjectId"
-       asp-route-start="@Model.PayPeriodStart.ToString("yyyy-MM-dd")"
-       asp-route-end="@Model.PayPeriodEnd.ToString("yyyy-MM-dd")"
-       class="btn-back">
-        <i class="bi bi-arrow-left"></i> Back
-    </a>
-}
 
 <partial name="_PayslipCard" model="Model" />
 
