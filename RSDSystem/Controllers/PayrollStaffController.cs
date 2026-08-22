@@ -88,15 +88,21 @@ namespace RSDSystem.Controllers
 
         private string? StaffName() => StaffNames.FromSession(HttpContext.Session);
 
+        private bool IsAdmin =>
+            string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
+
         private async Task<List<Project>> AssignedOngoingProjectsAsync()
         {
+            var projects = await _db.Projects.Ongoing()
+                .OrderBy(p => p.ProjectName)
+                .ToListAsync();
+            if (IsAdmin)
+                return projects;
+
             var staffName = StaffName();
             if (string.IsNullOrWhiteSpace(staffName))
                 return new List<Project>();
 
-            var projects = await _db.Projects.Ongoing()
-                .OrderBy(p => p.ProjectName)
-                .ToListAsync();
             return projects
                 .Where(p => StaffNames.IsAssigned(p.AssignedPayrollStaff, staffName))
                 .ToList();
@@ -569,7 +575,7 @@ namespace RSDSystem.Controllers
                 payroll.GrossPay = gross;
                 payroll.CashAdvance = cashAdvance;
                 payroll.NetPay = net;
-                payroll.GeneratedBy = StaffName() ?? "Staff";
+                payroll.GeneratedBy = StaffName() ?? (IsAdmin ? "Admin" : "Staff");
                 payroll.GeneratedDate = PhilippinesTime.Now;
             }
             else
@@ -603,7 +609,7 @@ namespace RSDSystem.Controllers
                     CashAdvance = cashAdvance,
                     NetPay = net,
                     Status = PayrollStatusOptions.Draft,
-                    GeneratedBy = StaffName() ?? "Staff",
+                    GeneratedBy = StaffName() ?? (IsAdmin ? "Admin" : "Staff"),
                     GeneratedDate = PhilippinesTime.Now
                 };
                 _db.Set<Payroll>().Add(payroll);
