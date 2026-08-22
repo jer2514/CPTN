@@ -15,7 +15,7 @@
     <div class="emp-title mb-3">All Users</div>
 
     <div class="list-controls-row">
-        <div class="list-controls-left">
+        <div class="list-controls-actions">
             <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
                 <i class="bi bi-search"></i>
                 <input type="text" name="search" value="@ViewBag.Search" placeholder="Search User" />
@@ -39,9 +39,6 @@
                     </li>
                 </ul>
             </div>
-        </div>
-
-        <div class="list-controls-actions">
             <a asp-action="Create" class="btn-primary-blue">Add User</a>
         </div>
     </div>
