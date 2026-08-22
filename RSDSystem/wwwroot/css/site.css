@@ -402,22 +402,23 @@ body {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex: 0 1 auto;
     min-width: 0;
 }
 
 .list-controls-left > .dropdown {
     flex-shrink: 0;
+    margin-left: 0;
 }
 
 .list-controls-left .search-wrap,
 .list-controls-left .search-wrap-wide {
     display: flex;
     align-items: center;
-    flex: 0 0 260px;
-    width: 260px;
-    max-width: 260px;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
 }
 
 .list-controls-actions {
@@ -437,13 +438,13 @@ body {
     }
 
 .search-wrap-wide {
-    flex: 0 0 260px;
-    width: 260px;
-    max-width: 260px;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
 }
 
     .search-wrap-wide input {
-        width: 100%;
+        width: 220px;
         box-sizing: border-box;
     }
 
