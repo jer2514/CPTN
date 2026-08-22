@@ -404,14 +404,14 @@ body {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 6px;
+    gap: 0;
     flex: 0 1 auto;
     min-width: 0;
 }
 
 .list-controls-left > .dropdown {
     flex-shrink: 0;
-    margin-left: 0;
+    margin-left: 6px;
 }
 
 .list-controls-left .search-wrap,
