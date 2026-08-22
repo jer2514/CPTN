@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Helpers;
 using RSDSystem.Services;
-using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -11,6 +10,10 @@ namespace RSDSystem.Controllers
     {
         private const string AttendanceRequiredMessage =
             "Import attendance for this payroll schedule before generating payroll.";
+        private const string EmployeeAttendanceRequiredMessage =
+            "No attendance records for this employee in this period. Import must match the employee ID.";
+        private const string NotEmployedMessage =
+            "This employee is not employed on this project.";
 
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _attendance;
@@ -127,6 +130,7 @@ namespace RSDSystem.Controllers
                       .ToListAsync();
 
                 var pendingCorrectionIds = await PendingCorrectionEmployeeIdsAsync(projectId);
+                var attendanceEmployeeIds = new HashSet<int>();
 
                 var schedules = await _db.Set<PayrollSchedule>()
                     .Where(s => s.ProjectId == projectId)
@@ -136,6 +140,11 @@ namespace RSDSystem.Controllers
                 var hasAttendance = openSchedule != null
                     && await _attendance.HasImportedAttendanceAsync(
                         projectId, openSchedule.StartingDate, openSchedule.EndDate, HttpContext.RequestAborted);
+                if (openSchedule != null && hasAttendance)
+                {
+                    attendanceEmployeeIds = await _attendance.EmployeeIdsWithAttendanceAsync(
+                        projectId, openSchedule.StartingDate, openSchedule.EndDate, HttpContext.RequestAborted);
+                }
 
                 var generatedEmployeeIds = new HashSet<int>();
                 try
@@ -163,6 +172,7 @@ namespace RSDSystem.Controllers
                     e.DailyRate,
                     RatePerHour = EmployeeRates.HourlyFromDaily(e.DailyRate),
                     e.IsActive,
+                    HasAttendance = attendanceEmployeeIds.Contains(e.EmployeeId),
                     AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId),
                     PendingCorrection = pendingCorrectionIds.Contains(e.EmployeeId)
                 });
@@ -331,31 +341,28 @@ namespace RSDSystem.Controllers
             if (defaultEnd < defaultStart)
                 defaultEnd = defaultStart;
 
+            if (!emp.IsActive || emp.ProjectId != projectId)
+            {
+                TempData["Error"] = NotEmployedMessage;
+                return RedirectToAction(nameof(GeneratePayroll), new { projectId });
+            }
+
             if (existing == null)
             {
-                if (!emp.IsActive || emp.ProjectId != projectId)
-                {
-                    TempData["Error"] = "This employee is not active on this project.";
-                    return RedirectToAction(nameof(GeneratePayroll), new { projectId });
-                }
-
                 if (await HasPendingCorrectionAsync(projectId, employeeId))
                 {
                     TempData["Error"] = "This employee has a pending attendance correction. Wait for admin approval before generating payroll.";
-                    return RedirectToAction(nameof(GeneratePayroll), new { projectId });
-                }
-
-                var imported = await _attendance.HasImportedAttendanceAsync(
-                    projectId, defaultStart, defaultEnd, HttpContext.RequestAborted);
-                if (!imported)
-                {
-                    TempData["Error"] = AttendanceRequiredMessage;
                     return RedirectToAction(nameof(GeneratePayroll), new { projectId });
                 }
             }
 
             var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
                 projectId, employeeId, defaultStart, defaultEnd, HttpContext.RequestAborted);
+            if (attendance == null)
+            {
+                TempData["Error"] = EmployeeAttendanceRequiredMessage;
+                return RedirectToAction(nameof(GeneratePayroll), new { projectId });
+            }
 
             ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
             ViewBag.IsEdit = existing != null;
@@ -371,20 +378,12 @@ namespace RSDSystem.Controllers
             ViewBag.PayrollScheduleId = activeSchedule?.PayrollScheduleId ?? 0;
             ViewBag.DefaultStart = defaultStart.ToString("yyyy-MM-dd");
             ViewBag.DefaultEnd = defaultEnd.ToString("yyyy-MM-dd");
-            ViewBag.DefaultDaysWorked = existing?.RegularDaysWorked
-                ?? attendance?.DaysPresent
-                ?? attendance?.DaysWorked
-                ?? Math.Max(1, DateRules.CountWeekdays(defaultStart, defaultEnd));
-            ViewBag.AbsentDays = existing?.AbsentDays
-                ?? attendance?.DaysAbsent
-                ?? 0;
-            ViewBag.OvertimeHours = existing?.OvertimeHours
-                ?? attendance?.OvertimeHours
-                ?? 0;
-            ViewBag.RegularHours = existing != null && existing.RegularHours > 0
-                ? existing.RegularHours
-                : attendance?.RegularHours
-                    ?? ((ViewBag.DefaultDaysWorked is int presentDays ? presentDays : 0) * 8m);
+            ViewBag.DefaultDaysWorked = attendance.DaysPresent > 0
+                ? attendance.DaysPresent
+                : attendance.DaysWorked;
+            ViewBag.AbsentDays = attendance.DaysAbsent;
+            ViewBag.OvertimeHours = attendance.OvertimeHours;
+            ViewBag.RegularHours = attendance.RegularHours;
             ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
             ViewBag.MinDate = activeSchedule != null
                 ? activeSchedule.StartingDate.ToString("yyyy-MM-dd")
@@ -422,9 +421,10 @@ namespace RSDSystem.Controllers
                 {
                     success = true,
                     found = false,
-                    daysWorked = DateRules.CountWeekdays(start, end),
+                    daysWorked = 0,
                     daysAbsent = 0,
-                    overtimeHours = 0m
+                    overtimeHours = 0m,
+                    regularHours = 0m
                 });
             }
 
@@ -474,19 +474,16 @@ namespace RSDSystem.Controllers
                     return Json(new { success = false, message = "Submitted or approved payroll cannot be edited." });
                 }
             }
-            else
-            {
-                if (!emp.IsActive || emp.ProjectId != projectId)
-                    return Json(new { success = false, message = "This employee is not active on this project." });
+            if (!emp.IsActive || emp.ProjectId != projectId)
+                return Json(new { success = false, message = NotEmployedMessage });
 
-                if (await HasPendingCorrectionAsync(projectId, employeeId))
+            if (payrollId <= 0 && await HasPendingCorrectionAsync(projectId, employeeId))
+            {
+                return Json(new
                 {
-                    return Json(new
-                    {
-                        success = false,
-                        message = "This employee has a pending attendance correction. Wait for admin approval before generating payroll."
-                    });
-                }
+                    success = false,
+                    message = "This employee has a pending attendance correction. Wait for admin approval before generating payroll."
+                });
             }
 
             var schedules = await _db.Set<PayrollSchedule>()
@@ -526,25 +523,17 @@ namespace RSDSystem.Controllers
             var periodStart = coveringSchedule.StartingDate.Date;
             var periodEnd = coveringSchedule.EndDate.Date;
 
-            var imported = await _attendance.HasImportedAttendanceAsync(
-                projectId, periodStart, periodEnd, HttpContext.RequestAborted);
-            if (!imported)
-                return Json(new { success = false, message = AttendanceRequiredMessage });
-
             var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
                 projectId, employeeId, periodStart, periodEnd, HttpContext.RequestAborted);
+            if (attendance == null)
+                return Json(new { success = false, message = EmployeeAttendanceRequiredMessage });
 
-            var regularDaysWorked = attendance?.DaysPresent
-                ?? attendance?.DaysWorked
-                ?? payroll?.RegularDaysWorked
-                ?? 0;
-            var absentDays = attendance?.DaysAbsent ?? payroll?.AbsentDays ?? 0;
-            var overtimeHours = attendance?.OvertimeHours ?? payroll?.OvertimeHours ?? 0;
-            var regularHours = attendance?.RegularHours > 0
-                ? attendance.RegularHours
-                : payroll != null && payroll.RegularHours > 0
-                    ? payroll.RegularHours
-                    : regularDaysWorked * 8m;
+            var regularDaysWorked = attendance.DaysPresent > 0
+                ? attendance.DaysPresent
+                : attendance.DaysWorked;
+            var absentDays = attendance.DaysAbsent;
+            var overtimeHours = attendance.OvertimeHours;
+            var regularHours = attendance.RegularHours;
 
             var errors = new Dictionary<string, string>();
             if (cashAdvance < 0)

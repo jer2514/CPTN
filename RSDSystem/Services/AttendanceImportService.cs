@@ -30,6 +30,14 @@ namespace RSDSystem.Services
                 };
             }
 
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                return new AttendancePreviewResult
+                {
+                    Error = "Finished projects cannot import or open attendance records."
+                };
+            }
+
             var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
             var parsed = AttendanceFileParser.Parse(file, fileName);
             if (parsed.Error != null)
@@ -395,6 +403,21 @@ namespace RSDSystem.Services
             return ToEmployeeSummary(rows);
         }
 
+        public async Task<HashSet<int>> EmployeeIdsWithAttendanceAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var ids = await ApplyRecordFilters(
+                    RecordsForProject(projectId), null, null, periodStart, periodEnd)
+                .Where(r => r.EmployeeId != null)
+                .Select(r => r.EmployeeId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            return ids.ToHashSet();
+        }
+
         public async Task<(int Deleted, string? Error)> DeletePeriodAsync(
             int projectId,
             DateTime? periodStart,
@@ -517,20 +540,12 @@ namespace RSDSystem.Services
             };
         }
 
-        private static decimal DayRegularHours(AttendanceRecord row)
-        {
-            if (row.WorkHoursActual > 0)
-                return row.WorkHoursActual;
-            return AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
-        }
+        private static decimal DayRegularHours(AttendanceRecord row) =>
+            AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
 
-        private static decimal DayOvertimeHours(AttendanceRecord row)
-        {
-            if (row.OvertimeHours > 0)
-                return row.OvertimeHours;
-            return AttendanceRules.OvertimeHours(
+        private static decimal DayOvertimeHours(AttendanceRecord row) =>
+            AttendanceRules.OvertimeHours(
                 row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
-        }
 
         private static string PeriodKey(DateTime start, DateTime end) =>
             start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
@@ -949,14 +964,10 @@ namespace RSDSystem.Services
 
         private async Task<List<Employee>> LoadMatchPoolAsync(int projectId, CancellationToken cancellationToken)
         {
-            var projectEmployees = await _db.Employees
+            return await _db.Employees
                 .AsNoTracking()
                 .Where(e => e.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
-
-            return projectEmployees.Count > 0
-                ? projectEmployees
-                : await _db.Employees.AsNoTracking().ToListAsync(cancellationToken);
         }
 
         // Extracts every row from the file exactly as it appears (raw name / raw ID),

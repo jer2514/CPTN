@@ -52,15 +52,19 @@ namespace RSDSystem.Services
                 .Where(p => p.ProjectId == projectId && p.Status == PayrollStatusOptions.Approved)
                 .ToListAsync(cancellationToken);
 
-            var generated = MonthTotals(payrolls);
+            var today = PhilippinesTime.Today;
+            var allMonths = MonthTotals(payrolls);
+            var generated = CompletedMonthTotals(allMonths, today);
             var currentRows = new List<PayrollPredictionRow>();
             string? error = null;
 
             if (generated.Count < 2)
             {
-                error = generated.Count == 0
-                    ? "This project has no approved payroll yet. Approve payroll for two months first."
-                    : "Need two months of approved payroll before the next month can be predicted.";
+                error = allMonths.Count == 0
+                    ? "This project has no approved payroll yet. Approve payroll for two finished months first."
+                    : generated.Count == 0
+                        ? "Wait until the whole payroll month is finished before the next month can be predicted."
+                        : "Need two finished months of approved payroll before the next month can be predicted.";
             }
             else
             {
@@ -89,12 +93,17 @@ namespace RSDSystem.Services
                 .ToListAsync(cancellationToken);
 
             var currentKeys = currentRows.Select(SnapshotKey).ToHashSet(StringComparer.Ordinal);
+            var currentWindows = currentRows.Select(WindowKey).ToHashSet(StringComparer.Ordinal);
             var shownPreviousWindows = new HashSet<string>(StringComparer.Ordinal);
             var rows = new List<PayrollPredictionRow>(currentRows);
             foreach (var saved in history)
             {
                 var previous = ToRow(saved, culture, isPrevious: true);
+                if (!DateRules.IsCalendarMonthFinished(previous.PreviousMonth2, PhilippinesTime.Today))
+                    continue;
                 if (currentKeys.Contains(SnapshotKey(previous)))
+                    continue;
+                if (currentWindows.Contains(WindowKey(previous)))
                     continue;
                 if (!shownPreviousWindows.Add(WindowKey(previous)))
                     continue;
@@ -267,6 +276,18 @@ namespace RSDSystem.Services
         private static string WindowKey(PayrollPredictionRow row) =>
             string.Create(CultureInfo.InvariantCulture,
                 $"{row.PreviousMonth1:yyyy-MM}|{row.PreviousMonth2:yyyy-MM}|{row.PredictionMonth:yyyy-MM}");
+
+        private static SortedDictionary<DateTime, decimal> CompletedMonthTotals(
+            SortedDictionary<DateTime, decimal> months, DateTime today)
+        {
+            var completed = new SortedDictionary<DateTime, decimal>();
+            foreach (var pair in months)
+            {
+                if (DateRules.IsCalendarMonthFinished(pair.Key, today))
+                    completed[pair.Key] = pair.Value;
+            }
+            return completed;
+        }
 
         private static SortedDictionary<DateTime, decimal> MonthTotals(List<Payroll> payrolls)
         {

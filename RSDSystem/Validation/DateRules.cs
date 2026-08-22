@@ -63,5 +63,17 @@ namespace RSDSystem.Validation
 
         public static DateTime MonthOfPeriod(DateTime payPeriodStart) =>
             new(payPeriodStart.Year, payPeriodStart.Month, 1);
+
+        public static DateTime FirstOfMonth(DateTime value) =>
+            new(value.Year, value.Month, 1);
+
+        public static DateTime LastDayOfMonth(DateTime value) =>
+            FirstOfMonth(value).AddMonths(1).AddDays(-1);
+
+        /// <summary>
+        /// True after the last calendar day of that month (Philippines local date).
+        /// </summary>
+        public static bool IsCalendarMonthFinished(DateTime month, DateTime today) =>
+            today.Date > LastDayOfMonth(month);
     }
 }
