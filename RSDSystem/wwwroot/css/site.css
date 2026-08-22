@@ -845,6 +845,19 @@ body {
         box-shadow: 0 0 0 3px rgba(229, 57, 53, .18);
     }
 
+    .form-ctrl:disabled,
+    .form-ctrl.is-disabled {
+        background: #e9edf3;
+        color: #8b93a7;
+        border-color: #d5dbe6;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+.form-lbl.is-disabled {
+    color: #8b93a7;
+}
+
 .field-error {
     display: block;
     min-height: 0;

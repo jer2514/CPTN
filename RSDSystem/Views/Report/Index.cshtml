@@ -70,6 +70,10 @@
         }
 
         async function loadPeriods() {
+            if (!needsPeriod()) {
+                periodEl.innerHTML = '<option value="">Not used for this report</option>';
+                return;
+            }
             periodEl.innerHTML = '<option value="">Loading...</option>';
             if (!projectEl.value) {
                 periodEl.innerHTML = '<option value="">Select a project first</option>';
@@ -157,16 +161,27 @@
         }
 
         function syncPeriodUi() {
-            periodEl.disabled = !needsPeriod();
+            const used = needsPeriod();
+            periodEl.disabled = !used;
+            periodEl.classList.toggle('is-disabled', !used);
             if (periodLabel) {
                 periodLabel.textContent = isMonthly() ? 'Month' : 'Payroll Period';
+                periodLabel.classList.toggle('is-disabled', !used);
             }
-            if (projectEl.value && needsPeriod()) {
+            if (!used) {
+                periodEl.innerHTML = '<option value="">Not used for this report</option>';
+                return;
+            }
+            if (projectEl.value) {
                 loadPeriods();
+            } else {
+                periodEl.innerHTML = '<option value="">Select a project first</option>';
             }
         }
 
-        projectEl.addEventListener('change', loadPeriods);
+        projectEl.addEventListener('change', function () {
+            if (needsPeriod()) loadPeriods();
+        });
         typeEl.addEventListener('change', syncPeriodUi);
         document.getElementById('generateReportBtn').addEventListener('click', generateReport);
         document.getElementById('printReportBtn').addEventListener('click', openPrint);
