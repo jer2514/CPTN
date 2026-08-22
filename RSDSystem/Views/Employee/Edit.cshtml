@@ -16,13 +16,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
@@ -163,11 +162,6 @@
                                 <option value="@p.ProjectId" selected="@(p.ProjectId == Model.ProjectId)">@p.ProjectName</option>
                             }
                         </select>
-                        <div id="reactivateHint" class="slip-schedule-hint" style="display:none; margin-top:8px">
-                            <i class="bi bi-info-circle-fill"></i>
-                            This employee is currently Inactive. Assigning them to a project will
-                            automatically set their status back to Active when you save.
-                        </div>
                     </div>
                 </div>
 
@@ -198,9 +192,6 @@
                         <input type="text" id="RatePerHourDisplay" class="form-ctrl" readonly tabindex="-1"
                                placeholder="0.00"
                                value="@(Model.DailyRate > 0 ? EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("0.00") : "")" />
-                        <div class="slip-schedule-hint" style="margin-top:6px">
-                            Calculated automatically from an 8-hour workday (rate per day ÷ 8).
-                        </div>
                     </div>
                 </div>
 
@@ -269,7 +260,6 @@
         })();
 
         const hasAssignedProject = @(Model.ProjectId.HasValue ? "true" : "false");
-        const employeeIsActive = @(Model.IsActive ? "true" : "false");
 
         function previewPhoto(input) {
             document.getElementById('fileLabel').textContent =
@@ -316,17 +306,5 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') closeDeactivateEmpModal();
         });
-
-        // ── Reactivation hint when assigning a project to an inactive employee ──
-        const projectSelect = document.getElementById('projectSelect');
-        const reactivateHint = document.getElementById('reactivateHint');
-
-        function updateReactivateHint() {
-            const hasProjectSelected = !!projectSelect.value;
-            reactivateHint.style.display = (!employeeIsActive && hasProjectSelected) ? 'block' : 'none';
-        }
-
-        projectSelect.addEventListener('change', updateReactivateHint);
-        updateReactivateHint(); // run once on load in case a project is already selected
     </script>
 }

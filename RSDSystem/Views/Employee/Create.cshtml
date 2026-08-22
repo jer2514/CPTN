@@ -14,13 +14,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
@@ -122,9 +121,6 @@
                         <option value="@p.ProjectId" selected="@(Model.ProjectId == p.ProjectId)">@p.ProjectName</option>
                     }
                 </select>
-                <div class="slip-schedule-hint" style="margin-top:6px">
-                    Leave empty to create the employee as inactive. Assigning a project makes them active.
-                </div>
             </div>
         </div>
 
@@ -155,9 +151,6 @@
                 <input type="text" id="RatePerHourDisplay" class="form-ctrl" readonly tabindex="-1"
                        placeholder="0.00"
                        value="@(Model.DailyRate > 0 ? EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("0.00") : "")" />
-                <div class="slip-schedule-hint" style="margin-top:6px">
-                    Calculated automatically from an 8-hour workday (rate per day ÷ 8).
-                </div>
             </div>
         </div>
 

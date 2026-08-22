@@ -14,13 +14,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
@@ -63,7 +62,6 @@
                             onclick="toggleUserStatus(@Model.UserId)">
                         <i class="bi bi-toggle-on"></i> Active
                     </button>
-                    <div class="slip-schedule-hint" style="margin-top:8px">Inactive users cannot log in.</div>
                 }
                 else
                 {
@@ -71,7 +69,6 @@
                             onclick="toggleUserStatus(@Model.UserId)">
                         <i class="bi bi-toggle-off"></i> Inactive
                     </button>
-                    <div class="slip-schedule-hint" style="margin-top:8px">This user cannot log in until you set them active.</div>
                 }
             </div>
 

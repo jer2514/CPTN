@@ -304,13 +304,13 @@ body {
 
 /* ── Primary blue button ─────────────────────────────────── */
 .btn-primary-blue {
-    background: #C9DAFF;
-    color: #000;
+    background: #2654F2;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     padding: 8px 20px;
     font-size: 14px;
-    font-weight: 400;
+    font-weight: 500;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -320,18 +320,18 @@ body {
 }
 
     .btn-primary-blue:hover {
-        background: #1B52BD;
-        color: #fff;
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
 .btn-primary-blue-block {
-    background: #266DF1;
-    color: #fff;
+    background: #2654F2;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     padding: 10px 28px;
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 500;
     cursor: pointer;
     margin-top: 18px;
     display: block;
@@ -340,18 +340,19 @@ body {
 }
 
     .btn-primary-blue-block:hover {
-        background: #1B52BD;
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
 /* ── Outline / filter button ─────────────────────────────── */
 .btn-outline-blue {
     border: none;
-    background: #C9DAFF;
-    color: #000;
+    background: #2654F2;
+    color: #ffffff;
     border-radius: 6px;
     padding: 8px 28px;
     font-size: 14px;
-    font-weight: 400;
+    font-weight: 500;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -360,8 +361,8 @@ body {
 }
 
     .btn-outline-blue:hover {
-        background: #1B52BD;
-        color: #fff
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
 /* ── Employee list card head ─────────────────────────────── */
@@ -397,6 +398,24 @@ body {
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 24px;
+}
+
+.list-controls-left {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.list-controls-left > .dropdown {
+    flex-shrink: 0;
+}
+
+.list-controls-left .search-wrap-wide {
+    flex: 1 1 200px;
 }
 
 .list-controls-actions {
@@ -628,8 +647,8 @@ body {
 }
 
 .badge-ongoing {
-    background: #d4f7e0;
-    color: #0d7a3e;
+    background: #22c55e;
+    color: #ffffff;
     border-radius: 20px;
     padding: 4px 16px;
     font-size: 12px;
@@ -638,8 +657,8 @@ body {
 }
 
 .badge-finished {
-    background: #d6e4ff;
-    color: #163F8B;
+    background: #2654F2;
+    color: #ffffff;
     border-radius: 20px;
     padding: 4px 16px;
     font-size: 12px;
@@ -648,8 +667,8 @@ body {
 }
 
 .badge-hold {
-    background: #ffdca0;
-    color: #a15c00;
+    background: #f59e0b;
+    color: #ffffff;
     border-radius: 20px;
     padding: 4px 16px;
     font-size: 12px;
@@ -773,7 +792,7 @@ body {
     background: #fff;
     border-radius: 14px;
     padding: 28px 32px;
-    max-width: 680px;
+    max-width: 880px;
     margin: 0 auto;
 }
 
@@ -890,19 +909,21 @@ select.form-ctrl {
 }
 
 .file-choose-btn {
-    background: #fff;
-    border: 1.5px solid #C9DAFF;
+    background: #2654F2;
+    border: none;
     border-radius: 7px;
     padding: 7px 14px;
     font-size: 12px;
-    color: #163F8B;
+    font-weight: 500;
+    color: #ffffff;
     cursor: pointer;
     white-space: nowrap;
     transition: background .15s;
 }
 
     .file-choose-btn:hover {
-        background: #f0f5ff;
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
 .file-name-lbl {
@@ -1475,13 +1496,13 @@ select.form-ctrl {
 }
 
 .btn-save-budget {
-    background: #266DF1;
-    color: #fff;
+    background: #2654F2;
+    color: #ffffff;
     border: none;
     border-radius: 7px;
     padding: 6px 18px;
     font-size: 12.5px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     margin: 8px 14px 10px;
     display: inline-block;
@@ -1489,7 +1510,8 @@ select.form-ctrl {
 }
 
     .btn-save-budget:hover {
-        background: #1B52BD;
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
 /* ── Project view page ───────────────────────────────────── */
@@ -1548,21 +1570,21 @@ select.form-ctrl {
 
 .proj-status-line .badge-ongoing {
     background: #22c55e;
-    color: #111;
+    color: #ffffff;
     padding: 6px 18px;
     font-size: 12.5px;
 }
 
 .proj-status-line .badge-hold {
     background: #f59e0b;
-    color: #111;
+    color: #ffffff;
     padding: 6px 18px;
     font-size: 12.5px;
 }
 
 .proj-status-line .badge-finished {
-    background: #266DF1;
-    color: #fff;
+    background: #2654F2;
+    color: #ffffff;
     padding: 6px 18px;
     font-size: 12.5px;
 }
@@ -1698,20 +1720,21 @@ select.form-ctrl {
 
 /* ── Add button ───────────────────────────────────────────── */
 button.add-emp-btn {
-    background: #266DF1;
-    color: #fff;
+    background: #2654F2;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     padding: 6px 16px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
     transition: background .15s;
     white-space: nowrap;
 }
 
     button.add-emp-btn:hover {
-        background: #1B52BD;
+        background: #1B3FBF;
+        color: #ffffff;
     }
 
     button.add-emp-btn:disabled {
@@ -2026,8 +2049,8 @@ button.badge-btn {
 }
 
 .btn-primary-blue-solid {
-    background: #266DF1;
-    color: #fff;
+    background: #2654F2;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     padding: 9px 26px;
@@ -2039,7 +2062,8 @@ button.badge-btn {
 }
 
 .btn-primary-blue-solid:hover {
-    background: #1B52BD;
+    background: #1B3FBF;
+    color: #ffffff;
 }
 
 .btn-generate-pill {
@@ -3512,6 +3536,18 @@ button.badge-btn {
     position: relative;
     z-index: 40;
     overflow: visible;
+}
+
+.content-topbar.page-sticky-bar {
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    background: #163F8B;
+    margin-top: -28px;
+    margin-left: -28px;
+    margin-right: -28px;
+    padding: 20px 28px 12px;
+    margin-bottom: 8px;
 }
 
 .dash-header .dash-welcome {
