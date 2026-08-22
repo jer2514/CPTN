@@ -56,6 +56,7 @@
             </thead>
             <tbody id="payrollTableBody"></tbody>
         </table>
+        <div id="payrollPager" class="att-pager" style="margin-top:18px"></div>
     </div>
 
     <div id="payrollEmpty" class="text-center text-muted py-5">
@@ -109,8 +110,10 @@
             if (!e.target.closest('.genpay-autocomplete')) suggestList.style.display = 'none';
         });
 
+        const pageSize = 10;
         let currentPayrolls = [];
         let currentProjectId = null;
+        let currentPage = 1;
 
         document.getElementById('loadPayrollsBtn').addEventListener('click', loadPayrolls);
 
@@ -143,7 +146,8 @@
 
                 emptyBox.style.display = 'none';
                 section.style.display = 'block';
-                renderPayrolls(currentPayrolls);
+                currentPage = 1;
+                renderPayrolls();
             } catch (err) {
                 emptyBox.textContent = 'Something went wrong while loading payroll records.';
             }
@@ -174,29 +178,81 @@
             return btns;
         }
 
-        function renderPayrolls(list) {
-            const tbody = document.getElementById('payrollTableBody');
+        function filteredPayrolls() {
+            const q = document.getElementById('payrollSearch').value.toLowerCase();
+            if (!q) return currentPayrolls;
+            return currentPayrolls.filter(p =>
+                (p.employeeName || '').toLowerCase().includes(q) ||
+                (p.job || '').toLowerCase().includes(q) ||
+                (p.displayId || '').toLowerCase().includes(q));
+        }
 
-            tbody.innerHTML = list.map(p => `
+        function renderPager(totalPages) {
+            const pager = document.getElementById('payrollPager');
+            if (!pager) return;
+            if (totalPages < 1) {
+                pager.innerHTML = '';
+                return;
+            }
+            pager.innerHTML =
+                `<button type="button" class="att-page-btn" data-dir="-1" ${currentPage <= 1 ? 'disabled' : ''}>&lsaquo;</button>` +
+                `<span>Page ${currentPage} of ${totalPages}</span>` +
+                `<button type="button" class="att-page-btn" data-dir="1" ${currentPage >= totalPages ? 'disabled' : ''}>&rsaquo;</button>`;
+        }
+
+        function renderPayrolls() {
+            const tbody = document.getElementById('payrollTableBody');
+            const list = filteredPayrolls();
+
+            if (!list.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No payroll records match your search.
+                        </td>
+                    </tr>`;
+                renderPager(0);
+                return;
+            }
+
+            const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const pageItems = list.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+            tbody.innerHTML = pageItems.map(p => `
                 <tr class="${statusClass(p.status)}">
                     <td>${p.displayId}</td>
                     <td>${p.employeeName}</td>
                     <td>${p.job}</td>
                     <td>${p.period || '—'}</td>
-                    <td><span class="status-pill status-${p.status.toLowerCase()}">${p.status}</span></td>
+                    <td><span class="status-pill status-${(p.status || '').toLowerCase()}">${p.status}</span></td>
                     <td>
                         <div class="action-cell">
                             ${actionButtons(p)}
                         </div>
                     </td>
                 </tr>`).join('');
+
+            renderPager(totalPages);
         }
 
         function filterPayrolls() {
-            const q = document.getElementById('payrollSearch').value.toLowerCase();
-            renderPayrolls(currentPayrolls.filter(p =>
-                p.employeeName.toLowerCase().includes(q) || p.job.toLowerCase().includes(q)));
+            currentPage = 1;
+            renderPayrolls();
         }
+
+        document.getElementById('payrollPager').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-dir]');
+            if (!btn || btn.disabled) return;
+            const list = filteredPayrolls();
+            const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+            const next = currentPage + Number(btn.dataset.dir);
+            if (next < 1 || next > totalPages) return;
+            currentPage = next;
+            renderPayrolls();
+        });
 
         function getToken() {
             return document.querySelector('#submitTokenForm input[name="__RequestVerificationToken"]').value;
