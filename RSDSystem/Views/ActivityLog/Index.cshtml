@@ -1,0 +1,91 @@
+@using RSDSystem.Helpers
+@model IEnumerable<RSDSystem.Models.ActivityLog>
+@{
+    ViewData["Title"] = "Activity Logs";
+    var sortBy = ViewBag.SortBy as string;
+}
+
+<div class="content-topbar">
+    <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card">
+    <div class="emp-title mb-3">Activity Logs</div>
+
+    <div class="list-controls-row">
+        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+            <i class="bi bi-search"></i>
+            <input type="text" name="search" value="@ViewBag.Search" placeholder="Search activity" />
+            <input type="hidden" name="sortBy" value="@sortBy" />
+        </form>
+
+        <div class="list-controls-actions">
+            <div class="dropdown">
+                <button class="btn-outline-blue dropdown-toggle"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <ul class="dropdown-menu filter-menu">
+                    <li>
+                        <a class="dropdown-item @(string.IsNullOrEmpty(sortBy) ? "active" : "")"
+                           asp-action="Index" asp-route-search="@ViewBag.Search">Newest</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "user" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="user"
+                           asp-route-search="@ViewBag.Search">User</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "role" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="role"
+                           asp-route-search="@ViewBag.Search">Role</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "activity" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="activity"
+                           asp-route-search="@ViewBag.Search">Activity</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item @(sortBy == "module" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="module"
+                           asp-route-search="@ViewBag.Search">Module</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <table class="emp-table">
+        <thead>
+            <tr>
+                <th>Date & Time</th>
+                <th>User</th>
+                <th>Role</th>
+                <th>Activity</th>
+                <th>Module</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No activity logs found.</td>
+                </tr>
+            }
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@PhilippinesTime.FormatDateTime(row.CreatedAt)</td>
+                    <td>@row.UserName</td>
+                    <td>@(row.Role == "PayrollStaff" ? "Payroll Staff" : row.Role)</td>
+                    <td>@row.Activity</td>
+                    <td>@row.Module</td>
+                    <td>@row.Description</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <partial name="_Pagination" />
+</div>

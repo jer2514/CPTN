@@ -1,4 +1,5 @@
 ﻿@model RSDSystem.Models.Payroll
+@using RSDSystem.Helpers
 @{
     ViewData["Title"] = "View Payroll";
     Layout = "_PayrollStaffLayout";
@@ -69,5 +70,5 @@
         </div>
     }
 
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy")</div>
+    <div class="payslip-footer">Generated Date: @PhilippinesTime.FormatLongDate(Model.GeneratedDate)</div>
 </div>

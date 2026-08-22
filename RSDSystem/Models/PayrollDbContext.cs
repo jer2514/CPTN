@@ -22,6 +22,7 @@ namespace RSDSystem.Models
         public DbSet<AttendanceCorrectionRequest> AttendanceCorrectionRequests { get; set; }
         public DbSet<ProjectEmployeeHistory> ProjectEmployeeHistories { get; set; }
         public DbSet<PayrollPredictionHistory> PayrollPredictionHistories { get; set; }
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -178,6 +179,9 @@ namespace RSDSystem.Models
 
             modelBuilder.Entity<PayrollPredictionHistory>()
                 .HasIndex(h => new { h.ProjectId, h.GeneratedAt });
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(a => a.CreatedAt);
         }
     }
 }

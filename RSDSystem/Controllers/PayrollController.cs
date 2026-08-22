@@ -14,13 +14,19 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly PayrollPredictionService _predictions;
         private readonly NotificationService _notifications;
+        private readonly ActivityLogService _logs;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
-        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions, NotificationService notifications)
+        public PayrollController(
+            PayrollDbContext db,
+            PayrollPredictionService predictions,
+            NotificationService notifications,
+            ActivityLogService logs)
         {
             _db = db;
             _predictions = predictions;
             _notifications = notifications;
+            _logs = logs;
         }
 
         private IActionResult? RequireAdmin()
@@ -132,7 +138,7 @@ namespace RSDSystem.Controllers
                     NetPay = regularPay,
                     Status = PayrollStatusOptions.Draft,
                     GeneratedBy = generatedBy,
-                    GeneratedDate = DateTime.Now
+                    GeneratedDate = PhilippinesTime.Now
                 });
                 created++;
             }
@@ -190,6 +196,12 @@ namespace RSDSystem.Controllers
                     message = page.Error
                 });
             }
+
+            await _logs.LogAsync(
+                ActivityTypes.GeneratePrediction,
+                ActivityModules.Prediction,
+                $"Loaded payroll prediction for {page.ProjectName}.",
+                page.ProjectId);
 
             return Json(new
             {
@@ -341,6 +353,11 @@ namespace RSDSystem.Controllers
                 : project.AssignedPayrollStaff;
 
             await _notifications.NotifyPayslipsSentAsync(project, start.Date, end.Date, count, HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.SendPayslips,
+                ActivityModules.Payroll,
+                $"Sent {count} approved payslip(s) for {project.ProjectName} ({PayrollPeriods.Label(start.Date, end.Date)}) to {staff}.",
+                project.ProjectId);
 
             TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
             return RedirectToAction(nameof(GeneratedPayslips), new
@@ -603,6 +620,12 @@ namespace RSDSystem.Controllers
             await _db.SaveChangesAsync();
 
             await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.ApprovePayroll,
+                ActivityModules.Payroll,
+                $"Approved payroll for {payroll.Employee?.FullName ?? "an employee"} on {payroll.Project?.ProjectName ?? "the project"}.",
+                payroll.ProjectId,
+                payroll.PayrollId);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -642,6 +665,12 @@ namespace RSDSystem.Controllers
             await _db.SaveChangesAsync();
 
             await _notifications.NotifyPayrollReturnedAsync(payroll, payroll.Project, reason.Trim(), HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.ReturnPayroll,
+                ActivityModules.Payroll,
+                $"Returned payroll for {payroll.Employee?.FullName ?? "an employee"} on {payroll.Project?.ProjectName ?? "the project"}.",
+                payroll.ProjectId,
+                payroll.PayrollId);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Validation;
+using RSDSystem.Services;
 using BCrypt.Net;
 
 namespace RSDSystem.Controllers
@@ -10,11 +11,13 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
         private readonly IWebHostEnvironment _env;
+        private readonly ActivityLogService _logs;
 
-        public UserManagementController(PayrollDbContext db, IWebHostEnvironment env)
+        public UserManagementController(PayrollDbContext db, IWebHostEnvironment env, ActivityLogService logs)
         {
             _db = db;
             _env = env;
+            _logs = logs;
         }
 
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
@@ -134,6 +137,11 @@ namespace RSDSystem.Controllers
             _db.Users.Add(user);
             user.UserCode = await GenerateUserCodeAsync();
             await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.CreateUser,
+                ActivityModules.UserManagement,
+                $"Added payroll staff user {user.FullName} ({user.Username}).",
+                relatedId: user.UserId);
             TempData["Success"] = "User added successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -235,6 +243,11 @@ namespace RSDSystem.Controllers
                 existing.PhotoPath = await SavePhotoAsync(photo);
 
             await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.EditUser,
+                ActivityModules.UserManagement,
+                $"Updated user {existing.FullName} ({existing.Username}).",
+                relatedId: existing.UserId);
 
             // If the account being edited is the one currently logged in,
             // refresh Session so the sidebar reflects the change immediately.

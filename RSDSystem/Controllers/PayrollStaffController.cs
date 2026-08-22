@@ -15,12 +15,18 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _attendance;
         private readonly NotificationService _notifications;
+        private readonly ActivityLogService _logs;
 
-        public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance, NotificationService notifications)
+        public PayrollStaffController(
+            PayrollDbContext db,
+            AttendanceImportService attendance,
+            NotificationService notifications,
+            ActivityLogService logs)
         {
             _db = db;
             _attendance = attendance;
             _notifications = notifications;
+            _logs = logs;
         }
 
         // GET /PayrollStaff  → "To do task" dashboard
@@ -575,7 +581,7 @@ namespace RSDSystem.Controllers
                 payroll.CashAdvance = cashAdvance;
                 payroll.NetPay = net;
                 payroll.GeneratedBy = StaffName() ?? "Staff";
-                payroll.GeneratedDate = DateTime.Now;
+                payroll.GeneratedDate = PhilippinesTime.Now;
             }
             else
             {
@@ -609,12 +615,18 @@ namespace RSDSystem.Controllers
                     NetPay = net,
                     Status = PayrollStatusOptions.Draft,
                     GeneratedBy = StaffName() ?? "Staff",
-                    GeneratedDate = DateTime.Now
+                    GeneratedDate = PhilippinesTime.Now
                 };
                 _db.Set<Payroll>().Add(payroll);
             }
 
             await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.GeneratePayroll,
+                ActivityModules.Payroll,
+                $"Generated payroll for {emp.FullName} on {project?.ProjectName ?? "the project"} ({PayrollPeriods.Label(periodStart, periodEnd)}).",
+                payroll.ProjectId,
+                payroll.PayrollId);
 
             return Json(new
             {
@@ -785,6 +797,13 @@ namespace RSDSystem.Controllers
              if (payroll.Project != null)
                  await _notifications.NotifyPayrollSubmittedAsync(
                      payroll.Project, payroll.GeneratedBy, resubmitted, HttpContext.RequestAborted);
+
+             await _logs.LogAsync(
+                 ActivityTypes.SubmitPayroll,
+                 ActivityModules.Payroll,
+                 $"Submitted payroll for {payroll.Project?.ProjectName ?? "the project"} ({PayrollPeriods.Label(payroll.PayPeriodStart, payroll.PayPeriodEnd)}).",
+                 payroll.ProjectId,
+                 payroll.PayrollId);
 
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }

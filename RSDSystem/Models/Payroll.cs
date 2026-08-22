@@ -53,7 +53,7 @@ namespace RSDSystem.Models
         [MaxLength(150)]
         public string? GeneratedBy { get; set; }
 
-        public DateTime GeneratedDate { get; set; } = DateTime.Now;
+        public DateTime GeneratedDate { get; set; } = Helpers.PhilippinesTime.Now;
 
         public DateTime? SubmittedAt { get; set; }
 

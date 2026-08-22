@@ -13,15 +13,18 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly NotificationService _notifications;
         private readonly AttendanceImportService _imports;
+        private readonly ActivityLogService _logs;
 
         public NotificationController(
             PayrollDbContext db,
             NotificationService notifications,
-            AttendanceImportService imports)
+            AttendanceImportService imports,
+            ActivityLogService logs)
         {
             _db = db;
             _notifications = notifications;
             _imports = imports;
+            _logs = logs;
         }
 
         public async Task<IActionResult> Index(int page = 1, string? filter = null)
@@ -174,6 +177,13 @@ namespace RSDSystem.Controllers
                 "/Attendance/Records",
                 HttpContext.RequestAborted);
 
+            await _logs.LogAsync(
+                ActivityTypes.ApproveCorrection,
+                ActivityModules.Attendance,
+                $"Approved an attendance correction for {employee} on {projectName}.",
+                request.ProjectId,
+                request.AttendanceCorrectionRequestId);
+
             return Json(new { success = true, message = "Attendance correction approved." });
         }
 
@@ -214,6 +224,13 @@ namespace RSDSystem.Controllers
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
                 HttpContext.RequestAborted);
+
+            await _logs.LogAsync(
+                ActivityTypes.ReturnCorrection,
+                ActivityModules.Attendance,
+                $"Returned an attendance correction for {employee} on {projectName}.",
+                request.ProjectId,
+                request.AttendanceCorrectionRequestId);
 
             return Json(new { success = true, message = "Correction request returned." });
         }

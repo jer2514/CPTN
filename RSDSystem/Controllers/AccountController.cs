@@ -8,16 +8,19 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
     public class AccountController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly ActivityLogService _logs;
 
-        public AccountController(PayrollDbContext db)
+        public AccountController(PayrollDbContext db, ActivityLogService logs)
         {
             _db = db;
+            _logs = logs;
         }
 
         // GET: /Account/Login
@@ -57,6 +60,13 @@ namespace RSDSystem.Controllers
             }
 
             SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
+            await _logs.LogAsync(
+                user.UserId,
+                user.FullName,
+                user.Role,
+                ActivityTypes.Login,
+                ActivityModules.Authentication,
+                $"{user.FullName} signed in.");
             return user.Role == "Admin"
                 ? RedirectToAction("Index", "Home")
                 : RedirectToAction("Index", "PayrollStaff");
@@ -79,7 +89,10 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
-            // Sign out the cookie authentication and clear session data.
+            await _logs.LogAsync(
+                ActivityTypes.Logout,
+                ActivityModules.Authentication,
+                "User signed out.");
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             HttpContext.Session.Clear();
 

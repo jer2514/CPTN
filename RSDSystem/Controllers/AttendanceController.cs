@@ -13,12 +13,18 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _imports;
         private readonly NotificationService _notifications;
+        private readonly ActivityLogService _logs;
 
-        public AttendanceController(PayrollDbContext db, AttendanceImportService imports, NotificationService notifications)
+        public AttendanceController(
+            PayrollDbContext db,
+            AttendanceImportService imports,
+            NotificationService notifications,
+            ActivityLogService logs)
         {
             _db = db;
             _imports = imports;
             _notifications = notifications;
+            _logs = logs;
         }
 
         public async Task<IActionResult> Import()
@@ -120,6 +126,13 @@ namespace RSDSystem.Controllers
                     .FirstOrDefaultAsync(p => p.ProjectId == result.ProjectId, HttpContext.RequestAborted);
                 if (importedProject != null)
                     await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
+
+                await _logs.LogAsync(
+                    ActivityTypes.ImportAttendance,
+                    ActivityModules.Attendance,
+                    $"Imported {result.RowCount} attendance row(s) for {result.ProjectName}.",
+                    result.ProjectId,
+                    result.ImportId);
 
                 var message = result.ReplacedPrevious
                     ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
@@ -458,6 +471,13 @@ namespace RSDSystem.Controllers
                 resubmitted,
                 HttpContext.RequestAborted);
 
+            await _logs.LogAsync(
+                ActivityTypes.RequestCorrection,
+                ActivityModules.Attendance,
+                $"Requested an attendance correction for {pending.EmployeeName} on {AttendanceDisplay.LongDate(pending.WorkDate)}.",
+                record.ProjectId,
+                pending.AttendanceCorrectionRequestId);
+
             return Json(new
             {
                 success = true,
@@ -580,7 +600,7 @@ namespace RSDSystem.Controllers
                 row.Matched,
                 row.Note,
                 format,
-                importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
+                importedAt = importedAt.HasValue ? PhilippinesTime.FormatDateTime(importedAt.Value) : null,
                 actionLabel,
                 pendingCorrection,
                 payrollLocked,

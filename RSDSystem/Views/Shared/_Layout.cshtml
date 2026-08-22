@@ -94,6 +94,12 @@
                     </a>
                 </li>
 
+                <li class="@(ViewContext.RouteData.Values["controller"]?.ToString() == "ActivityLog" ? "active" : "")">
+                    <a asp-controller="ActivityLog" asp-action="Index">
+                        <i class="bi bi-journal-text"></i> Activity Logs
+                    </a>
+                </li>
+
                 <li>
                     <a asp-controller="Account" asp-action="Logout">
                         <i class="bi bi-box-arrow-right"></i> Logout

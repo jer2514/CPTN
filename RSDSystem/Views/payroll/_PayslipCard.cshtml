@@ -40,7 +40,7 @@
     <div class="payslip-line"><span>Cash Advance:</span><span class="payslip-val">₱@Model.CashAdvance.ToString("N2")</span></div>
     <div class="payslip-line payslip-line-strong"><span>Net Pay:</span><span class="payslip-val">₱@Model.NetPay.ToString("N2")</span></div>
 
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+    <div class="payslip-footer">Generated Date: @PhilippinesTime.FormatLongDate(Model.GeneratedDate)</div>
 
     @if (Model.Status == PayrollStatusOptions.Correction && !string.IsNullOrWhiteSpace(Model.CorrectionReason))
     {
