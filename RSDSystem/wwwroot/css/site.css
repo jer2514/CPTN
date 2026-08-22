@@ -3919,6 +3919,36 @@ button.badge-btn {
     font-weight: 700;
 }
 
+.report-section-title {
+    margin: 16px 0 8px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.report-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+    margin: 8px 0 16px;
+    font-size: 13px;
+}
+
+.report-info-lbl {
+    display: block;
+    font-size: 12px;
+    color: #667085;
+}
+
+.report-under {
+    color: #0d7a3e;
+    font-weight: 600;
+}
+
+.report-over {
+    color: #b42318;
+    font-weight: 600;
+}
+
 .report-bottom-actions {
     margin-top: auto;
     display: flex;

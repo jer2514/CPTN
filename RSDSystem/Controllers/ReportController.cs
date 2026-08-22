@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using RSDSystem.Helpers;
 using RSDSystem.Models;
 using RSDSystem.Services;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -12,6 +13,7 @@ namespace RSDSystem.Controllers
     {
         public static readonly string[] ReportTypes =
         {
+            "Project Report",
             "Payroll Report",
             "Monthly Payroll Report",
             "Attendance Report",
@@ -134,7 +136,7 @@ namespace RSDSystem.Controllers
 
             var start = ParseIso(periodStart);
             var end = ParseIso(periodEnd);
-            if (type is not "Payroll Prediction Report" and not "Payroll Anomaly Report"
+            if (type is not "Project Report" and not "Payroll Prediction Report" and not "Payroll Anomaly Report"
                 && (!start.HasValue || !end.HasValue))
                 return new ReportBuild { Error = "Select a payroll period." };
 
@@ -145,6 +147,7 @@ namespace RSDSystem.Controllers
 
             return type switch
             {
+                "Project Report" => await ProjectReportAsync(project),
                 "Payroll Report" => await PayrollReportAsync(project, start!.Value, end!.Value, periodLabel),
                 "Monthly Payroll Report" => await MonthlyPayrollReportAsync(project, start!.Value, end!.Value),
                 "Attendance Report" => await AttendanceReportAsync(project, start!.Value, end!.Value, periodLabel),
@@ -152,6 +155,124 @@ namespace RSDSystem.Controllers
                 "Payroll Prediction Report" => await PredictionReportAsync(project),
                 _ => await AnomalyReportAsync(project, start, end, periodLabel)
             };
+        }
+
+        private async Task<ReportBuild> ProjectReportAsync(Project project)
+        {
+            var slips = await _db.Payrolls.AsNoTracking()
+                .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved)
+                .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd, p.NetPay })
+                .ToListAsync();
+
+            var payrollByMonth = new SortedDictionary<DateTime, decimal>();
+            foreach (var slip in slips)
+            {
+                var source = DateRules.IsUsableDate(slip.PayPeriodStart)
+                    ? slip.PayPeriodStart
+                    : slip.PayPeriodEnd;
+                var month = DateRules.MonthOfPeriod(source);
+                payrollByMonth[month] = payrollByMonth.TryGetValue(month, out var current)
+                    ? current + slip.NetPay
+                    : slip.NetPay;
+            }
+
+            var budgetByMonth = new Dictionary<DateTime, decimal>();
+            foreach (var row in project.MonthlyBudgets ?? new List<ProjectMonthlyBudget>())
+            {
+                if (!DateRules.IsUsableDate(row.MonthDate))
+                    continue;
+                var month = DateRules.FirstOfMonth(row.MonthDate);
+                budgetByMonth[month] = budgetByMonth.TryGetValue(month, out var current)
+                    ? current + row.Amount
+                    : row.Amount;
+            }
+
+            var months = new SortedSet<DateTime>();
+            foreach (var month in payrollByMonth.Keys)
+                months.Add(month);
+            foreach (var month in budgetByMonth.Keys)
+                months.Add(month);
+            if (DateRules.IsUsableDate(project.StartingDate) && DateRules.IsUsableDate(project.EstimateEndDate))
+            {
+                for (var month = DateRules.FirstOfMonth(project.StartingDate!.Value);
+                     month <= DateRules.FirstOfMonth(project.EstimateEndDate!.Value);
+                     month = month.AddMonths(1))
+                {
+                    months.Add(month);
+                }
+            }
+
+            var employeeCount = await _db.Employees.AsNoTracking()
+                .CountAsync(e => e.ProjectId == project.ProjectId && e.IsActive);
+
+            var html = new StringBuilder();
+            html.Append(Header(project.ProjectName, "Project Report", PhilippinesTime.FormatLongDate(PhilippinesTime.Today)));
+            html.Append("<div class=\"report-section-title\">Project Information</div>");
+            html.Append("<div class=\"report-info\">");
+            html.Append(InfoField("Project Name", project.ProjectName));
+            html.Append(InfoField("Status", ProjectStatusOptions.Normalize(project.Status)));
+            html.Append(InfoField("Location", project.Location));
+            html.Append(InfoField("Type of Service", project.TypeOfService));
+            html.Append(InfoField("Starting Date", DateLabel(project.StartingDate)));
+            html.Append(InfoField("Estimate End Date", DateLabel(project.EstimateEndDate)));
+            html.Append(InfoField("Assigned Payroll Staff", project.AssignedPayrollStaff));
+            html.Append(InfoField("Payroll Distribution", project.PayrollDistribution));
+            html.Append(InfoField("Active Employees", employeeCount.ToString(Dates)));
+            html.Append(InfoField("Payroll Budget", Money(project.PayrollBudget)));
+            html.Append("</div>");
+
+            html.Append("<div class=\"report-section-title\">Monthly Payroll and Budget</div>");
+            html.Append("<table class=\"report-table\"><thead><tr>");
+            html.Append("<th>Month</th><th>Allocated Budget</th><th>Total Payroll</th><th>Difference</th><th>Margin</th>");
+            html.Append("</tr></thead><tbody>");
+
+            decimal totalAllocated = 0;
+            decimal totalPayroll = 0;
+            if (months.Count == 0)
+            {
+                html.Append("<tr><td colspan=\"5\">No monthly budget or approved payroll for this project.</td></tr>");
+            }
+            else
+            {
+                foreach (var month in months)
+                {
+                    var hasBudget = budgetByMonth.TryGetValue(month, out var allocated);
+                    var payroll = payrollByMonth.GetValueOrDefault(month);
+                    if (hasBudget)
+                        totalAllocated += allocated;
+                    totalPayroll += payroll;
+
+                    html.Append("<tr>");
+                    html.Append($"<td>{Esc(month.ToString("MMMM yyyy", Dates))}</td>");
+                    html.Append($"<td>{(hasBudget ? Money(allocated) : "—")}</td>");
+                    html.Append($"<td>{Money(payroll)}</td>");
+                    if (hasBudget)
+                    {
+                        var difference = allocated - payroll;
+                        html.Append($"<td class=\"{MarginClass(difference)}\">{Money(difference)}</td>");
+                        html.Append($"<td class=\"{MarginClass(difference)}\">{Esc(MarginLabel(difference))}</td>");
+                    }
+                    else
+                    {
+                        html.Append("<td>—</td><td>—</td>");
+                    }
+                    html.Append("</tr>");
+                }
+            }
+            html.Append("</tbody></table>");
+
+            var monthlyMargin = totalAllocated - totalPayroll;
+            html.Append("<div class=\"report-total\">Total allocated budget: " + Money(totalAllocated) + "</div>");
+            html.Append("<div class=\"report-total\">Total payroll: " + Money(totalPayroll) + "</div>");
+            html.Append($"<div class=\"report-total {MarginClass(monthlyMargin)}\">Monthly budget difference: {Money(monthlyMargin)} ({Esc(MarginLabel(monthlyMargin))})</div>");
+            if (project.PayrollBudget.HasValue)
+            {
+                var projectMargin = project.PayrollBudget.Value - totalPayroll;
+                html.Append($"<div class=\"report-total {MarginClass(projectMargin)}\">Project payroll budget difference: {Money(projectMargin)} ({Esc(MarginLabel(projectMargin))})</div>");
+            }
+
+            return new ReportBuild { Title = "Project Report — " + project.ProjectName, Html = html.ToString() };
         }
 
         private async Task<ReportBuild> PayrollReportAsync(Project project, DateTime start, DateTime end, string periodLabel)
@@ -467,6 +588,23 @@ namespace RSDSystem.Controllers
 
         private static string Header(string? projectName, string reportType, string period) =>
             $"<div class=\"report-head\"><div>{Esc(reportType)}</div><div>{Esc(projectName)}</div><div>{Esc(period)}</div></div>";
+
+        private static string InfoField(string label, string? value) =>
+            $"<div><span class=\"report-info-lbl\">{Esc(label)}</span><div>{Esc(value)}</div></div>";
+
+        private static string DateLabel(DateTime? value) =>
+            DateRules.IsUsableDate(value)
+                ? value!.Value.ToString("MMMM dd, yyyy", Dates)
+                : "—";
+
+        private static string Money(decimal? value) =>
+            value.HasValue ? "₱" + value.Value.ToString("N2", Dates) : "—";
+
+        private static string MarginClass(decimal difference) =>
+            difference < 0 ? "report-over" : difference > 0 ? "report-under" : "";
+
+        private static string MarginLabel(decimal difference) =>
+            difference < 0 ? "Over budget" : difference > 0 ? "Under budget" : "On budget";
 
         private static string Esc(string? value) =>
             System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(value) ? "—" : value);
