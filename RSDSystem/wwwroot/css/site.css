@@ -130,10 +130,8 @@ body {
 /* ── Dashboard ────────────────────────────────────────── */
 .dash-header {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    margin-top: 25px;
-    margin-bottom: 38px;
 }
 
 .dash-welcome {
@@ -223,9 +221,9 @@ body {
 /* ── Main content area ──────────────────────────────────── */
 .content-area {
     flex: 1;
-    background: #163F8B;
+    background: #2654F2;
     overflow-y: auto;
-    padding: 28px 28px;
+    padding: 0 28px 28px;
 }
 
 /* ── Page label (small caps above card) ─────────────────── */
@@ -238,13 +236,13 @@ body {
     margin-bottom: 10px;
 }
 
-/* ── Topbar (bell button row) ───────────────────────────── */
+/* ── Topbar (bell / back row) ─────────────────────────────
+   Height matches .logo-container (10px margin + 120px + 2px border)
+   so Back sits on the same line as border-bottom: 2px solid #266DF1. */
 .content-topbar {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-top: 20px;
-    margin-bottom:35px;
+    align-items: flex-end;
 }
 
 .content-topbar .bell-btn {
@@ -290,9 +288,8 @@ body {
     font-weight: 500;
     color: #163F8B;
     text-decoration: none;
-    margin-bottom: 18px;
-    position: sticky;
-    top: 16px;
+    margin-bottom: 0;
+    position: static;
     z-index: 50;
     box-shadow: 0 2px 8px rgba(38, 109, 241, .15);
 }
@@ -2861,9 +2858,8 @@ button.badge-btn {
 
 .pred-topbar {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: 12px;
 }
 
 .pred-back {
@@ -3529,12 +3525,20 @@ button.badge-btn {
     }
 }
 
-/* ── Notifications ───────────────────────────────────────── */
+/* ── Notifications / sticky page header ──────────────────── */
 .dash-header,
 .content-topbar,
 .pred-topbar {
-    position: relative;
-    z-index: 40;
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    box-sizing: border-box;
+    height: 132px;
+    min-height: 132px;
+    background: #2654F2;
+    border-bottom: 2px solid #266DF1;
+    margin: 0 -28px 24px;
+    padding: 0 28px 10px;
     overflow: visible;
 }
 
@@ -3542,12 +3546,7 @@ button.badge-btn {
     position: sticky;
     top: 0;
     z-index: 80;
-    background: #163F8B;
-    margin-top: -28px;
-    margin-left: -28px;
-    margin-right: -28px;
-    padding: 20px 28px 12px;
-    margin-bottom: 8px;
+    background: #2654F2;
 }
 
 .dash-header .dash-welcome {

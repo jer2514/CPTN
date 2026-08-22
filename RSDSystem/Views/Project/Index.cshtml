@@ -15,6 +15,11 @@
 
     <div class="list-controls-row">
         <div class="list-controls-left">
+            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@search" placeholder="Search Project" />
+                <input type="hidden" name="status" value="@status" />
+            </form>
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -42,11 +47,6 @@
                     }
                 </ul>
             </div>
-            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@search" placeholder="Search Project" />
-                <input type="hidden" name="status" value="@status" />
-            </form>
         </div>
 
         <div class="list-controls-actions">

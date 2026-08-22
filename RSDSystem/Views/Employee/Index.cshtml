@@ -16,6 +16,11 @@
 
     <div class="list-controls-row">
         <div class="list-controls-left">
+            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search Employee" />
+                <input type="hidden" name="sortBy" value="@sortBy" />
+            </form>
             <div class="dropdown">
                 <button class="btn-outline-blue dropdown-toggle"
                         data-bs-toggle="dropdown" aria-expanded="false">
@@ -44,11 +49,6 @@
                     </li>
                 </ul>
             </div>
-            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
-                <i class="bi bi-search"></i>
-                <input type="text" name="search" value="@ViewBag.Search" placeholder="Search Employee" />
-                <input type="hidden" name="sortBy" value="@sortBy" />
-            </form>
         </div>
 
         <div class="list-controls-actions">
