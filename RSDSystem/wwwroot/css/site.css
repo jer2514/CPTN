@@ -4060,21 +4060,27 @@ button.badge-btn {
     border: none;
     border-radius: 10px;
     padding: 12px 28px;
-    font-weight: 600;
+    font-weight: 500;
+    color: #ffffff;
     cursor: pointer;
 }
 
 .report-download-btn {
-    background: #f5b7b7;
-    color: #fff;
+    background: #FF0000;
+    color: #ffffff;
 }
 
 .report-print-btn {
-    background: #9ec5ff;
-    color: #163F8B;
+    background: #2654F2;
+    color: #ffffff;
 }
 
-.report-download-btn:hover,
+.report-download-btn:hover {
+    background: #CC0000;
+    color: #ffffff;
+}
+
 .report-print-btn:hover {
-    filter: brightness(.97);
+    background: #1B3FBF;
+    color: #ffffff;
 }
