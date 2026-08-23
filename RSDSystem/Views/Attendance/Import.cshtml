@@ -55,8 +55,8 @@
                     <input type="text" id="rowSearch" placeholder="Search User" />
                 </div>
                 <div class="dropdown">
-                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        Filter
+                    <button class="btn-outline-blue dropdown-toggle filter-label-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                        All
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
@@ -403,6 +403,8 @@
                 previewFormat = data.format || 'Statistic';
                 currentPage = 1;
                 statusFilter = 'all';
+                if (typeof setFilterButtonLabel === 'function')
+                    setFilterButtonLabel(document.querySelector('#previewSection .filter-label-btn'), 'All');
 
                 lastFileName = data.fileName || '';
                 lastPeriodText = (data.periodStart && data.periodEnd)

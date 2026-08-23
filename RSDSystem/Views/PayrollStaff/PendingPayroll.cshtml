@@ -40,9 +40,9 @@
                     <input type="text" id="payrollSearch" placeholder="Search Employee" oninput="filterPayrolls()" />
                 </div>
                 <div class="dropdown">
-                    <button type="button" class="btn-outline-blue dropdown-toggle"
+                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                        Filter
+                        All
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item active" data-sort="all">All</button></li>
@@ -162,6 +162,8 @@
                 document.querySelectorAll('.filter-menu [data-sort]').forEach(function (item) {
                     item.classList.toggle('active', item.dataset.sort === 'all');
                 });
+                if (typeof setFilterButtonLabel === 'function')
+                    setFilterButtonLabel(document.querySelector('#payrollSection .filter-label-btn'), 'All');
                 renderPayrolls();
             } catch (err) {
                 emptyBox.textContent = 'Something went wrong while loading payroll records.';

@@ -240,6 +240,15 @@ namespace RSDSystem.Controllers
                 $"Loaded payroll prediction for {page.ProjectName}.",
                 page.ProjectId);
 
+            try
+            {
+                await _notifications.NotifyPredictionReadyAsync(page, HttpContext.RequestAborted);
+            }
+            catch
+            {
+                // Forecast still returns even if the admin bell cannot be updated.
+            }
+
             return Json(new
             {
                 success = true,
