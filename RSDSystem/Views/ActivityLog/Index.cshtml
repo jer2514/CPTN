@@ -3,9 +3,10 @@
 @{
     ViewData["Title"] = "Activity Logs";
     var sortBy = ViewBag.SortBy as string;
-    var filterLabel = sortBy == "user" ? "Filter: User"
-        : sortBy == "role" ? "Filter: Role"
-        : "Filter: Newest";
+    var filterLabel = sortBy == "user" ? "User"
+        : sortBy == "role" ? "Role"
+        : sortBy == "newest" ? "Newest"
+        : "Filter";
 }
 
 <div class="content-topbar">
@@ -29,8 +30,9 @@
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     <li>
-                        <a class="dropdown-item @(string.IsNullOrEmpty(sortBy) ? "active" : "")"
-                           asp-action="Index" asp-route-search="@ViewBag.Search">Newest</a>
+                        <a class="dropdown-item @(string.IsNullOrEmpty(sortBy) || sortBy == "newest" ? "active" : "")"
+                           asp-action="Index" asp-route-sortBy="newest"
+                           asp-route-search="@ViewBag.Search">Newest</a>
                     </li>
                     <li>
                         <a class="dropdown-item @(sortBy == "user" ? "active" : "")"

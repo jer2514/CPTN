@@ -55,7 +55,7 @@
                 <div class="dropdown">
                     <button type="button" id="attFilterBtn" class="btn-outline-blue dropdown-toggle filter-label-btn"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                        Filter: All
+                        Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
@@ -228,7 +228,7 @@
                 if (typeof setFilterButtonLabel === 'function')
                     setFilterButtonLabel(filterBtn, this.textContent.trim() || (statusFilter === 'all' ? 'All' : statusFilter));
                 else if (filterBtn)
-                    filterBtn.textContent = 'Filter: ' + (this.textContent.trim() || (statusFilter === 'all' ? 'All' : statusFilter));
+                    filterBtn.textContent = this.textContent.trim() || (statusFilter === 'all' ? 'All' : statusFilter);
                 currentPage = 1;
                 if (selectedPeriod()) loadRecords();
             });
