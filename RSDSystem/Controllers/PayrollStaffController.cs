@@ -691,6 +691,7 @@ namespace RSDSystem.Controllers
                     p.PayrollId,
                     DisplayId = EmployeeIds.Format(p.EmployeeCode),
                     EmployeeName = string.Join(" ", new[] { p.FirstName, p.LastName }.Where(n => !string.IsNullOrWhiteSpace(n))),
+                    LastName = p.LastName ?? "",
                     p.Job,
                     p.Status,
                     p.NetPay,

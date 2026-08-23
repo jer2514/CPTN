@@ -8,7 +8,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="att-page-title">Import Attendance</div>
 
     @if (ViewBag.ShowingAllProjects == true)
@@ -47,12 +47,16 @@
     </div>
 
     <div id="previewSection" class="att-preview" style="display:none">
-        <div class="emp-card-head" style="margin-top:6px">
-            <div id="previewMeta" class="att-preview-meta"></div>
-            <div class="emp-controls">
+        <div id="previewMeta" class="att-preview-meta"></div>
+        <div class="list-controls-row att-list-toolbar">
+            <div class="list-controls-left">
+                <div class="search-wrap search-wrap-wide">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="rowSearch" placeholder="Search User" />
+                </div>
                 <div class="dropdown">
                     <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i> Filter
+                        Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
@@ -60,13 +64,8 @@
                         <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Half-day">Half-day</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
-                        <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
                     </ul>
-                </div>
-                <div class="search-wrap">
-                    <i class="bi bi-search"></i>
-                    <input type="text" id="rowSearch" placeholder="Search User" />
                 </div>
             </div>
         </div>

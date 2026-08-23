@@ -172,7 +172,7 @@ else
             </div>
         </div>
 
-        <div class="form-row form-row-2">
+        <div class="slip-generate-row">
             <div>
                 <label class="form-lbl">Cash Advance</label>
                 <input type="number" name="cashAdvance" id="cashAdvance" class="form-ctrl"
@@ -180,13 +180,11 @@ else
                        data-validate="nonNeg" data-label="Cash advance" />
                 <span class="field-error" data-error-for="cashAdvance"></span>
             </div>
-            <div></div>
+            <button type="submit" id="generateBtn" class="btn-primary-blue-block"
+                    @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
+                @(isEdit ? "Save Changes" : "Generate Payroll")
+            </button>
         </div>
-
-        <button type="submit" id="generateBtn" class="btn-primary-blue-block"
-                @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
-            @(isEdit ? "Save Changes" : "Generate Payroll")
-        </button>
     </form>
 </div>
 
