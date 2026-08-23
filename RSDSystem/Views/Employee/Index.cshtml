@@ -3,10 +3,10 @@
 @{
     ViewData["Title"] = "Employee";
     var sortBy = ViewBag.SortBy as string;
-    var filterLabel = sortBy == "lastname" ? "Last Name"
-        : sortBy == "assigned" ? "Assigned"
-        : sortBy == "status" ? "Status"
-        : "All";
+    var filterLabel = sortBy == "lastname" ? "Filter: Last Name"
+        : sortBy == "assigned" ? "Filter: Assigned"
+        : sortBy == "status" ? "Filter: Status"
+        : "Filter: All";
 }
 
 
