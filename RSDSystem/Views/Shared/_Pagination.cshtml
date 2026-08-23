@@ -3,6 +3,10 @@
     int totalPages = ViewBag.TotalPages ?? 1;
     string search = ViewBag.Search;
     string sortBy = ViewBag.SortBy;
+    string status = ViewBag.Status;
+    string projectName = ViewBag.ProjectName;
+    var projectId = ViewBag.SelectedProjectId;
+    var month = ViewBag.Month;
 }
 
 @if (totalPages > 1)
@@ -13,12 +17,16 @@
     <div class="pagination-wrap">
         <a class="page-link @(currentPage == 1 ? "disabled" : "")"
            asp-action="Index" asp-route-page="@(currentPage - 1)"
-           asp-route-search="@search" asp-route-sortBy="@sortBy">&lsaquo;</a>
+           asp-route-search="@search" asp-route-sortBy="@sortBy"
+           asp-route-status="@status" asp-route-projectName="@projectName"
+           asp-route-projectId="@projectId" asp-route-month="@month">&lsaquo;</a>
 
         @if (startPage > 1)
         {
             <a class="page-link" asp-action="Index" asp-route-page="1"
-               asp-route-search="@search" asp-route-sortBy="@sortBy">1</a>
+               asp-route-search="@search" asp-route-sortBy="@sortBy"
+               asp-route-status="@status" asp-route-projectName="@projectName"
+               asp-route-projectId="@projectId" asp-route-month="@month">1</a>
             if (startPage > 2)
             {
 
@@ -30,7 +38,9 @@
         {
             <a class="page-link @(i == currentPage ? "active" : "")"
                asp-action="Index" asp-route-page="@i"
-               asp-route-search="@search" asp-route-sortBy="@sortBy">@i</a>
+               asp-route-search="@search" asp-route-sortBy="@sortBy"
+               asp-route-status="@status" asp-route-projectName="@projectName"
+               asp-route-projectId="@projectId" asp-route-month="@month">@i</a>
         }
 
         @if (totalPages > endPage)
@@ -40,11 +50,15 @@
                 <span class="page-ellipsis">…</span>
             }
             <a class="page-link" asp-action="Index" asp-route-page="@totalPages"
-               asp-route-search="@search" asp-route-sortBy="@sortBy">@totalPages</a>
+               asp-route-search="@search" asp-route-sortBy="@sortBy"
+               asp-route-status="@status" asp-route-projectName="@projectName"
+               asp-route-projectId="@projectId" asp-route-month="@month">@totalPages</a>
         }
 
         <a class="page-link @(currentPage == totalPages ? "disabled" : "")"
            asp-action="Index" asp-route-page="@(currentPage + 1)"
-           asp-route-search="@search" asp-route-sortBy="@sortBy">&rsaquo;</a>
+           asp-route-search="@search" asp-route-sortBy="@sortBy"
+           asp-route-status="@status" asp-route-projectName="@projectName"
+           asp-route-projectId="@projectId" asp-route-month="@month">&rsaquo;</a>
     </div>
 }

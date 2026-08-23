@@ -10,7 +10,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="emp-title mb-3">Projects</div>
 
     <div class="list-controls-row">
@@ -91,5 +91,6 @@
                 </div>
             }
         </div>
+        @await Html.PartialAsync("_Pagination")
     }
 </div>

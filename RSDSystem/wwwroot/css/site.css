@@ -130,7 +130,7 @@ body {
 /* ── Dashboard ────────────────────────────────────────── */
 .dash-header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
 }
 
@@ -138,6 +138,7 @@ body {
     font-size: 20px;
     font-weight: 700;
     color: #fff;
+    line-height: 1.2;
 }
 
 .dash-stats-row {
@@ -351,11 +352,13 @@ body {
     color: #ffffff;
     border-radius: 6px;
     height: 38px;
+    min-width: 160px;
     padding: 0 18px;
     font-size: 14px;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     cursor: pointer;
     transition: background .15s;
@@ -482,8 +485,23 @@ body {
 .emp-index-card .emp-table th:nth-child(7) { width: 9%; }  /* Action */
 
 .user-index-card .search-wrap-wide input,
-.emp-index-card .search-wrap-wide input {
+.emp-index-card .search-wrap-wide input,
+.search-stretch-card .search-wrap-wide input {
     width: 42cqw;
+}
+
+.search-stretch-card {
+    container-type: inline-size;
+}
+
+.search-stretch-card .genpay-select-wrap {
+    max-width: none;
+    width: 42cqw;
+}
+
+.search-stretch-card .genpay-autocomplete,
+.search-stretch-card .genpay-autocomplete .form-ctrl {
+    width: 100%;
 }
 
 .mb-3 {
@@ -536,8 +554,11 @@ body {
 }
 
     .filter-menu .dropdown-item {
-        font-size: 13px;
-        padding: 8px 18px;
+        font-size: 14px;
+        min-height: 38px;
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
         color: #163F8B;
     }
 
@@ -1653,6 +1674,13 @@ select.form-ctrl {
     margin-top: 4px;
 }
 
+.emp-action-btns .btn-outline-blue,
+.emp-action-btns .btn-primary-blue {
+    background: #2654F2;
+    color: #ffffff;
+    border: none;
+}
+
 /* ── Wide overlay modal (employee lists) ─────────────────── */
 .emp-modal {
     width: 640px;
@@ -2459,9 +2487,9 @@ button.badge-btn {
 /* ── Admin dashboard ──────────────────────────────────────── */
 .dash-welcome {
     color: #fff;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    margin: 20px 0 18px;
+    margin: 0;
 }
 
 .dash-stats-row {
@@ -2571,7 +2599,7 @@ button.badge-btn {
 /* ── Admin View Payroll / Prediction ─────────────────────── */
 .vp-filters {
     display: grid;
-    grid-template-columns: 1fr 220px auto;
+    grid-template-columns: 1fr 220px;
     gap: 14px;
     align-items: end;
     margin-bottom: 22px;
@@ -2976,13 +3004,13 @@ button.badge-btn {
 }
 
 .pred-btn-pdf {
-    background: #fff;
-    color: #111;
+    background: #FF0000;
+    color: #ffffff;
 }
 
 .pred-btn-pdf:hover {
-    background: #f3f3f3;
-    color: #111;
+    background: #CC0000;
+    color: #ffffff;
 }
 
 .pred-btn-send {
@@ -3644,12 +3672,13 @@ button.badge-btn {
     height: 132px;
     min-height: 132px;
     margin: 0 -28px 0;
-    padding: 10px 28px 0;
+    padding: 0 28px;
 }
 
 .dash-header .dash-welcome {
     margin: 0;
     padding-right: 61px;
+    line-height: 1.2;
 }
 
 .notif-bell-wrap {

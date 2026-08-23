@@ -38,9 +38,6 @@
                 }
             </select>
         </div>
-        <div class="vp-filter-submit">
-            <button type="submit" class="btn-primary-blue-solid">Apply</button>
-        </div>
     </form>
 
     @if (ViewBag.NeedsProject is true)
@@ -49,7 +46,7 @@
     }
     else if (!Model.Any())
     {
-        <div class="text-center text-muted py-5">No approved payrolls found.</div>
+        <div class="text-center text-muted py-5">No payrolls found.</div>
     }
     else
     {
@@ -80,6 +77,7 @@
                 </div>
             }
         </div>
+        @await Html.PartialAsync("_Pagination")
     }
 </div>
 

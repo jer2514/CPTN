@@ -10,7 +10,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="att-page-title">Attendance Records</div>
 
     @if (ViewBag.ShowingAllProjects == true)
@@ -55,14 +55,13 @@
                 <div class="dropdown">
                     <button type="button" id="attFilterBtn" class="btn-outline-blue dropdown-toggle"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i> Filter
+                        Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Complete">Complete</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Half-day">Half-day</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
-                        <li><button type="button" class="dropdown-item" data-status="Early Off">Early Off</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
                     </ul>
                 </div>

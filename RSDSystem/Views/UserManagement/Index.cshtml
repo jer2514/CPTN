@@ -28,6 +28,10 @@
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     <li>
+                        <a class="dropdown-item @(string.IsNullOrEmpty(sortBy) ? "active" : "")"
+                           asp-action="Index" asp-route-search="@ViewBag.Search">All</a>
+                    </li>
+                    <li>
                         <a class="dropdown-item @(sortBy == "lastname" ? "active" : "")"
                            asp-action="Index" asp-route-sortBy="lastname"
                            asp-route-search="@ViewBag.Search">Last Name</a>
