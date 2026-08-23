@@ -49,7 +49,7 @@ namespace RSDSystem.Controllers
             var periods = hasProject
                 ? await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true)
                 : new List<PayrollPeriodRow>();
-            const int pageSize = 10;
+            const int pageSize = 5;
             var totalPages = Math.Max(1, (int)Math.Ceiling(periods.Count / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
             ViewBag.PageTitle = "View Payroll";
@@ -287,7 +287,7 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            const int pageSize = 10;
+            const int pageSize = 5;
             var slips = await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)

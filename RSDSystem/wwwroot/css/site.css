@@ -2183,8 +2183,25 @@ button.badge-btn {
     background: #fff;
     border-radius: 14px;
     padding: 28px 32px;
-    max-width: 560px;
+    max-width: 880px;
     margin: 0 auto;
+}
+
+.slip-generate-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.slip-generate-row .btn-primary-blue-block {
+    width: auto;
+    margin-top: 0;
+    height: 38px;
+    padding: 0 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .slip-title {

@@ -9,7 +9,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="emp-title mb-3">Pending Payroll</div>
 
     @if (ViewBag.ShowingAllProjects == true)
@@ -33,12 +33,22 @@
     </div>
 
     <div id="payrollSection" style="display:none">
-        <div class="emp-card-head" style="margin-top:6px">
-            <div></div>
-            <div class="emp-controls">
-                <div class="search-wrap">
+        <div class="list-controls-row att-list-toolbar">
+            <div class="list-controls-left">
+                <div class="search-wrap search-wrap-wide">
                     <i class="bi bi-search"></i>
                     <input type="text" id="payrollSearch" placeholder="Search Employee" oninput="filterPayrolls()" />
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="btn-outline-blue dropdown-toggle"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        Filter
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li><button type="button" class="dropdown-item active" data-sort="all">All</button></li>
+                        <li><button type="button" class="dropdown-item" data-sort="lastname">Last Name</button></li>
+                        <li><button type="button" class="dropdown-item" data-sort="status">Status</button></li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -114,6 +124,7 @@
         let currentPayrolls = [];
         let currentProjectId = null;
         let currentPage = 1;
+        let payrollSort = 'all';
 
         document.getElementById('loadPayrollsBtn').addEventListener('click', loadPayrolls);
 
@@ -147,6 +158,10 @@
                 emptyBox.style.display = 'none';
                 section.style.display = 'block';
                 currentPage = 1;
+                payrollSort = 'all';
+                document.querySelectorAll('.filter-menu [data-sort]').forEach(function (item) {
+                    item.classList.toggle('active', item.dataset.sort === 'all');
+                });
                 renderPayrolls();
             } catch (err) {
                 emptyBox.textContent = 'Something went wrong while loading payroll records.';
@@ -178,13 +193,23 @@
             return btns;
         }
 
+        function payrollLastName(p) {
+            return (p.lastName || (p.employeeName || '').trim().split(/\s+/).pop() || '').toLowerCase();
+        }
+
         function filteredPayrolls() {
             const q = document.getElementById('payrollSearch').value.toLowerCase();
-            if (!q) return currentPayrolls;
-            return currentPayrolls.filter(p =>
+            let list = currentPayrolls.filter(p =>
+                !q ||
                 (p.employeeName || '').toLowerCase().includes(q) ||
                 (p.job || '').toLowerCase().includes(q) ||
                 (p.displayId || '').toLowerCase().includes(q));
+            if (payrollSort === 'lastname') {
+                list = [...list].sort((a, b) => payrollLastName(a).localeCompare(payrollLastName(b)));
+            } else if (payrollSort === 'status') {
+                list = [...list].sort((a, b) => (a.status || '').localeCompare(b.status || ''));
+            }
+            return list;
         }
 
         function renderPager(totalPages) {
@@ -242,6 +267,17 @@
             currentPage = 1;
             renderPayrolls();
         }
+
+        document.querySelectorAll('.filter-menu [data-sort]').forEach(function (el) {
+            el.addEventListener('click', function () {
+                payrollSort = this.dataset.sort || 'all';
+                document.querySelectorAll('.filter-menu [data-sort]').forEach(function (item) {
+                    item.classList.toggle('active', item.dataset.sort === payrollSort);
+                });
+                currentPage = 1;
+                renderPayrolls();
+            });
+        });
 
         document.getElementById('payrollPager').addEventListener('click', function (e) {
             const btn = e.target.closest('[data-dir]');
