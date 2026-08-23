@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = "Activity Logs";
     var sortBy = ViewBag.SortBy as string;
-    var filterLabel = sortBy == "user" ? "User"
-        : sortBy == "role" ? "Role"
-        : "Newest";
+    var filterLabel = sortBy == "user" ? "Filter: User"
+        : sortBy == "role" ? "Filter: Role"
+        : "Filter: Newest";
 }
 
 <div class="content-topbar">

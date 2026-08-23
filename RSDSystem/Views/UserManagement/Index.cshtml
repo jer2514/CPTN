@@ -3,9 +3,9 @@
 @{
     ViewData["Title"] = "User Management";
     var sortBy = ViewBag.SortBy as string;
-    var filterLabel = sortBy == "lastname" ? "Last Name"
-        : sortBy == "status" ? "Status"
-        : "All";
+    var filterLabel = sortBy == "lastname" ? "Filter: Last Name"
+        : sortBy == "status" ? "Filter: Status"
+        : "Filter: All";
 }
 
 
