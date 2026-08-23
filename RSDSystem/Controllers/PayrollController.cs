@@ -39,7 +39,7 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        public async Task<IActionResult> Index(string? projectName, int? projectId, int? month)
+        public async Task<IActionResult> Index(string? projectName, int? projectId, int? month, int page = 1)
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
@@ -49,13 +49,18 @@ namespace RSDSystem.Controllers
             var periods = hasProject
                 ? await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true)
                 : new List<PayrollPeriodRow>();
+            const int pageSize = 10;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(periods.Count / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
             ViewBag.PageTitle = "View Payroll";
             ViewBag.ProjectName = projectName ?? "";
             ViewBag.SelectedProjectId = projectId;
             ViewBag.Month = month;
             ViewBag.Months = MonthOptions();
             ViewBag.NeedsProject = !hasProject;
-            return View(periods);
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            return View(periods.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
         public async Task<IActionResult> Period(int projectId, DateTime start, DateTime end)
@@ -282,7 +287,7 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            const int pageSize = 4;
+            const int pageSize = 10;
             var slips = await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)

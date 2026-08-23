@@ -28,8 +28,9 @@ namespace RSDSystem.Controllers
         }
 
         // GET /Project
-        public async Task<IActionResult> Index(string? search, string? status)
+        public async Task<IActionResult> Index(string? search, string? status, int page = 1)
         {
+            const int pageSize = 24;
             var filter = ProjectStatusOptions.Normalize(status);
             var query = _db.Projects.AsNoTracking().WithStatus(filter);
 
@@ -42,11 +43,18 @@ namespace RSDSystem.Controllers
                     (p.TypeOfService != null && p.TypeOfService.Contains(s)));
             }
 
+            query = query.OrderBy(p => p.ProjectName);
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
             ViewBag.Search = search;
             ViewBag.Status = filter;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
             ViewBag.PageTitle = "Projects";
 
-            return View(await query.OrderBy(p => p.ProjectName).ToListAsync());
+            return View(await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync());
         }
 
         // GET /Project/Details/{id}

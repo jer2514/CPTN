@@ -39,7 +39,6 @@
                 <th>Regular Hours</th>
                 <th>OT Hours</th>
                 <th>Net Pay</th>
-                <th>Status</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -47,7 +46,7 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No approved payrolls for this period.</td>
+                    <td colspan="6" class="text-center text-muted py-4">No payrolls for this period.</td>
                 </tr>
             }
             @foreach (var row in Model)
@@ -58,9 +57,6 @@
                     <td>@row.RegularHours.ToString("0.##")</td>
                     <td>@row.OtHours.ToString("0.##")</td>
                     <td>₱@row.NetPay.ToString("N2")</td>
-                    <td>
-                        <span class="badge-active">Approved</span>
-                    </td>
                     <td>
                         @if (row.PayrollId.HasValue)
                         {
