@@ -237,8 +237,9 @@ body {
 }
 
 /* ── Topbar (bell / back row) ─────────────────────────────
-   Height matches .logo-container (10px margin + 120px + 2px border)
-   so Back sits on the same line as border-bottom: 2px solid #266DF1. */
+   Logo block is 10px + 120px + 2px border = 132px.
+   Index cards start on that border line (same as Back).
+   The bell is pinned to the top-right of the content area. */
 .content-topbar {
     display: flex;
     justify-content: space-between;
@@ -262,6 +263,7 @@ body {
     border: none;
     cursor: pointer;
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
 }
 
     .bell-btn:hover {
@@ -3577,18 +3579,22 @@ button.badge-btn {
 .dash-header,
 .content-topbar,
 .pred-topbar {
+    box-sizing: border-box;
+    background: #163F8B;
+    border-bottom: none;
+    overflow: visible;
+}
+
+/* Form / detail pages: Back top edge stays on the logo border. */
+.content-topbar:has(.btn-back),
+.pred-topbar {
     position: sticky;
     top: 0;
     z-index: 80;
-    box-sizing: border-box;
     height: auto;
     min-height: 0;
-    background: #163F8B;
-    border-bottom: none;
-    /* Logo block is 10 + 120 + 2 = 132px. Top of Back/bell starts on that line. */
     margin: 132px -28px 16px;
     padding: 0 28px 12px;
-    overflow: visible;
 }
 
 .content-topbar.page-sticky-bar {
@@ -3598,15 +3604,38 @@ button.badge-btn {
     background: #163F8B;
 }
 
+/* Index / dashboard: occupy the logo block so the card starts on the border. */
+.content-topbar:not(:has(.btn-back)),
+.dash-header {
+    position: relative;
+    z-index: 80;
+    height: 132px;
+    min-height: 132px;
+    margin: 0 -28px 0;
+    padding: 10px 28px 0;
+}
+
 .dash-header .dash-welcome {
     margin: 0;
+    padding-right: 61px;
 }
 
 .notif-bell-wrap {
-    position: relative;
+    position: fixed;
+    top: 10px;
+    right: 28px;
     display: inline-flex;
     flex-shrink: 0;
-    z-index: 40;
+    z-index: 90;
+}
+
+.content-topbar > .bell-btn,
+.dash-header > .bell-btn,
+.pred-topbar > .bell-btn {
+    position: fixed;
+    top: 10px;
+    right: 28px;
+    z-index: 90;
 }
 
 .content-topbar .notif-bell-wrap,
