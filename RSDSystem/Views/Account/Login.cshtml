@@ -5,50 +5,58 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/login.css?v=2" />
+    <link rel="stylesheet" href="~/css/login.css?v=3" />
 }
 
 <div class="login-page">
-    <div class="login-card">
+    <div class="login-shell">
+        <aside class="login-brand">
+            <img src="~/Uploads/Images/RSDLogo.png" alt="RSD Logo" class="login-logo" />
+            <h1 class="login-brand-title">RSD Payroll System</h1>
+            <p class="login-brand-copy">Attendance, payroll, and project records for the construction team.</p>
+        </aside>
 
-        <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
-
-            @Html.AntiForgeryToken()
-
-            <div class="logo-wrap">
-                <img src="~/Uploads/Images/RSDLogo.png" alt="RSD Logo" class="login-logo" />
-                <div class="login-heading">RSD Payroll System</div>
-                <div class="login-sub">Sign in to continue</div>
+        <section class="login-panel">
+            <div class="login-panel-head">
+                <h2>Sign in</h2>
+                <p>Enter your username and password to continue.</p>
             </div>
 
-            @if (!string.IsNullOrEmpty(ViewBag.Error))
-            {
-                <div class="login-alert" role="alert">
-                    @ViewBag.Error
+            <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
+                @Html.AntiForgeryToken()
+
+                @if (!string.IsNullOrEmpty(ViewBag.Error))
+                {
+                    <div class="login-alert" role="alert">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        <span>@ViewBag.Error</span>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label for="Username" class="form-label">Username</label>
+                    <div class="field-wrap">
+                        <i class="bi bi-person field-icon"></i>
+                        <input id="Username" name="Username" type="text" class="form-ctrl" value="" required autocomplete="username" />
+                    </div>
                 </div>
-            }
 
-            <div class="form-group">
-                <label for="Username" class="form-label">Username</label>
-                <input id="Username" name="Username" type="text" class="form-ctrl" value="" required autocomplete="username" />
-            </div>
-
-            <div class="form-group">
-                <label for="Password" class="form-label">Password</label>
-                <div class="password-wrapper">
-                    <input id="Password" name="Password" type="password" class="form-ctrl" required autocomplete="current-password" />
-                    <button type="button" class="pw-toggle" aria-label="Show password">
-                        <i class="bi bi-eye"></i>
-                    </button>
+                <div class="form-group">
+                    <label for="Password" class="form-label">Password</label>
+                    <div class="field-wrap password-wrapper">
+                        <i class="bi bi-lock field-icon"></i>
+                        <input id="Password" name="Password" type="password" class="form-ctrl" required autocomplete="current-password" />
+                        <button type="button" class="pw-toggle" aria-label="Show password">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
 
-            <div class="form-group mt-1">
-                <button type="submit" class="btn-primary-blue-block">Login</button>
-            </div>
-        </form>
+                <button type="submit" class="btn-primary-blue-block">Sign in</button>
+            </form>
+        </section>
     </div>
 </div>
 
