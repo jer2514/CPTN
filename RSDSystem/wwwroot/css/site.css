@@ -449,7 +449,7 @@ body {
 }
 
     .search-wrap-wide input {
-        width: 460px;
+        width: 520px;
         height: 38px;
         box-sizing: border-box;
     }
@@ -3677,7 +3677,7 @@ button.badge-btn {
     position: absolute;
     top: 54px;
     right: 0;
-    width: 380px;
+    width: min(500px, calc(100vw - 270px));
     max-height: min(70vh, 560px);
     background: #fff;
     border-radius: 14px;
