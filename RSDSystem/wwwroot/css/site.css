@@ -2188,20 +2188,18 @@ button.badge-btn {
 }
 
 .slip-generate-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
+    flex-direction: column;
     gap: 14px;
-    align-items: end;
+}
+
+.slip-generate-row .form-ctrl {
+    width: 100%;
 }
 
 .slip-generate-row .btn-primary-blue-block {
-    width: auto;
-    margin-top: 0;
-    height: 38px;
-    padding: 0 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    width: 100%;
+    margin-top: 4px;
 }
 
 .slip-title {
