@@ -38,14 +38,12 @@
 }
 
 .login-logo {
-    width: 168px;
-    max-width: 70%;
+    width: 240px;
+    max-width: 88%;
     height: auto;
     display: block;
-    background: #fff;
-    border-radius: 12px;
-    padding: 10px 12px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, .12);
+    background: transparent;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .25));
 }
 
 .login-brand-title {
