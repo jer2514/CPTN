@@ -454,24 +454,35 @@ body {
         box-sizing: border-box;
     }
 
-/* Users search ends at the midpoint between the User and Role columns. */
-.user-index-card {
+/* Users/Employees search ends between the name column and the next column
+   (User/Role, Employee/Job). */
+.user-index-card,
+.emp-index-card {
     container-type: inline-size;
 }
 
-.user-index-card .emp-table {
+.user-index-card .emp-table,
+.emp-index-card .emp-table {
     table-layout: fixed;
 }
 
-.user-index-card .emp-table th:nth-child(1) { width: 13%; } /* Staff ID */
-.user-index-card .emp-table th:nth-child(2) { width: 22%; } /* User */
-.user-index-card .emp-table th:nth-child(3) { width: 14%; } /* Role */
-.user-index-card .emp-table th:nth-child(4) { width: 20%; } /* Email */
-.user-index-card .emp-table th:nth-child(5) { width: 12%; } /* Date Added */
-.user-index-card .emp-table th:nth-child(6) { width: 10%; } /* Status */
-.user-index-card .emp-table th:nth-child(7) { width: 9%; }  /* Action */
+.user-index-card .emp-table th:nth-child(1),
+.emp-index-card .emp-table th:nth-child(1) { width: 13%; } /* ID */
+.user-index-card .emp-table th:nth-child(2),
+.emp-index-card .emp-table th:nth-child(2) { width: 22%; } /* User / Employee */
+.user-index-card .emp-table th:nth-child(3),
+.emp-index-card .emp-table th:nth-child(3) { width: 14%; } /* Role / Job */
+.user-index-card .emp-table th:nth-child(4),
+.emp-index-card .emp-table th:nth-child(4) { width: 20%; } /* Email / Assigned */
+.user-index-card .emp-table th:nth-child(5),
+.emp-index-card .emp-table th:nth-child(5) { width: 12%; } /* Date Added */
+.user-index-card .emp-table th:nth-child(6),
+.emp-index-card .emp-table th:nth-child(6) { width: 10%; } /* Status */
+.user-index-card .emp-table th:nth-child(7),
+.emp-index-card .emp-table th:nth-child(7) { width: 9%; }  /* Action */
 
-.user-index-card .search-wrap-wide input {
+.user-index-card .search-wrap-wide input,
+.emp-index-card .search-wrap-wide input {
     width: 42cqw;
 }
 
