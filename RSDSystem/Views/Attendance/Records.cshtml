@@ -53,9 +53,9 @@
                     <input type="text" id="rowSearch" placeholder="Search User" />
                 </div>
                 <div class="dropdown">
-                    <button type="button" id="attFilterBtn" class="btn-outline-blue dropdown-toggle"
+                    <button type="button" id="attFilterBtn" class="btn-outline-blue dropdown-toggle filter-label-btn"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                        Filter
+                        All
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><button type="button" class="dropdown-item" data-status="all">All</button></li>
@@ -225,11 +225,8 @@
             el.addEventListener('click', function (e) {
                 e.preventDefault();
                 statusFilter = this.dataset.status || 'all';
-                if (filterBtn) {
-                    filterBtn.innerHTML = statusFilter === 'all'
-                        ? '<i class="bi bi-funnel"></i> Filter'
-                        : '<i class="bi bi-funnel"></i> ' + statusFilter;
-                }
+                if (filterBtn)
+                    filterBtn.textContent = this.textContent.trim() || (statusFilter === 'all' ? 'All' : statusFilter);
                 currentPage = 1;
                 if (selectedPeriod()) loadRecords();
             });

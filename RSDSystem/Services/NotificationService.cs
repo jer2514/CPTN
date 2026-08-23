@@ -97,50 +97,59 @@ namespace RSDSystem.Services
             await NotifyPayrollAlertsAsync(project, cancellationToken);
         }
 
+        public async Task NotifyPredictionReadyAsync(
+            PayrollPredictionPage page, CancellationToken cancellationToken = default)
+        {
+            var current = page.Rows.FirstOrDefault(r => !r.IsPrevious);
+            if (current == null)
+                return;
+
+            var name = string.IsNullOrWhiteSpace(page.ProjectName) || page.ProjectName == "—"
+                ? "the project"
+                : page.ProjectName.Trim();
+
+            await NotifyAdminsAsync(
+                NotificationKinds.PayrollPredictionAvailable,
+                "Payroll prediction is ready",
+                $"A payroll prediction for {name} is ready. Open Payroll Prediction to review the next-month estimate.",
+                page.ProjectId,
+                null,
+                "/Payroll/Prediction",
+                cancellationToken);
+
+            if (current.ExceedsBudget)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollAnomalyBudget,
+                    "Next month may exceed budget",
+                    $"The predicted amount for {current.PredictionLabel} on {name} is {Peso(current.PredictedPayroll)}, which exceeds the allocated budget of {Peso(current.AllocatedBudget)}. Open Payroll Prediction to review.",
+                    page.ProjectId,
+                    null,
+                    "/Payroll/Prediction",
+                    cancellationToken);
+            }
+
+            if (current.UnusualChange)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollAnomalyPattern,
+                    "Unusual payroll change",
+                    $"Payroll for {name} jumped compared with recent months. Open Payroll Prediction to review the change before approving.",
+                    page.ProjectId,
+                    null,
+                    "/Payroll/Prediction",
+                    cancellationToken);
+            }
+        }
+
         public async Task NotifyPayrollAlertsAsync(Project project, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
             try
             {
                 var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: cancellationToken);
-                var current = page.Error == null
-                    ? page.Rows.FirstOrDefault(r => !r.IsPrevious) ?? page.Rows.FirstOrDefault()
-                    : null;
-                if (current != null)
-                {
-                    await NotifyAdminsAsync(
-                        NotificationKinds.PayrollPredictionAvailable,
-                        "Payroll prediction is ready",
-                        $"A payroll prediction for {name} is ready. Open Payroll Prediction to review the next-month estimate.",
-                        project.ProjectId,
-                        null,
-                        "/Payroll/Prediction",
-                        cancellationToken);
-
-                    if (current.ExceedsBudget)
-                    {
-                        await NotifyAdminsAsync(
-                            NotificationKinds.PayrollAnomalyBudget,
-                            "Next month may exceed budget",
-                            $"The predicted amount for {current.PredictionLabel} on {name} is {Peso(current.PredictedPayroll)}, which exceeds the allocated budget of {Peso(current.AllocatedBudget)}. Open Payroll Prediction to review.",
-                            project.ProjectId,
-                            null,
-                            "/Payroll/Prediction",
-                            cancellationToken);
-                    }
-
-                    if (current.UnusualChange)
-                    {
-                        await NotifyAdminsAsync(
-                            NotificationKinds.PayrollAnomalyPattern,
-                            "Unusual payroll change",
-                            $"Payroll for {name} jumped compared with recent months. Open Payroll Prediction to review the change before approving.",
-                            project.ProjectId,
-                            null,
-                            "/Payroll/Prediction",
-                            cancellationToken);
-                    }
-                }
+                if (page.Error == null)
+                    await NotifyPredictionReadyAsync(page, cancellationToken);
             }
             catch
             {

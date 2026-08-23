@@ -3,6 +3,9 @@
 @{
     ViewData["Title"] = "User Management";
     var sortBy = ViewBag.SortBy as string;
+    var filterLabel = sortBy == "lastname" ? "Last Name"
+        : sortBy == "status" ? "Status"
+        : "All";
 }
 
 
@@ -22,9 +25,9 @@
                 <input type="hidden" name="sortBy" value="@sortBy" />
             </form>
             <div class="dropdown">
-                <button class="btn-outline-blue dropdown-toggle"
+                <button class="btn-outline-blue dropdown-toggle filter-label-btn"
                         data-bs-toggle="dropdown" aria-expanded="false">
-                    Filter
+                    @filterLabel
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     <li>
