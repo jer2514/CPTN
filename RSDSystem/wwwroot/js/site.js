@@ -1,5 +1,30 @@
-﻿// Optional shared page scripts. Filter-button labels live in each list view on this branch.
-// Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
-// This file currently has no functions; page UI lives in form-validation.js, notifications.js,
-// payroll-slip.js, project-suggest.js, and toasts.js.
+﻿(function () {
+    function itemLabel(item) {
+        return (item.getAttribute('data-filter-label') || item.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    window.setFilterButtonLabel = function (btnOrItem, label) {
+        var btn = btnOrItem && btnOrItem.classList && btnOrItem.classList.contains('filter-label-btn')
+            ? btnOrItem
+            : (btnOrItem && btnOrItem.closest
+                ? (btnOrItem.closest('.dropdown') || document).querySelector('.filter-label-btn')
+                : document.querySelector('.filter-label-btn'));
+        if (btn)
+            btn.textContent = (label || '').replace(/\s+/g, ' ').trim() || 'Filter';
+    };
+
+    document.addEventListener('click', function (e) {
+        var item = e.target.closest('.filter-menu .dropdown-item');
+        if (!item)
+            return;
+        var label = itemLabel(item);
+        if (!label)
+            return;
+        var dropdown = item.closest('.dropdown');
+        var btn = dropdown && dropdown.querySelector('.filter-label-btn');
+        if (btn)
+            btn.textContent = label;
+    });
+})();

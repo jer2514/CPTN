@@ -15,20 +15,25 @@ namespace RSDSystem.Controllers
     /// </summary>
     public class AttendanceController : Controller
     {
+        private const string FinishedAttendanceMessage =
+            "Finished projects cannot be opened in Attendance Records.";
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };
 
         private readonly PayrollDbContext _db;
         private readonly AttendanceImportService _imports;
         private readonly NotificationService _notifications;
+        private readonly ActivityLogService _logs;
 
-        /// <summary>
-        /// Receives the database, import service, and notifications used after a successful file import.
-        /// </summary>
-        public AttendanceController(PayrollDbContext db, AttendanceImportService imports, NotificationService notifications)
+        public AttendanceController(
+            PayrollDbContext db,
+            AttendanceImportService imports,
+            NotificationService notifications,
+            ActivityLogService logs)
         {
             _db = db;
             _imports = imports;
             _notifications = notifications;
+            _logs = logs;
         }
 
         /// <summary>
@@ -155,12 +160,23 @@ namespace RSDSystem.Controllers
                 if (importedProject != null)
                     await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
 
+                await _logs.LogAsync(
+                    ActivityTypes.ImportAttendance,
+                    ActivityModules.Attendance,
+                    $"Imported {result.RowCount} attendance row(s) for {result.ProjectName}.",
+                    result.ProjectId,
+                    result.ImportId);
+
+                var message = result.ReplacedPrevious
+                    ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
+                    : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
+                if (result.SkippedLockedCount > 0)
+                    message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+
                 return Json(new
                 {
                     success = true,
-                    message = result.ReplacedPrevious
-                        ? $"Replaced previous attendance for these dates. Imported {result.RowCount} row(s) for {result.ProjectName}."
-                        : $"Imported {result.RowCount} row(s) for {result.ProjectName}.",
+                    message,
                     result.ImportId,
                     result.ProjectId,
                     result.RowCount,
@@ -185,15 +201,15 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPeriods(int projectId)
         {
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var periods = await _imports.ListPeriodsAsync(projectId, HttpContext.RequestAborted);
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periods = periods.Select(p => new
                 {
                     key = p.Key,
@@ -215,9 +231,9 @@ namespace RSDSystem.Controllers
             int projectId, string? search, string? status, int page = 1,
             string? periodStart = null, string? periodEnd = null)
         {
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
@@ -229,19 +245,32 @@ namespace RSDSystem.Controllers
                 .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n));
 
             var recordIds = rows.Select(r => r.AttendanceRecordId).ToList();
-            var pendingIds = recordIds.Count == 0
-                ? new HashSet<int>()
-                : (await _db.AttendanceCorrectionRequests.AsNoTracking()
+            var pendingIds = new HashSet<int>();
+            var approvedIds = new HashSet<int>();
+            var closedPayrolls = await PayrollAttendanceLock.LoadClosedAsync(
+                _db, projectId, HttpContext.RequestAborted);
+            if (recordIds.Count > 0)
+            {
+                var requests = await _db.AttendanceCorrectionRequests.AsNoTracking()
                     .Where(c => recordIds.Contains(c.AttendanceRecordId)
-                        && c.Status == CorrectionRequestStatuses.Pending)
+                        && (c.Status == CorrectionRequestStatuses.Pending
+                            || c.Status == CorrectionRequestStatuses.Approved))
+                    .Select(c => new { c.AttendanceRecordId, c.Status })
+                    .ToListAsync(HttpContext.RequestAborted);
+                pendingIds = requests
+                    .Where(c => c.Status == CorrectionRequestStatuses.Pending)
                     .Select(c => c.AttendanceRecordId)
-                    .ToListAsync(HttpContext.RequestAborted))
                     .ToHashSet();
+                approvedIds = requests
+                    .Where(c => c.Status == CorrectionRequestStatuses.Approved)
+                    .Select(c => c.AttendanceRecordId)
+                    .ToHashSet();
+            }
 
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periodLabel = start.HasValue && end.HasValue
                     ? AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end)
                     : null,
@@ -274,7 +303,10 @@ namespace RSDSystem.Controllers
                     Status = r.Status,
                     Matched = r.Matched,
                     Note = r.Matched ? null : "No matching employee on this project."
-                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt, pendingIds.Contains(r.AttendanceRecordId)))
+                }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt,
+                    pendingIds.Contains(r.AttendanceRecordId),
+                    approvedIds.Contains(r.AttendanceRecordId),
+                    PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate)))
             });
         }
 
@@ -291,9 +323,9 @@ namespace RSDSystem.Controllers
             if (!IsAdmin)
                 return Json(new { success = false, message = "Attendance summary is available to admin only." });
 
-            var project = await _db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.ProjectId == projectId);
-            if (project == null)
-                return Json(new { success = false, message = "Project not found." });
+            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
 
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
@@ -307,7 +339,7 @@ namespace RSDSystem.Controllers
             return Json(new
             {
                 success = true,
-                projectName = project.ProjectName,
+                projectName = project!.ProjectName,
                 periodLabel = AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end),
                 importedBy = summary.ImportedBy,
                 total = summary.Total,
@@ -353,6 +385,10 @@ namespace RSDSystem.Controllers
             if (!IsAdmin)
                 return Json(new { success = false, message = "Only admin can delete imported attendance." });
 
+            var (_, blocked) = await RequireOngoingProjectAsync(projectId);
+            if (blocked != null)
+                return blocked;
+
             var start = ParseIsoDate(periodStart);
             var end = ParseIsoDate(periodEnd);
             var (deleted, error) = await _imports.DeletePeriodAsync(
@@ -392,7 +428,7 @@ namespace RSDSystem.Controllers
         /// <returns>JSON success after times are saved, or an error explaining why edit is not allowed.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateRecord(
+        public IActionResult UpdateRecord(
             int recordId,
             string? timeIn1,
             string? timeOut1,
@@ -402,36 +438,11 @@ namespace RSDSystem.Controllers
             string? overtimeOut,
             string? status)
         {
-            if (IsAdmin)
+            return Json(new
             {
-                return Json(new
-                {
-                    success = false,
-                    message = "Attendance records are view-only for admin. Approve staff correction requests from Notifications."
-                });
-            }
-
-            var record = await _db.AttendanceRecords.AsNoTracking()
-                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId);
-            if (record == null)
-                return Json(new { success = false, message = "Attendance row not found." });
-
-            if (record.Status == AttendanceStatuses.Complete)
-            {
-                return Json(new
-                {
-                    success = false,
-                    message = "Complete attendance needs an admin-reviewed correction request."
-                });
-            }
-
-            var error = await _imports.UpdateRecordAsync(
-                recordId, timeIn1, timeOut1, timeIn2, timeOut2, overtimeIn, overtimeOut, status,
-                HttpContext.RequestAborted);
-            if (error != null)
-                return Json(new { success = false, message = error });
-
-            return Json(new { success = true, message = "Attendance row updated." });
+                success = false,
+                message = "Attendance changes must be submitted as a correction request."
+            });
         }
 
         /// <summary>
@@ -470,9 +481,33 @@ namespace RSDSystem.Controllers
             if (record == null)
                 return Json(new { success = false, message = "Attendance row not found." });
 
+            var (_, blocked) = await RequireOngoingProjectAsync(record.ProjectId);
+            if (blocked != null)
+                return blocked;
+
+            if (await PayrollAttendanceLock.IsLockedAsync(
+                    _db, record.ProjectId, record.EmployeeId, record.WorkDate, HttpContext.RequestAborted))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Payroll for this employee is already approved. Attendance cannot be edited."
+                });
+            }
+
+            var alreadyApproved = await _db.AttendanceCorrectionRequests
+                .AnyAsync(c => c.AttendanceRecordId == recordId
+                    && c.Status == CorrectionRequestStatuses.Approved);
+            if (alreadyApproved)
+                return Json(new { success = false, message = "This attendance row was already approved and cannot be edited again." });
+
             var pending = await _db.AttendanceCorrectionRequests
-                .FirstOrDefaultAsync(c => c.AttendanceRecordId == recordId
-                    && c.Status == CorrectionRequestStatuses.Pending);
+                .Where(c => c.AttendanceRecordId == recordId
+                    && (c.Status == CorrectionRequestStatuses.Pending
+                        || c.Status == CorrectionRequestStatuses.Returned))
+                .OrderByDescending(c => c.CreatedAt)
+                .FirstOrDefaultAsync();
+            var resubmitted = pending != null && pending.Status == CorrectionRequestStatuses.Returned;
             if (pending == null)
             {
                 pending = new AttendanceCorrectionRequest
@@ -480,7 +515,7 @@ namespace RSDSystem.Controllers
                     AttendanceRecordId = record.AttendanceRecordId,
                     ProjectId = record.ProjectId,
                     EmployeeId = record.EmployeeId,
-                    CreatedAt = DateTime.Now
+                    CreatedAt = PhilippinesTime.Now
                 };
                 _db.AttendanceCorrectionRequests.Add(pending);
             }
@@ -509,9 +544,23 @@ namespace RSDSystem.Controllers
                 pending.WorkDate,
                 record.ProjectId,
                 pending.AttendanceCorrectionRequestId,
+                resubmitted,
                 HttpContext.RequestAborted);
 
-            return Json(new { success = true, message = "Correction request sent to admin." });
+            await _logs.LogAsync(
+                ActivityTypes.RequestCorrection,
+                ActivityModules.Attendance,
+                $"Requested an attendance correction for {pending.EmployeeName} on {AttendanceDisplay.LongDate(pending.WorkDate)}.",
+                record.ProjectId,
+                pending.AttendanceCorrectionRequestId);
+
+            return Json(new
+            {
+                success = true,
+                message = resubmitted
+                    ? "Correction request resubmitted to admin."
+                    : "Correction request sent to admin."
+            });
         }
 
         /// <summary>
@@ -536,9 +585,17 @@ namespace RSDSystem.Controllers
                 .ToListAsync();
         }
 
-        /// <summary>
-        /// Staff FullName used to scope Preview/Import to assigned projects. Admin returns null (all projects).
-        /// </summary>
+        private async Task<(Project? Project, IActionResult? Error)> RequireOngoingProjectAsync(int projectId)
+        {
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId);
+            if (project == null)
+                return (null, Json(new { success = false, message = "Project not found." }));
+            if (ProjectStatusOptions.IsFinished(project.Status))
+                return (null, Json(new { success = false, message = FinishedAttendanceMessage }));
+            return (project, null);
+        }
+
         private string? StaffScope()
         {
             var role = HttpContext.Session.GetString("Role");
@@ -590,11 +647,14 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        /// <summary>
-        /// Shape one attendance row for Preview and GetRecords JSON.
-        /// Recomputes status with AttendanceRules so Complete rows get Request Edit instead of Edit.
-        /// </summary>
-        private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
+        private static object ToRowJson(
+            AttendancePreviewRow row,
+            int? recordId = null,
+            string? format = null,
+            DateTime? importedAt = null,
+            bool pendingCorrection = false,
+            bool correctionApproved = false,
+            bool payrollLocked = false)
         {
             var computed = new AttendanceRecord
             {
@@ -608,14 +668,14 @@ namespace RSDSystem.Controllers
             };
             AttendanceRules.Apply(computed);
             var status = AttendanceStatuses.Display(computed.Status);
-            var requestEdit = AttendanceStatuses.CountsAsWorked(status) && status == AttendanceStatuses.Complete;
+            var locked = payrollLocked || correctionApproved;
             string actionLabel;
-            if (pendingCorrection)
+            if (payrollLocked || correctionApproved)
+                actionLabel = "Approved";
+            else if (pendingCorrection)
                 actionLabel = "Pending Review";
-            else if (requestEdit)
-                actionLabel = "Request Edit";
             else
-                actionLabel = "Edit";
+                actionLabel = "Request Edit";
 
             return new
             {
@@ -644,10 +704,12 @@ namespace RSDSystem.Controllers
                 row.Matched,
                 row.Note,
                 format,
-                importedAt = importedAt?.ToString("MMM dd, yyyy h:mm tt", AttendanceDisplay.English),
+                importedAt = importedAt.HasValue ? PhilippinesTime.FormatDateTime(importedAt.Value) : null,
                 actionLabel,
                 pendingCorrection,
-                requestEdit
+                payrollLocked,
+                requestEdit = !locked,
+                locked
             };
         }
     }

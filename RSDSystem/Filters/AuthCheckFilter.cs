@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
+using RSDSystem.Models;
 
 namespace RSDSystem.Filters
 {
@@ -21,10 +23,13 @@ namespace RSDSystem.Filters
         // Controllers reachable without being logged in
         private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
 
-        /// <summary>
-        /// Runs before every MVC action. Input is the current request (controller name + session UserId/Role).
-        /// Output is either continue, HTTP 401 JSON, redirect to Login, or bounce PayrollStaff off Admin-only controllers.
-        /// </summary>
+        private readonly PayrollDbContext _db;
+
+        public AuthCheckFilter(PayrollDbContext db)
+        {
+            _db = db;
+        }
+
         public void OnActionExecuting(ActionExecutingContext context)
         {
             var controllerName = context.RouteData.Values["controller"]?.ToString();
@@ -39,24 +44,24 @@ namespace RSDSystem.Filters
             // Step 2: everyone else needs a logged-in session; JSON callers get 401 instead of an HTML redirect.
             if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(role))
             {
-                // Fetch/XHR endpoints must not redirect to the HTML login page.
-            if (WantsJson(context))
-                {
-                    context.Result = new JsonResult(new
-                    {
-                        success = false,
-                        message = "Your session expired. Refresh the page and sign in again."
-                    })
-                    { StatusCode = 401 };
-                    return;
-                }
-
-                context.Result = new RedirectToActionResult("Login", "Account", null);
+                Reject(context, "Your session expired. Refresh the page and sign in again.");
                 return;
             }
 
-            // Step 3: Keep PayrollStaff out of Admin-only areas (Home, Users, Employees, Projects, Reports).
-            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report" };
+            if (int.TryParse(userId, out var id))
+            {
+                var active = _db.Users.AsNoTracking()
+                    .Any(u => u.UserId == id && u.IsActive);
+                if (!active)
+                {
+                    context.HttpContext.Session.Clear();
+                    Reject(context, "This account is inactive and cannot log in.", inactive: true);
+                    return;
+                }
+            }
+
+            // Keep PayrollStaff out of Admin-only areas
+            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll", "ActivityLog" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
                 context.Result = new RedirectToActionResult("Index", "PayrollStaff", null);
@@ -68,10 +73,22 @@ namespace RSDSystem.Filters
         /// </summary>
         public void OnActionExecuted(ActionExecutedContext context) { }
 
-        /// <summary>
-        /// True when the request should receive JSON (Accept header or known AJAX actions for attendance import,
-        /// payroll prediction, notifications, and reports). Used so an expired session returns 401 instead of the login HTML page.
-        /// </summary>
+        private static void Reject(ActionExecutingContext context, string message, bool inactive = false)
+        {
+            if (WantsJson(context))
+            {
+                context.Result = new JsonResult(new { success = false, message })
+                {
+                    StatusCode = 401
+                };
+                return;
+            }
+
+            context.Result = inactive
+                ? new RedirectToActionResult("Login", "Account", new { inactive = 1 })
+                : new RedirectToActionResult("Login", "Account", null);
+        }
+
         private static bool WantsJson(ActionExecutingContext context)
         {
             var request = context.HttpContext.Request;
@@ -106,7 +123,8 @@ namespace RSDSystem.Filters
                         || string.Equals(action, "ApproveCorrection", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "ReturnCorrection", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "GetTask", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(action, "ApproveTask", StringComparison.OrdinalIgnoreCase)))
+                        || string.Equals(action, "ApproveTask", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "ReturnTask", StringComparison.OrdinalIgnoreCase)))
                 || (string.Equals(controller, "Report", StringComparison.OrdinalIgnoreCase)
                     && (string.Equals(action, "Periods", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(action, "Generate", StringComparison.OrdinalIgnoreCase)));

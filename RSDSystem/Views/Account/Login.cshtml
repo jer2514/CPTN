@@ -9,58 +9,58 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/login.css" />
+    <link rel="stylesheet" href="~/css/login.css?v=5" />
 }
 
 <div class="login-page">
-    <div class="login-card">
+    <div class="login-shell">
+        <aside class="login-brand">
+            <img src="~/Uploads/Images/RSDLogoWhite.png" alt="RSD Construction Services" class="login-logo" />
+            <h1 class="login-brand-title">RSD Payroll System</h1>
+            <p class="login-brand-copy">Attendance, payroll, and project records for the construction team.</p>
+        </aside>
 
-        <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
-
-            @Html.AntiForgeryToken()
-
-            <div class="logo-wrap">
-                <img src="~/Uploads/Images/RSDLogo.png" alt="RSD Logo" class="login-logo" />
+        <section class="login-panel">
+            <div class="login-panel-head">
+                <h2>Sign in</h2>
+                <p>Enter your username and password to continue.</p>
             </div>
 
-            @if (!string.IsNullOrEmpty(ViewBag.Error))
-            {
-                <div class="alert alert-danger" role="alert" style="
-                            background:#fde8e8;
-                            color:#c0392b;
-                            border:1.5px solid #fecaca;
-                            border-radius:8px;
-                            padding:10px 16px;
-                            font-size:13px;
-                            margin-bottom:16px;">
-                    @ViewBag.Error
+            <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
+                @Html.AntiForgeryToken()
+
+                @if (!string.IsNullOrEmpty(ViewBag.Error))
+                {
+                    <div class="login-alert" role="alert">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        <span>@ViewBag.Error</span>
+                    </div>
+                }
+
+                <div class="form-group">
+                    <label for="Username" class="form-label">Username</label>
+                    <div class="field-wrap">
+                        <i class="bi bi-person field-icon"></i>
+                        <input id="Username" name="Username" type="text" class="form-ctrl" value="" required autocomplete="username" />
+                    </div>
                 </div>
-            }
 
-            <div class="form-group">
-                <label for="Username" class="form-label">Username</label>
-                <input id="Username" name="Username" type="text" class="form-ctrl" value="" required />
-            </div>
-
-            <div class="form-group">
-                <label for="Password" class="form-label">Password</label>
-                <div class="password-wrapper">
-                    <input id="Password" name="Password" type="password" class="form-ctrl" required />
-                    <button type="button" class="pw-toggle" aria-label="Toggle password visibility">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
+                <div class="form-group">
+                    <label for="Password" class="form-label">Password</label>
+                    <div class="field-wrap password-wrapper">
+                        <i class="bi bi-lock field-icon"></i>
+                        <input id="Password" name="Password" type="password" class="form-ctrl" required autocomplete="current-password" />
+                        <button type="button" class="pw-toggle" aria-label="Show password">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
 
-            <div class="form-group mt-1">
-                <button type="submit" class="btn-primary-blue-block">Login</button>
-            </div>
-        </form>
+                <button type="submit" class="btn-primary-blue-block">Sign in</button>
+            </form>
+        </section>
     </div>
 </div>
 
@@ -74,9 +74,13 @@
             const toggle = document.querySelector('.pw-toggle');
             if (toggle && pwInput) {
                 toggle.addEventListener('click', function () {
-                    const type = pwInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                    pwInput.setAttribute('type', type);
-                    toggle.classList.toggle('visible', type === 'text');
+                    const hidden = pwInput.getAttribute('type') === 'password';
+                    pwInput.setAttribute('type', hidden ? 'text' : 'password');
+                    toggle.classList.toggle('visible', hidden);
+                    toggle.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+                    toggle.innerHTML = hidden
+                        ? '<i class="bi bi-eye-slash"></i>'
+                        : '<i class="bi bi-eye"></i>';
                 });
             }
         })();

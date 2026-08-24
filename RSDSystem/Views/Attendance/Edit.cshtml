@@ -115,6 +115,8 @@
                             </td>
                             <td class="att-quick-cell">
                                 <button type="button" class="att-quick-btn" data-fill="standard">8–5</button>
+                                <button type="button" class="att-quick-btn" data-fill="morning">8–12</button>
+                                <button type="button" class="att-quick-btn" data-fill="afternoon">1–5</button>
                                 <button type="button" class="att-quick-btn" data-fill="copy">Copy</button>
                                 <button type="button" class="att-quick-btn" data-fill="clear">Clear</button>
                             </td>
@@ -234,6 +236,16 @@
             if (btn.dataset.fill === 'standard') {
                 const values = ['08:00', '12:00', '13:00', '17:00', '', ''];
                 inputs.forEach((input, i) => input.value = values[i]);
+            } else if (btn.dataset.fill === 'morning') {
+                inputs[0].value = '08:00';
+                inputs[1].value = '12:00';
+                inputs[2].value = '';
+                inputs[3].value = '';
+            } else if (btn.dataset.fill === 'afternoon') {
+                inputs[0].value = '';
+                inputs[1].value = '';
+                inputs[2].value = '13:00';
+                inputs[3].value = '17:00';
             } else if (btn.dataset.fill === 'clear') {
                 inputs.forEach(input => input.value = '');
             } else if (btn.dataset.fill === 'copy') {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
@@ -12,13 +13,12 @@ namespace RSDSystem.Controllers
     public class ProjectController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly NotificationService _notifications;
 
-        /// <summary>
-        /// Receives the payroll database used for project CRUD and employee assignment.
-        /// </summary>
-        public ProjectController(PayrollDbContext db)
+        public ProjectController(PayrollDbContext db, NotificationService notifications)
         {
             _db = db;
+            _notifications = notifications;
         }
 
         /// <summary>
@@ -36,13 +36,10 @@ namespace RSDSystem.Controllers
                                               .ToList();
         }
 
-        /// <summary>
-        /// GET /Project. Admin project list. Search matches name, location, or type.
-        /// Status filter uses ProjectStatusOptions (On Going, Finished, and others). Add Project opens Create.
-        /// </summary>
-        /// <returns>The project list view for the chosen status.</returns>
-        public async Task<IActionResult> Index(string? search, string? status)
+        // GET /Project
+        public async Task<IActionResult> Index(string? search, string? status, int page = 1)
         {
+            const int pageSize = 24;
             var filter = ProjectStatusOptions.Normalize(status);
             var query = _db.Projects.AsNoTracking().WithStatus(filter);
 
@@ -55,11 +52,18 @@ namespace RSDSystem.Controllers
                     (p.TypeOfService != null && p.TypeOfService.Contains(s)));
             }
 
+            query = query.OrderBy(p => p.ProjectName);
+            var totalCount = await query.CountAsync();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
+
             ViewBag.Search = search;
             ViewBag.Status = filter;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
             ViewBag.PageTitle = "Projects";
 
-            return View(await query.OrderBy(p => p.ProjectName).ToListAsync());
+            return View(await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync());
         }
 
         /// <summary>
@@ -74,17 +78,16 @@ namespace RSDSystem.Controllers
 
             if (project == null) return NotFound();
 
-            var employees = await _db.Employees
-                                     .Where(e => e.ProjectId == id)
-                                     .ToListAsync();
+            var employees = await LoadProjectEmployeesAsync(id, ProjectStatusOptions.IsFinished(project.Status));
 
             var unassignedEmployees = await _db.Employees
-                                     .Where(e => e.ProjectId == null && e.IsActive)
+                                     .Where(e => e.ProjectId == null)
                                      .OrderBy(e => e.FirstName)
                                      .ToListAsync();
 
             ViewBag.Employees = employees;
             ViewBag.UnassignedEmployees = unassignedEmployees;
+            ViewBag.EmployeesReadOnly = ProjectStatusOptions.IsFinished(project.Status);
             ViewBag.PageTitle = "View Project";
             return View(project);
         }
@@ -144,6 +147,7 @@ namespace RSDSystem.Controllers
 
             _db.Projects.Add(project);
             await _db.SaveChangesAsync();
+            await _notifications.NotifyStaffAssignedAsync(project, HttpContext.RequestAborted);
             TempData["Success"] = "Project added successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -159,6 +163,11 @@ namespace RSDSystem.Controllers
                                    .FirstOrDefaultAsync(p => p.ProjectId == id);
 
             if (project == null) return NotFound();
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot be edited.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
 
             var employees = await _db.Employees
                                      .Where(e => e.ProjectId == id)
@@ -202,6 +211,15 @@ namespace RSDSystem.Controllers
                                     .FirstOrDefaultAsync(p => p.ProjectId == project.ProjectId);
 
             if (existing == null) return NotFound();
+            if (ProjectStatusOptions.IsFinished(existing.Status))
+            {
+                TempData["Error"] = "Finished projects cannot be edited.";
+                return RedirectToAction(nameof(Details), new { id = existing.ProjectId });
+            }
+
+            var previousStaff = existing.AssignedPayrollStaff;
+            var becomingFinished = ProjectStatusOptions.IsFinished(project.Status)
+                && !ProjectStatusOptions.IsFinished(existing.Status);
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
             existing.ProjectName = ti.ToTitleCase((project.ProjectName ?? string.Empty).Trim().ToLower());
@@ -231,8 +249,17 @@ namespace RSDSystem.Controllers
                 }
             }
 
+            if (becomingFinished)
+                await InactivateAssignedEmployeesAsync(existing.ProjectId);
+
             await _db.SaveChangesAsync();
-            TempData["Success"] = "Project updated successfully.";
+
+            if (!string.Equals(previousStaff?.Trim(), existing.AssignedPayrollStaff?.Trim(), StringComparison.OrdinalIgnoreCase))
+                await _notifications.NotifyStaffAssignedAsync(existing, HttpContext.RequestAborted);
+
+            TempData["Success"] = becomingFinished
+                ? "Project marked finished. Assigned employees are now inactive, and the roster is kept for viewing."
+                : "Project updated successfully.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -299,17 +326,10 @@ namespace RSDSystem.Controllers
         /// <returns>A redirect back to the project list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public IActionResult Delete(int id)
         {
-            var project = await _db.Projects
-                                   .Include(p => p.MonthlyBudgets)
-                                   .FirstOrDefaultAsync(p => p.ProjectId == id);
-            if (project != null)
-            {
-                _db.Projects.Remove(project);
-                await _db.SaveChangesAsync();
-            }
-            return RedirectToAction(nameof(Index));
+            TempData["Error"] = "Projects cannot be deleted. Mark the project as Finished instead.";
+            return RedirectToAction(nameof(Details), new { id });
         }
 
         /// <summary>
@@ -325,6 +345,7 @@ namespace RSDSystem.Controllers
             if (emp != null)
             {
                 emp.ProjectId = null;
+                emp.IsActive = false;
                 await _db.SaveChangesAsync();
             }
             return RedirectToAction(nameof(Edit), new { id = projectId });
@@ -340,6 +361,12 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignEmployee(int employeeId, int projectId)
         {
+            var project = await _db.Projects.FindAsync(projectId);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+            if (ProjectStatusOptions.IsFinished(project.Status))
+                return Json(new { success = false, message = "Finished projects cannot have employees assigned." });
+
             var emp = await _db.Employees.FindAsync(employeeId);
             if (emp == null)
                 return Json(new { success = false, message = "Employee not found." });
@@ -389,6 +416,78 @@ namespace RSDSystem.Controllers
                     job = emp.JobClassification
                 }
             });
+        }
+
+        private async Task InactivateAssignedEmployeesAsync(int projectId)
+        {
+            var employees = await _db.Employees
+                .Where(e => e.ProjectId == projectId)
+                .ToListAsync();
+            if (employees.Count == 0)
+                return;
+
+            var existingIds = await _db.ProjectEmployeeHistories
+                .Where(h => h.ProjectId == projectId)
+                .Select(h => h.EmployeeId)
+                .ToListAsync();
+            var known = existingIds.ToHashSet();
+
+            foreach (var emp in employees)
+            {
+                if (!known.Contains(emp.EmployeeId))
+                {
+                    _db.ProjectEmployeeHistories.Add(new ProjectEmployeeHistory
+                    {
+                        ProjectId = projectId,
+                        EmployeeId = emp.EmployeeId,
+                        RecordedAt = DateTime.Now
+                    });
+                    known.Add(emp.EmployeeId);
+                }
+
+                emp.IsActive = false;
+                emp.ProjectId = null;
+            }
+        }
+
+        private async Task<List<Employee>> LoadProjectEmployeesAsync(int projectId, bool finished)
+        {
+            if (!finished)
+            {
+                return await _db.Employees
+                    .Where(e => e.ProjectId == projectId)
+                    .OrderBy(e => e.LastName)
+                    .ThenBy(e => e.FirstName)
+                    .ToListAsync();
+            }
+
+            var historyIds = await _db.ProjectEmployeeHistories
+                .Where(h => h.ProjectId == projectId)
+                .Select(h => h.EmployeeId)
+                .ToListAsync();
+            var assignedIds = await _db.Employees
+                .Where(e => e.ProjectId == projectId)
+                .Select(e => e.EmployeeId)
+                .ToListAsync();
+            var payrollIds = await _db.Payrolls
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => p.EmployeeId)
+                .Distinct()
+                .ToListAsync();
+
+            var ids = historyIds
+                .Concat(assignedIds)
+                .Concat(payrollIds)
+                .Distinct()
+                .ToList();
+            if (ids.Count == 0)
+                return new List<Employee>();
+
+            return await _db.Employees
+                .Where(e => ids.Contains(e.EmployeeId))
+                .OrderBy(e => e.LastName)
+                .ThenBy(e => e.FirstName)
+                .ToListAsync();
         }
     }
 }

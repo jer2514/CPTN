@@ -126,6 +126,11 @@ namespace RSDSystem.Controllers
                 message += $" {result.UnmatchedCount} row(s) did not match an employee.";
             }
 
+            if (result.SkippedLockedCount > 0)
+            {
+                message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+            }
+
             return message;
         }
 

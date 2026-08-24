@@ -49,6 +49,9 @@ namespace RSDSystem.Models
 
         /// <summary>OT hours from attendance; multiplied by RatePerHour for OvertimePay.</summary>
         [Column(TypeName = "decimal(18,2)")]
+        public decimal RegularHours { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
         public decimal OvertimeHours { get; set; }
 
         /// <summary>Days marked Absent in the same period (does not add to pay).</summary>
@@ -82,8 +85,9 @@ namespace RSDSystem.Models
         [MaxLength(150)]
         public string? GeneratedBy { get; set; }
 
-        /// <summary>When the slip was first created (or last regenerated).</summary>
-        public DateTime GeneratedDate { get; set; } = DateTime.Now;
+        public DateTime GeneratedDate { get; set; } = Helpers.PhilippinesTime.Now;
+
+        public DateTime? SubmittedAt { get; set; }
 
         /// <summary>Admin Return reason; shown to staff on Correction slips so they know what to fix.</summary>
         [MaxLength(500)]
@@ -105,7 +109,13 @@ namespace RSDSystem.Models
         /// <summary>Admin approved; locked for staff and counted in View Payroll / prediction.</summary>
         public const string Approved = "Approved";
 
-        /// <summary>Sort key so pending-correction slips appear first on staff lists.</summary>
+        public static bool IsApproved(string? status) =>
+            string.Equals((status ?? "").Trim(), Approved, StringComparison.OrdinalIgnoreCase);
+
+        public static bool IsSubmitted(string? status) =>
+            string.Equals((status ?? "").Trim(), Submitted, StringComparison.OrdinalIgnoreCase);
+
+        // Correction first, then Draft, then Submitted, then anything else
         public static int SortRank(string status) => status switch
         {
             Correction => 0,

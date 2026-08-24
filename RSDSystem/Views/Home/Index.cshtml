@@ -84,7 +84,7 @@
                         <tr>
                             <td>@p.StaffName</td>
                             <td>@p.ProjectName</td>
-                            <td>@p.Date.ToString("MM-dd-yy")</td>
+                            <td>@PhilippinesTime.FormatDateTime(p.Date)</td>
                             <td>
                                 <a href="@Url.Action("ReviewProject", "Payroll", new { projectId = p.ProjectId })"
                                    class="pill-btn pill-view">Review</a>
@@ -138,10 +138,6 @@
                                                       '@s.EndDate.ToString("yyyy-MM-dd")')">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
-                                <button type="button" class="action-btn action-delete" title="Delete"
-                                        onclick="openDeleteModal(@s.PayrollScheduleId, '@Html.Raw((s.Project?.ProjectName ?? "").Replace("'", "\\'"))')">
-                                    <i class="bi bi-trash-fill"></i>
-                                </button>
                             </div>
                         </td>
                     </tr>
@@ -176,15 +172,15 @@
                     <span class="field-error" data-error-for="ProjectId"></span>
                 </div>
                 <div>
-                    <label class="form-lbl">Type of Project <span class="req-star">*</span></label>
-                    <select name="TypeOfService" id="scheduleTypeSelect" class="form-ctrl"
-                            data-validate="required" data-label="Type of project">
-                        <option value="">Select type</option>
+                    <label class="form-lbl">Type of Project</label>
+                    <select id="scheduleTypeSelect" class="form-ctrl" disabled>
+                        <option value="">Select a project first</option>
                         @foreach (var s in services)
                         {
                             <option value="@s">@s</option>
                         }
                     </select>
+                    <input type="hidden" name="TypeOfService" id="scheduleTypeHidden" value="" />
                     <span class="field-error" data-error-for="TypeOfService"></span>
                 </div>
             </div>
@@ -215,29 +211,6 @@
                 </button>
             </div>
         </form>
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
-    <div class="del-modal">
-        <div class="del-icon-wrap">
-            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
-        </div>
-        <div class="del-title">Are you sure?</div>
-        <div class="del-msg">
-            You are about to permanently delete the schedule for:
-            <strong id="deleteScheduleName"></strong>.
-            This action cannot be undone.
-        </div>
-        <div class="del-actions">
-            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
-            <form id="deleteForm" asp-controller="Payroll" asp-action="DeleteSchedule" method="post">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" id="deleteScheduleId" value="" />
-                <button type="submit" class="del-btn-delete">Delete</button>
-            </form>
-        </div>
     </div>
 </div>
 
@@ -293,8 +266,10 @@
 
         function autoFillProjectType(projectId) {
             const typeSelect = document.getElementById('scheduleTypeSelect');
+            const typeHidden = document.getElementById('scheduleTypeHidden');
             const type = projectTypeMap[projectId];
             typeSelect.value = type ? type : "";
+            typeHidden.value = type ? type : "";
             applyProjectDateBounds(projectId);
         }
 
@@ -305,6 +280,7 @@
             document.getElementById('schedulePayrollScheduleId').value = '';
             document.getElementById('scheduleProjectSelect').value = '';
             document.getElementById('scheduleTypeSelect').value = '';
+            document.getElementById('scheduleTypeHidden').value = '';
             document.getElementById('scheduleStartDate').value = '';
             document.getElementById('scheduleEndDate').value = '';
             applyProjectDateBounds('');
@@ -319,6 +295,7 @@
             document.getElementById('schedulePayrollScheduleId').value = id;
             document.getElementById('scheduleProjectSelect').value = projectId;
             document.getElementById('scheduleTypeSelect').value = typeOfService;
+            document.getElementById('scheduleTypeHidden').value = typeOfService;
             document.getElementById('scheduleStartDate').value = startDate;
             document.getElementById('scheduleEndDate').value = endDate;
             applyProjectDateBounds(String(projectId));
@@ -331,18 +308,8 @@
                 document.getElementById('scheduleOverlay').classList.remove('open');
         }
 
-        function openDeleteModal(id, name) {
-            document.getElementById('deleteScheduleName').textContent = name;
-            document.getElementById('deleteScheduleId').value = id;
-            document.getElementById('deleteOverlay').classList.add('open');
-        }
-        function closeDeleteModal(e) {
-            if (!e || e.target === document.getElementById('deleteOverlay'))
-                document.getElementById('deleteOverlay').classList.remove('open');
-        }
-
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { closeScheduleModal(); closeDeleteModal(); }
+            if (e.key === 'Escape') closeScheduleModal();
         });
     </script>
 }

@@ -48,6 +48,8 @@ namespace RSDSystem.Helpers
 
         /// <summary>Sentence shown under the risk heading on the prediction page and in admin notifications.</summary>
         public string? RiskDetail { get; set; }
+        public string Engine { get; set; } = "local";
+        public string? Model { get; set; }
     }
 
     /// <summary>
@@ -109,7 +111,9 @@ namespace RSDSystem.Helpers
                 UnusualChange = unusual,
                 ChangePercent = changePercent,
                 RiskTitle = riskTitle,
-                RiskDetail = riskDetail
+                RiskDetail = riskDetail,
+                Engine = "local",
+                Model = "linear-trend"
             };
         }
 

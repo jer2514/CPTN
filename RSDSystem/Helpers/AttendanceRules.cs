@@ -46,30 +46,35 @@ namespace RSDSystem.Helpers
         /// </summary>
         public static decimal RegularHours(string? in1, string? out1, string? in2, string? out2)
         {
-            decimal hours = 0;
-            foreach (var (timeIn, timeOut) in new[] { (in1, out1), (in2, out2) })
+            var morningIn = CountedSessionIn(in1, MorningStart);
+            var afternoonIn = CountedSessionIn(in2, AfternoonStart);
+            var hours = 0;
+            foreach (var (timeIn, timeOut) in new[] { (morningIn, out1), (afternoonIn, out2) })
             {
-                hours += OverlapHours(timeIn, timeOut, MorningStart, MorningEnd);
-                hours += OverlapHours(timeIn, timeOut, AfternoonStart, ShiftEnd);
+                hours += CountedWindowHours(timeIn, timeOut, MorningStart, MorningEnd);
+                hours += CountedWindowHours(timeIn, timeOut, AfternoonStart, ShiftEnd);
             }
 
-            return Math.Round(hours, 2);
+            return hours;
         }
 
         /// <summary>
-        /// Overtime hours after 17:00. Prefers dedicated OT in/out punches; otherwise uses any regular punches past shift end.
+        /// In by 8:30 counts from 8:00 (grace). After 8:30 the 8–9 hour is unpaid.
+        /// Later arrivals snap up to the next full hour.
         /// </summary>
+        public static string? CountedMorningIn(string? timeIn) =>
+            CountedSessionIn(timeIn, MorningStart);
+
         public static decimal OvertimeHours(
             string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
         {
             var dayEnd = TimeSpan.FromDays(1);
-            var punchedOt = OverlapHours(overtimeIn, overtimeOut, ShiftEnd, dayEnd);
+            var punchedOt = CountedWindowHours(overtimeIn, overtimeOut, ShiftEnd, dayEnd);
             if (punchedOt > 0)
                 return punchedOt;
 
-            return Math.Round(
-                OverlapHours(in1, out1, ShiftEnd, dayEnd)
-                + OverlapHours(in2, out2, ShiftEnd, dayEnd), 2);
+            return CountedWindowHours(in1, out1, ShiftEnd, dayEnd)
+                + CountedWindowHours(in2, out2, ShiftEnd, dayEnd);
         }
 
         /// <summary>
@@ -156,10 +161,26 @@ namespace RSDSystem.Helpers
             || !string.IsNullOrWhiteSpace(row.OvertimeOut);
 
         /// <summary>
-        /// Hours where a punch pair overlaps a shift window (morning, afternoon, or after 17:00).
-        /// Overnight punch-out is shifted +1 day. Returns 0 if either punch cannot be parsed.
+        /// In within 30 minutes of the session start counts from that hour.
+        /// Later arrivals lose the current hour and start on the next one.
         /// </summary>
-        private static decimal OverlapHours(string? timeIn, string? timeOut, TimeSpan windowStart, TimeSpan windowEnd)
+        private static string? CountedSessionIn(string? timeIn, TimeSpan sessionStart)
+        {
+            if (!AttendanceDisplay.TryParseTime(timeIn, out var firstIn))
+                return timeIn;
+
+            if (firstIn <= sessionStart + LateGrace)
+                return FormatClock(sessionStart);
+
+            var hourStart = TimeSpan.FromHours(Math.Floor(firstIn.TotalHours));
+            if (firstIn == hourStart)
+                return FormatClock(firstIn);
+
+            return FormatClock(hourStart + TimeSpan.FromHours(1));
+        }
+
+        private static int CountedWindowHours(
+            string? timeIn, string? timeOut, TimeSpan windowStart, TimeSpan windowEnd)
         {
             if (!AttendanceDisplay.TryParseTime(timeIn, out var start)
                 || !AttendanceDisplay.TryParseTime(timeOut, out var end))
@@ -168,12 +189,23 @@ namespace RSDSystem.Helpers
             if (end < start)
                 end += TimeSpan.FromDays(1);
 
-            var from = start > windowStart ? start : windowStart;
-            var to = end < windowEnd ? end : windowEnd;
-            if (to <= from)
-                return 0;
+            var paidMinutes = 60 - EarlyGrace.TotalMinutes;
+            var hours = 0;
+            for (var slot = windowStart; slot < windowEnd; slot += TimeSpan.FromHours(1))
+            {
+                var slotEnd = slot + TimeSpan.FromHours(1);
+                var from = start > slot ? start : slot;
+                var to = end < slotEnd ? end : slotEnd;
+                if (to <= from)
+                    continue;
+                if ((to - from).TotalMinutes >= paidMinutes)
+                    hours++;
+            }
 
-            return Math.Round((decimal)(to - from).TotalHours, 2);
+            return hours;
         }
+
+        private static string FormatClock(TimeSpan value) =>
+            DateTime.Today.Add(value).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
     }
 }

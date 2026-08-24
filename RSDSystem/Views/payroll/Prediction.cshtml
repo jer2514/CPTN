@@ -11,7 +11,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="emp-title mb-3">Payroll Prediction</div>
 
     <div class="genpay-controls">
@@ -34,7 +34,7 @@
     </div>
 
     <div id="predictionEmpty" class="text-center text-muted py-5">
-        Select a project and click Load Prediction to forecast the next monthly budget from the previous two months.
+        Select a project and click Load Prediction.
     </div>
 </div>
 
@@ -50,26 +50,26 @@
             <strong id="prMonth">—</strong>
         </div>
         <div class="pred-result-row">
-            <span id="prPrevious1Label">Previous Budget</span>
+            <span id="prPrevious1Label">Previous Payroll</span>
             <strong id="prPrevious1">—</strong>
         </div>
         <div class="pred-result-row">
-            <span id="prPrevious2Label">Previous Budget</span>
+            <span id="prPrevious2Label">Previous Payroll</span>
             <strong id="prPrevious2">—</strong>
         </div>
         <div class="pred-result-row">
-            <span>Predicted Monthly Budget</span>
+            <span>Predicted Payroll</span>
             <strong id="prPredicted">—</strong>
         </div>
-        <div class="pred-result-hint">Predicted from this project’s previous two monthly budgets.</div>
-        <div class="pred-result-row" id="prAllocatedRow" hidden>
+        <div class="pred-result-row" id="prAllocatedRow">
             <span id="prAllocatedLabel">Allocated Budget</span>
             <strong id="prAllocated">—</strong>
         </div>
         <div class="pred-result-row">
-            <span id="prDifferenceLabel">Change from last month</span>
+            <span id="prDifferenceLabel">Budget Difference</span>
             <strong id="prDifference">—</strong>
         </div>
+        <div class="pred-result-hint" id="prHint">Predicted from consecutive generated payroll months: each pair forecasts the next month.</div>
         <div id="prRisk" class="pred-risk" hidden>
             <i class="bi bi-exclamation-triangle-fill"></i>
             <div>
@@ -113,7 +113,8 @@
         });
         projectInput.addEventListener('focus', function () {
             const q = projectInput.value.trim().toLowerCase();
-            renderSuggestions(q ? allProjects.filter(p => p.name.toLowerCase().includes(q)) : allProjects);
+            if (!q) { suggestList.style.display = 'none'; return; }
+            renderSuggestions(allProjects.filter(p => p.name.toLowerCase().includes(q)));
         });
         suggestList.addEventListener('click', function (e) {
             const li = e.target.closest('li[data-id]');
@@ -134,11 +135,12 @@
         function renderRows(page) {
             const list = document.getElementById('predictionList');
             list.innerHTML = (page.rows || []).map((row, index) => `
-                <div class="vp-period-card pred-forecast-card">
+                <div class="vp-period-card pred-forecast-card${row.isPrevious ? ' pred-forecast-previous' : ''}">
                     <div class="pred-forecast-head">
-                        <span>Previous Budget ${row.previousMonth1}</span>
-                        <span>Previous Budget ${row.previousMonth2}</span>
-                        <span>Predicted Budget ${row.predictionMonth}</span>
+                        <span>Previous Payroll (${row.previousMonth1 || '—'})</span>
+                        <span>Previous Payroll (${row.previousMonth2 || '—'})</span>
+                        <span>Predicted Payroll (${row.predictionMonth || '—'})</span>
+                        <span>Allocated Budget (${row.predictionMonth || '—'})</span>
                         <span>Action</span>
                     </div>
                     <div class="pred-forecast-body">
@@ -146,8 +148,10 @@
                         <span>${peso(row.previousAmount2)}</span>
                         <span>
                             ${peso(row.predictedBudget ?? row.predictedPayroll)}
+                            ${row.isPrevious ? '<span class="pred-previous-flag">Previous load</span>' : ''}
                             ${row.exceedsBudget ? '<span class="pred-anomaly-flag">Anomaly</span>' : ''}
                         </span>
+                        <span>${row.hasAllocatedBudget ? peso(row.allocatedBudget) : '—'}</span>
                         <span>
                             <button type="button" class="pill-btn pill-view" data-row-index="${index}">
                                 <i class="bi bi-eye-fill"></i> View
@@ -158,32 +162,34 @@
             `).join('');
         }
 
-        function openResult(row, generatedAt, projectName) {
+        function engineHint(page) {
+            if (page && page.usedPythonApi) {
+                return 'Predicted by the Python payroll model (FastAPI + scikit-learn Linear Regression).';
+            }
+            return 'Predicted from consecutive generated payroll months: each pair forecasts the next month.';
+        }
+
+        function openResult(row, generatedAt, projectName, page) {
             document.getElementById('prProject').textContent = projectName || '—';
             document.getElementById('prMonth').textContent = row.predictionMonth || '—';
             document.getElementById('prPrevious1Label').textContent = row.previousMonth1
-                ? ('Previous Budget ' + row.previousMonth1)
-                : 'Previous Budget';
+                ? ('Previous Payroll ' + row.previousMonth1)
+                : 'Previous Payroll';
             document.getElementById('prPrevious2Label').textContent = row.previousMonth2
-                ? ('Previous Budget ' + row.previousMonth2)
-                : 'Previous Budget';
+                ? ('Previous Payroll ' + row.previousMonth2)
+                : 'Previous Payroll';
             document.getElementById('prPrevious1').textContent = peso(row.previousAmount1);
             document.getElementById('prPrevious2').textContent = peso(row.previousAmount2);
             document.getElementById('prPredicted').textContent = peso(row.predictedBudget ?? row.predictedPayroll);
-            const allocatedRow = document.getElementById('prAllocatedRow');
-            if (row.hasAllocatedBudget) {
-                document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
-                    ? ('Allocated Budget ' + row.predictionMonth)
-                    : 'Allocated Budget';
-                document.getElementById('prAllocated').textContent = peso(row.allocatedBudget);
-                allocatedRow.hidden = false;
-                document.getElementById('prDifferenceLabel').textContent = row.exceedsBudget
-                    ? 'Over allocated budget'
-                    : 'Vs allocated budget';
-            } else {
-                allocatedRow.hidden = true;
-                document.getElementById('prDifferenceLabel').textContent = 'Change from last month';
-            }
+            document.getElementById('prAllocatedLabel').textContent = row.predictionMonth
+                ? ('Allocated Budget (' + row.predictionMonth + ')')
+                : 'Allocated Budget';
+            document.getElementById('prAllocated').textContent = row.hasAllocatedBudget
+                ? peso(row.allocatedBudget)
+                : '—';
+            document.getElementById('prDifferenceLabel').textContent = row.hasAllocatedBudget
+                ? 'Budget Difference'
+                : 'Change from last month';
             document.getElementById('prDifference').textContent = peso(row.budgetDifference);
             const risk = document.getElementById('prRisk');
             if (row.riskTitle) {
@@ -194,7 +200,13 @@
             } else {
                 risk.hidden = true;
             }
-            document.getElementById('prGenerated').textContent = generatedAt || '—';
+            document.getElementById('prGenerated').textContent = row.generatedAt || generatedAt || '—';
+            const hint = document.getElementById('prHint');
+            if (hint) {
+                hint.textContent = row.isPrevious
+                    ? 'Saved from an earlier Load Prediction. Compare it with the current forecast for the same month to see the adjustment.'
+                    : engineHint(page);
+            }
             document.getElementById('predictionOverlay').hidden = false;
         }
 
@@ -206,7 +218,7 @@
             const btn = e.target.closest('[data-row-index]');
             if (!btn || !lastPage) return;
             const row = lastPage.rows[Number(btn.dataset.rowIndex)];
-            if (row) openResult(row, lastPage.generatedAt, lastPage.projectName);
+            if (row) openResult(row, lastPage.generatedAt, lastPage.projectName, lastPage);
         });
         document.getElementById('predictionOverlay').addEventListener('click', function (e) {
             if (e.target.id === 'predictionOverlay') closeResult();
@@ -250,6 +262,7 @@
                 renderRows(data);
                 empty.style.display = 'none';
                 section.style.display = 'block';
+                if (data.warning) showToast(data.warning);
             } catch (err) {
                 empty.textContent = 'Could not load budget prediction.';
             }

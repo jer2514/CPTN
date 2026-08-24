@@ -25,7 +25,7 @@
     </div>
     <div class="payslip-row2">
         <div><span class="payslip-lbl">Job Classification: </span><span class="payslip-val">@(Model.Employee?.JobClassification ?? "—")</span></div>
-        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@((Model.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@EmployeeRates.HourlyFromDaily(Model.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
     </div>
 
     <div class="payslip-section-lbl">
@@ -33,6 +33,7 @@
         <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy", dateCulture) – @Model.PayPeriodEnd.ToString("MMMM dd, yyyy", dateCulture)</span>
     </div>
     <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
+    <div class="payslip-line"><span>Regular Hours:</span><span class="payslip-val">@PayrollComputation.PaidRegularHours(Model).ToString("0.##") hrs</span></div>
     <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours.ToString("0.##") hours</span></div>
     <div class="payslip-line"><span>Absent:</span><span class="payslip-val">@Model.AbsentDays Days</span></div>
 
@@ -43,7 +44,7 @@
     <div class="payslip-line"><span>Cash Advance:</span><span class="payslip-val">₱@Model.CashAdvance.ToString("N2")</span></div>
     <div class="payslip-line payslip-line-strong"><span>Net Pay:</span><span class="payslip-val">₱@Model.NetPay.ToString("N2")</span></div>
 
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+    <div class="payslip-footer">Generated Date: @PhilippinesTime.FormatLongDate(Model.GeneratedDate)</div>
 
     @if (Model.Status == PayrollStatusOptions.Correction && !string.IsNullOrWhiteSpace(Model.CorrectionReason))
     {

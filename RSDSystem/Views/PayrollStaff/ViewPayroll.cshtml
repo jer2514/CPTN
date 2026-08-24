@@ -1,8 +1,5 @@
-﻿@*
-    Staff: PayrollStaffController.ViewPayroll. Read-only payslip for one Draft/Correction/
-    Submitted/Approved row; Edit is offered only while status is Draft or Correction.
-*@
-@model RSDSystem.Models.Payroll
+﻿@model RSDSystem.Models.Payroll
+@using RSDSystem.Helpers
 @{
     ViewData["Title"] = "View Payroll";
     Layout = "_PayrollStaffLayout";
@@ -44,7 +41,7 @@
     </div>
     <div class="payslip-row2">
         <div><span class="payslip-lbl">Job Classification: </span><span class="payslip-val">@Model.Employee?.JobClassification</span></div>
-        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@Model.Employee?.RatePerHour.ToString("N2")</span></div>
+        <div><span class="payslip-lbl">Rate per hour: </span><span class="payslip-val">₱@EmployeeRates.HourlyFromDaily(Model.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
     </div>
 
     <div class="payslip-section-lbl">
@@ -52,6 +49,7 @@
         <span class="payslip-period">Payroll Period: @Model.PayPeriodStart.ToString("MMMM dd, yyyy") - @Model.PayPeriodEnd.ToString("MMMM dd, yyyy")</span>
     </div>
     <div class="payslip-line"><span>Regular Days Worked:</span><span class="payslip-val">@Model.RegularDaysWorked Days</span></div>
+    <div class="payslip-line"><span>Regular Hours:</span><span class="payslip-val">@RSDSystem.Helpers.PayrollComputation.PaidRegularHours(Model).ToString("0.##") hrs</span></div>
     <div class="payslip-line"><span>Overtime:</span><span class="payslip-val">@Model.OvertimeHours hours</span></div>
     <div class="payslip-line"><span>Absent:</span><span class="payslip-val">@Model.AbsentDays Days</span></div>
 
@@ -72,5 +70,5 @@
         </div>
     }
 
-    <div class="payslip-footer">Generated Date: @Model.GeneratedDate.ToString("MMMM dd, yyyy")</div>
+    <div class="payslip-footer">Generated Date: @PhilippinesTime.FormatLongDate(Model.GeneratedDate)</div>
 </div>

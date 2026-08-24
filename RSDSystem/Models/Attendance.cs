@@ -42,8 +42,7 @@ namespace RSDSystem.Models
         [MaxLength(150)]
         public string? ImportedBy { get; set; }
 
-        /// <summary>When ImportFile saved this batch.</summary>
-        public DateTime ImportedAt { get; set; } = DateTime.Now;
+        public DateTime ImportedAt { get; set; } = Helpers.PhilippinesTime.Now;
 
         /// <summary>How many AttendanceRecord rows were created from the file.</summary>
         public int RowCount { get; set; }
@@ -207,9 +206,11 @@ namespace RSDSystem.Models
         public static string Display(string? status) =>
             IsHalfDay(status) ? HalfDay : (status ?? "");
 
-        /// <summary>True when the day should count toward RegularDaysWorked (not Absent).</summary>
+        public static bool CountsAsFullDay(string? status) =>
+            status is Complete or Late or EarlyOff or LateEarlyOff;
+
         public static bool CountsAsWorked(string? status) =>
-            status is Complete or Late or EarlyOff or LateEarlyOff || IsHalfDay(status);
+            CountsAsFullDay(status) || IsHalfDay(status);
 
         /// <summary>True for Late or Late + Early Off; used by the Late filter and Summary chips.</summary>
         public static bool CountsAsLate(string? status) =>

@@ -47,7 +47,7 @@ namespace RSDSystem.Services
                 ProjectId = projectId,
                 RelatedId = relatedId,
                 Url = url,
-                CreatedAt = DateTime.Now
+                CreatedAt = PhilippinesTime.Now
             });
             await _db.SaveChangesAsync(cancellationToken);
         }
@@ -78,76 +78,96 @@ namespace RSDSystem.Services
                 ProjectId = projectId,
                 RelatedId = relatedId,
                 Url = url,
-                CreatedAt = DateTime.Now
+                CreatedAt = PhilippinesTime.Now
             });
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// After staff submit payroll for review: tells admins to open Review Payroll, then runs prediction/budget alerts.
-        /// </summary>
-        public async Task NotifyPayrollSubmittedAsync(Project project, string? submittedBy, CancellationToken cancellationToken = default)
+        public async Task NotifyPayrollSubmittedAsync(
+            Project project, string? submittedBy, bool resubmitted = false,
+            CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
             var staff = PersonName(submittedBy, "Payroll staff");
-            await NotifyAdminsAsync(
-                NotificationKinds.PayrollSubmitted,
-                "Payroll submitted for review",
-                $"{staff} submitted payroll for {name}. Open Review Payroll to approve or return it.",
-                project.ProjectId,
-                null,
-                "/Payroll/ReviewProject?projectId=" + project.ProjectId,
-                cancellationToken);
+            if (resubmitted)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollResubmitted,
+                    "Payroll resubmitted for review",
+                    $"{staff} resubmitted the returned payroll for {name}. Open Review Payroll to approve or return it again.",
+                    project.ProjectId,
+                    null,
+                    "/Payroll/ReviewProject?projectId=" + project.ProjectId,
+                    cancellationToken);
+            }
+            else
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollSubmitted,
+                    "Payroll submitted for review",
+                    $"{staff} submitted payroll for {name}. Open Review Payroll to approve or return it.",
+                    project.ProjectId,
+                    null,
+                    "/Payroll/ReviewProject?projectId=" + project.ProjectId,
+                    cancellationToken);
+            }
 
             await NotifyPayrollAlertsAsync(project, cancellationToken);
         }
 
-        /// <summary>
-        /// Loads next-month prediction for the project and notifies admins if it is ready, over allocated budget, or an unusual jump.
-        /// Also compares this period's NetPay total to Project.PayrollBudget. Prediction failures are swallowed so submit still succeeds.
-        /// </summary>
+        public async Task NotifyPredictionReadyAsync(
+            PayrollPredictionPage page, CancellationToken cancellationToken = default)
+        {
+            var current = page.Rows.FirstOrDefault(r => !r.IsPrevious);
+            if (current == null)
+                return;
+
+            var name = string.IsNullOrWhiteSpace(page.ProjectName) || page.ProjectName == "—"
+                ? "the project"
+                : page.ProjectName.Trim();
+
+            await NotifyAdminsAsync(
+                NotificationKinds.PayrollPredictionAvailable,
+                "Payroll prediction is ready",
+                $"A payroll prediction for {name} is ready. Open Payroll Prediction to review the next-month estimate.",
+                page.ProjectId,
+                null,
+                "/Payroll/Prediction",
+                cancellationToken);
+
+            if (current.ExceedsBudget)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollAnomalyBudget,
+                    "Next month may exceed budget",
+                    $"The predicted amount for {current.PredictionLabel} on {name} is {Peso(current.PredictedPayroll)}, which exceeds the allocated budget of {Peso(current.AllocatedBudget)}. Open Payroll Prediction to review.",
+                    page.ProjectId,
+                    null,
+                    "/Payroll/Prediction",
+                    cancellationToken);
+            }
+
+            if (current.UnusualChange)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.PayrollAnomalyPattern,
+                    "Unusual payroll change",
+                    $"Payroll for {name} jumped compared with recent months. Open Payroll Prediction to review the change before approving.",
+                    page.ProjectId,
+                    null,
+                    "/Payroll/Prediction",
+                    cancellationToken);
+            }
+        }
+
         public async Task NotifyPayrollAlertsAsync(Project project, CancellationToken cancellationToken = default)
         {
             var name = ProjectName(project);
             try
             {
-                var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken);
-                if (page.Rows.Count > 0 && page.Error == null)
-                {
-                    await NotifyAdminsAsync(
-                        NotificationKinds.PayrollPredictionAvailable,
-                        "Payroll prediction is ready",
-                        $"A payroll prediction for {name} is ready. Open Payroll Prediction to review the next-month estimate.",
-                        project.ProjectId,
-                        null,
-                        "/Payroll/Prediction",
-                        cancellationToken);
-
-                    if (page.Rows.Any(r => r.ExceedsBudget))
-                    {
-                        var over = page.Rows.First(r => r.ExceedsBudget);
-                        await NotifyAdminsAsync(
-                            NotificationKinds.PayrollAnomalyBudget,
-                            "Next month may exceed budget",
-                            $"The predicted amount for {over.PredictionLabel} on {name} is {Peso(over.PredictedPayroll)}, which exceeds the allocated budget of {Peso(over.AllocatedBudget)}. Open Payroll Prediction to review.",
-                            project.ProjectId,
-                            null,
-                            "/Payroll/Prediction",
-                            cancellationToken);
-                    }
-
-                    if (page.Rows.Any(r => r.UnusualChange))
-                    {
-                        await NotifyAdminsAsync(
-                            NotificationKinds.PayrollAnomalyPattern,
-                            "Unusual payroll change",
-                            $"Payroll for {name} jumped compared with recent months. Open Payroll Prediction to review the change before approving.",
-                            project.ProjectId,
-                            null,
-                            "/Payroll/Prediction",
-                            cancellationToken);
-                    }
-                }
+                var page = await _predictions.LoadAsync(project.ProjectId, cancellationToken: cancellationToken);
+                if (page.Error == null)
+                    await NotifyPredictionReadyAsync(page, cancellationToken);
             }
             catch
             {
@@ -159,7 +179,8 @@ namespace RSDSystem.Services
                 return;
 
             var latest = await _db.Payrolls.AsNoTracking()
-                .Where(p => p.ProjectId == project.ProjectId)
+                .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved)
                 .OrderByDescending(p => p.PayPeriodEnd)
                 .Select(p => new { p.PayPeriodStart, p.PayPeriodEnd })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -168,6 +189,7 @@ namespace RSDSystem.Services
 
             var periodTotal = await _db.Payrolls.AsNoTracking()
                 .Where(p => p.ProjectId == project.ProjectId
+                    && p.Status == PayrollStatusOptions.Approved
                     && p.PayPeriodStart == latest.PayPeriodStart
                     && p.PayPeriodEnd == latest.PayPeriodEnd)
                 .SumAsync(p => (decimal?)p.NetPay, cancellationToken) ?? 0;
@@ -202,15 +224,55 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
-        /// <summary>
-        /// Tells the project's AssignedPayrollStaff that Admin created/assigned a generate-payroll task (optional period dates in the text).
-        /// No-ops when the project has no assigned staff name.
-        /// </summary>
+        public async Task NotifyStaffAssignedAsync(Project project, CancellationToken cancellationToken = default)
+        {
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.StaffAssigned,
+                "Assigned to a project",
+                $"Admin assigned you to {name}. When a payroll schedule is added, it will appear in To do task.",
+                project.ProjectId,
+                null,
+                "/PayrollStaff/Index",
+                cancellationToken);
+        }
+
+        public async Task NotifyPayslipsSentAsync(
+            Project project, DateTime start, DateTime end, int count,
+            CancellationToken cancellationToken = default)
+        {
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            var period = PeriodLabel(start, end);
+            var slips = count == 1 ? "1 payslip" : count + " payslips";
+            var relatedId = start.Year * 10000 + start.Month * 100 + start.Day;
+            var downloadUrl = "/PayrollStaff/DownloadPayslips?projectId=" + project.ProjectId
+                + "&start=" + start.ToString("yyyy-MM-dd")
+                + "&end=" + end.ToString("yyyy-MM-dd");
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.PayslipsSent,
+                "Payslips sent",
+                $"Admin sent {slips} for {name} ({period}). Download them from this notification.",
+                project.ProjectId,
+                relatedId,
+                downloadUrl,
+                cancellationToken);
+        }
+
         public async Task NotifyNewTaskAsync(
             Project project, DateTime? periodStart = null, DateTime? periodEnd = null,
             CancellationToken cancellationToken = default)
         {
-            var staff = project.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
@@ -241,7 +303,7 @@ namespace RSDSystem.Services
             await NotifyAdminsAsync(
                 NotificationKinds.TaskCompletionRequested,
                 "Task marked done — approval needed",
-                $"{staff} marked the payroll task for {name} ({period}) as done. Open the notification to approve and close the task.",
+                $"{staff} marked the payroll task for {name} ({period}) as done. Open the notification to approve it or return it for correction.",
                 schedule.ProjectId,
                 schedule.PayrollScheduleId,
                 "/Notification/Index",
@@ -255,7 +317,7 @@ namespace RSDSystem.Services
             PayrollSchedule schedule, CancellationToken cancellationToken = default)
         {
             var project = schedule.Project;
-            var staff = project?.AssignedPayrollStaff?.Trim();
+            var staff = await ResolveStaffRecipientAsync(project?.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
 
@@ -272,12 +334,35 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
-        /// <summary>
-        /// Tells the staff who generated the slip (or assigned staff) that Admin approved it. Link opens Pending Payroll for that project.
-        /// </summary>
+        public async Task NotifyTaskCompletionReturnedAsync(
+            PayrollSchedule schedule, string reason, CancellationToken cancellationToken = default)
+        {
+            var project = schedule.Project;
+            var staff = await ResolveStaffRecipientAsync(project?.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            var period = PeriodLabel(schedule.StartingDate, schedule.EndDate);
+            var note = string.IsNullOrWhiteSpace(reason)
+                ? "Please correct this payroll task and mark it done again."
+                : reason.Trim();
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.TaskCompletionReturned,
+                "Task returned for correction",
+                $"Admin returned your completed task for {name} ({period}). Reason: {note}. Open To do task to correct it and mark it done again.",
+                schedule.ProjectId,
+                schedule.PayrollScheduleId,
+                "/PayrollStaff/Index",
+                cancellationToken);
+        }
+
         public async Task NotifyPayrollApprovedAsync(Payroll payroll, Project? project, CancellationToken cancellationToken = default)
         {
-            var staff = StaffFor(payroll, project);
+            var staff = await ResolveStaffRecipientAsync(StaffFor(payroll, project), cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
             var name = ProjectName(project);
             var employee = PersonName(payroll.Employee?.FullName, "an employee");
             var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
@@ -297,7 +382,9 @@ namespace RSDSystem.Services
         /// </summary>
         public async Task NotifyPayrollReturnedAsync(Payroll payroll, Project? project, string reason, CancellationToken cancellationToken = default)
         {
-            var staff = StaffFor(payroll, project);
+            var staff = await ResolveStaffRecipientAsync(StaffFor(payroll, project), cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
             var name = ProjectName(project);
             var employee = PersonName(payroll.Employee?.FullName, "an employee");
             var period = PeriodLabel(payroll.PayPeriodStart, payroll.PayPeriodEnd);
@@ -318,7 +405,8 @@ namespace RSDSystem.Services
         /// </summary>
         public async Task NotifyAttendanceCorrectionRequestedAsync(
             string? staffName, string? employeeName, string? projectName, DateTime? workDate,
-            int projectId, int requestId, CancellationToken cancellationToken = default)
+            int projectId, int requestId, bool resubmitted = false,
+            CancellationToken cancellationToken = default)
         {
             var staff = PersonName(staffName, "Payroll staff");
             var employee = PersonName(employeeName, "an employee");
@@ -326,6 +414,19 @@ namespace RSDSystem.Services
             var date = workDate.HasValue
                 ? workDate.Value.ToString("MMMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
                 : "an attendance date";
+            if (resubmitted)
+            {
+                await NotifyAdminsAsync(
+                    NotificationKinds.AttendanceCorrectionResubmitted,
+                    "Attendance correction resubmitted",
+                    $"{staff} resubmitted the returned attendance correction for {employee} on {date} for {project}. Open the notification to approve or return it again.",
+                    projectId,
+                    requestId,
+                    "/Notification/Index",
+                    cancellationToken);
+                return;
+            }
+
             await NotifyAdminsAsync(
                 NotificationKinds.AttendanceCorrectionRequest,
                 "Attendance correction requested",
@@ -340,15 +441,19 @@ namespace RSDSystem.Services
         /// Paged bell list for Notification/Index: items, total rows, and unread count for this role (Admin sees all admin rows; staff sees own name).
         /// </summary>
         public async Task<(List<AppNotification> Items, int Total, int Unread)> ListAsync(
-            string role, string? fullName, int page, int pageSize, CancellationToken cancellationToken = default)
+            string role, string? fullName, int page, int pageSize, bool unreadOnly = false,
+            CancellationToken cancellationToken = default)
         {
             var query = ForUser(_db.AppNotifications.AsNoTracking(), role, fullName);
-            var total = await query.CountAsync(cancellationToken);
             var unread = await query.CountAsync(n => !n.IsRead, cancellationToken);
+            if (unreadOnly)
+                query = query.Where(n => !n.IsRead);
+            var total = await query.CountAsync(cancellationToken);
             page = Math.Max(1, page);
             pageSize = Math.Clamp(pageSize, 5, 50);
             var items = await query
-                .OrderByDescending(n => n.CreatedAt)
+                .OrderBy(n => n.IsRead)
+                .ThenByDescending(n => n.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
@@ -362,7 +467,8 @@ namespace RSDSystem.Services
             string role, string? fullName, int take = 7, CancellationToken cancellationToken = default)
         {
             return await ForUser(_db.AppNotifications.AsNoTracking(), role, fullName)
-                .OrderByDescending(n => n.CreatedAt)
+                .OrderBy(n => n.IsRead)
+                .ThenByDescending(n => n.CreatedAt)
                 .Take(Math.Clamp(take, 1, 20))
                 .ToListAsync(cancellationToken);
         }
@@ -406,8 +512,8 @@ namespace RSDSystem.Services
         /// </summary>
         public static string RelativeTime(DateTime createdAt)
         {
-            var local = createdAt.Kind == DateTimeKind.Utc ? createdAt.ToLocalTime() : createdAt;
-            var now = DateTime.Now;
+            var local = PhilippinesTime.ToLocal(createdAt);
+            var now = PhilippinesTime.Now;
             var span = now - local;
             if (span.TotalSeconds < 45)
                 return "just now";
@@ -452,10 +558,13 @@ namespace RSDSystem.Services
             if (string.Equals(role, NotificationRoles.Admin, StringComparison.OrdinalIgnoreCase))
                 return source.Where(n => n.RecipientRole == NotificationRoles.Admin);
 
-            var name = (fullName ?? "").Trim().ToLower();
+            var keys = StaffNames.LookupKeys(fullName);
+            if (keys.Count == 0)
+                return source.Where(n => false);
+
             return source.Where(n => n.RecipientRole == NotificationRoles.PayrollStaff
                 && n.RecipientName != null
-                && n.RecipientName.Trim().ToLower() == name);
+                && keys.Contains(n.RecipientName));
         }
 
         /// <summary>
@@ -465,7 +574,12 @@ namespace RSDSystem.Services
             string role, string? name, string kind, int? projectId, int? relatedId,
             CancellationToken cancellationToken)
         {
-            var since = DateTime.Now.AddMinutes(-10);
+            if (kind == NotificationKinds.PayrollResubmitted
+                || kind == NotificationKinds.AttendanceCorrectionResubmitted
+                || kind == NotificationKinds.TaskCompletionRequested)
+                return false;
+
+            var since = PhilippinesTime.Now.AddMinutes(-10);
             var query = _db.AppNotifications.AsNoTracking()
                 .Where(n => n.RecipientRole == role
                     && n.Kind == kind
@@ -481,9 +595,22 @@ namespace RSDSystem.Services
             return await query.AnyAsync(cancellationToken);
         }
 
-        /// <summary>
-        /// Trims the bell message to 500 characters so it fits AppNotifications.Message.
-        /// </summary>
+        private async Task<string?> ResolveStaffRecipientAsync(string? staffName, CancellationToken cancellationToken)
+        {
+            var assigned = (staffName ?? "").Trim();
+            if (assigned.Length == 0)
+                return null;
+
+            var staff = await _db.Users.AsNoTracking()
+                .Where(u => u.Role == "PayrollStaff")
+                .ToListAsync(cancellationToken);
+            var match = staff.FirstOrDefault(u =>
+                StaffNames.SamePerson(assigned, u.FullName)
+                || StaffNames.SamePerson(assigned, $"{u.FirstName} {u.LastName}")
+                || string.Equals(assigned, u.Username, StringComparison.OrdinalIgnoreCase));
+            return match?.FullName ?? assigned;
+        }
+
         private static string ClipMessage(string message)
         {
             var text = (message ?? "").Trim();

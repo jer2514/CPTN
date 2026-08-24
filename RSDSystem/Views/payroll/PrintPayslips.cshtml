@@ -50,7 +50,7 @@
                             <div><span class="lbl">Employee Name: </span><span class="val">@(slip.Employee?.FullName ?? "")</span></div>
                             <div><span class="lbl">Rate per day: </span><span class="val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
                             <div><span class="lbl">Job Classification: </span><span class="val">@(slip.Employee?.JobClassification)</span></div>
-                            <div><span class="lbl">Rate per hour: </span><span class="val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                            <div><span class="lbl">Rate per hour: </span><span class="val">₱@EmployeeRates.HourlyFromDaily(slip.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
                         </div>
 
                         <div class="section">
@@ -59,6 +59,7 @@
                         </div>
                         <div class="fields">
                             <span class="lbl">Regular Days Worked:</span><span class="val">@slip.RegularDaysWorked Days</span>
+                            <span class="lbl">Regular Hours:</span><span class="val">@PayrollComputation.PaidRegularHours(slip).ToString("0.##") hrs</span>
                             <span class="lbl">Overtime:</span><span class="val">@slip.OvertimeHours.ToString("0.##") hours</span>
                             <span class="lbl">Absent:</span><span class="val">@slip.AbsentDays Days</span>
                         </div>
@@ -76,7 +77,7 @@
                             <span class="lbl">Net Pay:</span><span class="val">₱@slip.NetPay.ToString("N2")</span>
                         </div>
 
-                        <div class="footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                        <div class="footer">Generated Date: @PhilippinesTime.FormatLongDate(slip.GeneratedDate)</div>
                     </div>
                 }
             </div>

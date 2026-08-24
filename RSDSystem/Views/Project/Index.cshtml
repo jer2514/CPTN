@@ -7,6 +7,8 @@
     ViewData["Title"] = "Projects";
     var search = ViewBag.Search as string;
     var status = ViewBag.Status as string ?? ProjectStatusOptions.OnGoing;
+    var statusClicked = !string.IsNullOrWhiteSpace(Context.Request.Query["status"]);
+    var filterLabel = statusClicked ? status : "Filter";
 }
 
 
@@ -14,21 +16,20 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="emp-title mb-3">Projects</div>
 
     <div class="list-controls-row">
-        <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
-            <i class="bi bi-search"></i>
-            <input type="text" name="search" value="@search" placeholder="Search Project" />
-            <input type="hidden" name="status" value="@status" />
-        </form>
-
-        <div class="list-controls-actions">
+        <div class="list-controls-left">
+            <form asp-action="Index" method="get" class="search-wrap search-wrap-wide">
+                <i class="bi bi-search"></i>
+                <input type="text" name="search" value="@search" placeholder="Search Project" />
+                <input type="hidden" name="status" value="@status" />
+            </form>
             <div class="dropdown">
-                <button class="btn-outline-blue dropdown-toggle"
+                <button class="btn-outline-blue dropdown-toggle filter-label-btn"
                         data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="bi bi-funnel"></i> Filter
+                    @filterLabel
                 </button>
                 <ul class="dropdown-menu filter-menu">
                     @foreach (var option in ProjectStatusOptions.All)
@@ -52,7 +53,8 @@
                     }
                 </ul>
             </div>
-
+        </div>
+        <div class="list-controls-actions">
             <a asp-action="Create" class="btn-primary-blue">Add Project</a>
         </div>
     </div>
@@ -95,5 +97,6 @@
                 </div>
             }
         </div>
+        @await Html.PartialAsync("_Pagination")
     }
 </div>

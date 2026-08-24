@@ -5,7 +5,20 @@
     const token = tokenInput ? tokenInput.value : '';
     const isAdmin = document.body.dataset.role === 'Admin';
 
-    // Wraps each .bell-btn with a badge + dropdown panel if the layout has not done so yet.
+    function hideReturnReason() {
+        const wrap = document.getElementById('corrReturnWrap');
+        const reason = document.getElementById('corrReturnReason');
+        if (wrap) wrap.hidden = true;
+        if (reason) reason.value = '';
+    }
+
+    function hideTaskReturnReason() {
+        const wrap = document.getElementById('taskReturnWrap');
+        const reason = document.getElementById('taskReturnReason');
+        if (wrap) wrap.hidden = true;
+        if (reason) reason.value = '';
+    }
+
     function wrapBells() {
         document.querySelectorAll('.bell-btn').forEach(function (btn) {
             if (btn.closest('.notif-bell-wrap')) return;
@@ -57,6 +70,12 @@
                 return;
             }
             setBadges(data.unread || 0);
+            const headSpan = panel.querySelector('.notif-panel-head span');
+            if (headSpan) {
+                headSpan.textContent = data.unread > 0
+                    ? 'Notifications · ' + data.unread + ' unread'
+                    : 'Notifications';
+            }
             const viewAll = panel.querySelector('.notif-view-all');
             if (viewAll && data.viewAllUrl) viewAll.href = data.viewAllUrl;
             if (!data.items || !data.items.length) {
@@ -127,7 +146,7 @@
         if (id) {
             try { await postForm('/Notification/MarkRead', { id: id }); } catch (err) { /* ignore */ }
         }
-        if (isAdmin && kind === 'AttendanceCorrectionRequest' && related) {
+        if (isAdmin && related && (kind === 'AttendanceCorrectionRequest' || kind === 'AttendanceCorrectionResubmitted')) {
             closeAll();
             openCorrectionModal(related);
             return;
@@ -175,6 +194,7 @@
             document.getElementById('corrReason').textContent = data.reason || '—';
             const actions = document.getElementById('corrActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
+            hideReturnReason();
         } catch (err) {
             showToast('Could not load the correction request.');
             overlay.classList.remove('open');
@@ -192,6 +212,7 @@
         }
         overlay.classList.add('open');
         overlay.dataset.id = id;
+        hideTaskReturnReason();
         document.getElementById('taskStaff').textContent = '…';
         document.getElementById('taskProject').textContent = '…';
         document.getElementById('taskType').textContent = '…';
@@ -212,6 +233,7 @@
             document.getElementById('taskPeriod').textContent = data.period || '—';
             const actions = document.getElementById('taskActions');
             if (actions) actions.style.display = data.pending ? 'flex' : 'none';
+            if (!data.pending) hideTaskReturnReason();
         } catch (err) {
             showToast('Could not load the task.');
             overlay.classList.remove('open');
@@ -256,7 +278,10 @@
     const overlay = document.getElementById('attendanceCorrectionOverlay');
     if (overlay) {
         overlay.addEventListener('click', function (e) {
-            if (e.target === overlay) overlay.classList.remove('open');
+            if (e.target === overlay) {
+                overlay.classList.remove('open');
+                hideReturnReason();
+            }
         });
         const approveBtn = document.getElementById('corrApprove');
         const returnBtn = document.getElementById('corrReturn');
@@ -269,14 +294,44 @@
                 window.location.reload();
             });
         }
+        const returnWrap = document.getElementById('corrReturnWrap');
+        const returnReason = document.getElementById('corrReturnReason');
+        const returnCancel = document.getElementById('corrReturnCancel');
+        const returnSend = document.getElementById('corrReturnSend');
+        const corrActions = document.getElementById('corrActions');
+
+        function showReturnReason() {
+            if (corrActions) corrActions.style.display = 'none';
+            if (returnWrap) returnWrap.hidden = false;
+            if (returnReason) {
+                returnReason.value = '';
+                returnReason.focus();
+            }
+        }
+
         if (returnBtn) {
-            returnBtn.addEventListener('click', async function () {
+            returnBtn.addEventListener('click', function () {
+                showReturnReason();
+            });
+        }
+        if (returnCancel) {
+            returnCancel.addEventListener('click', function () {
+                hideReturnReason();
+                if (corrActions) corrActions.style.display = 'flex';
+            });
+        }
+        if (returnSend) {
+            returnSend.addEventListener('click', async function () {
                 const id = overlay.dataset.id;
-                const reason = window.prompt('Reason for returning this correction:', 'The submitted correction could not be verified.');
-                if (reason == null) return;
+                const reason = returnReason ? returnReason.value.trim() : '';
+                if (!reason) {
+                    showToast('Enter a reason for returning this correction.');
+                    return;
+                }
                 const data = await postForm('/Notification/ReturnCorrection', { id: id, reason: reason });
                 if (!data.success) { showToast(data.message || 'Could not return the request.'); return; }
                 overlay.classList.remove('open');
+                hideReturnReason();
                 window.location.reload();
             });
         }
@@ -285,23 +340,149 @@
     const taskOverlay = document.getElementById('taskApprovalOverlay');
     if (taskOverlay) {
         taskOverlay.addEventListener('click', function (e) {
-            if (e.target === taskOverlay) taskOverlay.classList.remove('open');
+            if (e.target === taskOverlay) {
+                taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
+            }
         });
         const taskApproveBtn = document.getElementById('taskApprove');
+        const taskReturnBtn = document.getElementById('taskReturn');
+        const taskReturnWrap = document.getElementById('taskReturnWrap');
+        const taskReturnReason = document.getElementById('taskReturnReason');
+        const taskReturnCancel = document.getElementById('taskReturnCancel');
+        const taskReturnSend = document.getElementById('taskReturnSend');
+        const taskActions = document.getElementById('taskActions');
+
+        function showTaskReturnReason() {
+            if (taskActions) taskActions.style.display = 'none';
+            if (taskReturnWrap) taskReturnWrap.hidden = false;
+            if (taskReturnReason) {
+                taskReturnReason.value = '';
+                taskReturnReason.focus();
+            }
+        }
+
         if (taskApproveBtn) {
             taskApproveBtn.addEventListener('click', async function () {
                 const id = taskOverlay.dataset.id;
                 const data = await postForm('/Notification/ApproveTask', { id: id });
                 if (!data.success) { showToast(data.message || 'Could not approve the task.'); return; }
                 taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
+                window.location.reload();
+            });
+        }
+        if (taskReturnBtn) {
+            taskReturnBtn.addEventListener('click', function () {
+                showTaskReturnReason();
+            });
+        }
+        if (taskReturnCancel) {
+            taskReturnCancel.addEventListener('click', function () {
+                hideTaskReturnReason();
+                if (taskActions) taskActions.style.display = 'flex';
+            });
+        }
+        if (taskReturnSend) {
+            taskReturnSend.addEventListener('click', async function () {
+                const id = taskOverlay.dataset.id;
+                const reason = taskReturnReason ? taskReturnReason.value.trim() : '';
+                if (!reason) {
+                    showToast('Enter a reason for returning this task.');
+                    return;
+                }
+                const data = await postForm('/Notification/ReturnTask', { id: id, reason: reason });
+                if (!data.success) { showToast(data.message || 'Could not return the task.'); return; }
+                taskOverlay.classList.remove('open');
+                hideTaskReturnReason();
                 window.location.reload();
             });
         }
     }
 
     wrapBells();
-    fetch('/Notification/UnreadCount', { headers: { 'Accept': 'application/json' } })
-        .then(function (res) { return res.json(); })
-        .then(function (data) { if (data.success) setBadges(data.unread || 0); })
-        .catch(function () { });
+    function refreshUnread() {
+        fetch('/Notification/UnreadCount', { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.json(); })
+            .then(function (data) { if (data.success) setBadges(data.unread || 0); })
+            .catch(function () { });
+    }
+    refreshUnread();
+    window.setInterval(refreshUnread, 15000);
+
+    const isStaff = document.body.dataset.role === 'PayrollStaff';
+
+    function shownToastKey(id) {
+        return 'rsd-notif-toast-' + id;
+    }
+
+    function rememberToast(id) {
+        var key = shownToastKey(id);
+        try {
+            if (sessionStorage.getItem(key)) return false;
+            sessionStorage.setItem(key, '1');
+            return true;
+        } catch (err) {
+            return true;
+        }
+    }
+
+    async function showLiveNotificationToasts() {
+        if (typeof window.showToast !== 'function') return;
+        if (window.location.pathname.toLowerCase().indexOf('/payrollstaff/downloadpayslips') === 0)
+            return;
+        try {
+            const res = await fetch('/Notification/Recent', { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (!data.success) return;
+            if (typeof data.unread === 'number') setBadges(data.unread);
+            (data.items || []).forEach(function (item) {
+                if (item.isRead) return;
+                if (!rememberToast(item.id)) return;
+
+                if (isStaff && item.kind === 'PayslipsSent') {
+                    var href = item.url || '/PayrollStaff/PendingPayroll';
+                    window.showToast(item.message || 'Payslips are ready to download.', 'success', {
+                        delay: 14000,
+                        action: {
+                            label: 'Download',
+                            href: href,
+                            onClick: function (e, url) {
+                                if (e) e.preventDefault();
+                                postForm('/Notification/MarkRead', { id: item.id })
+                                    .catch(function () { })
+                                    .finally(function () {
+                                        window.location.href = url || href;
+                                    });
+                            }
+                        }
+                    });
+                    return;
+                }
+
+                if (isAdmin && (item.kind === 'PayrollResubmitted'
+                    || item.kind === 'AttendanceCorrectionResubmitted'
+                    || item.kind === 'TaskCompletionRequested')) {
+                    window.showToast(item.message || item.title || 'You have a new notification.', 'success', {
+                        delay: 12000,
+                        action: item.url ? {
+                            label: 'Open',
+                            href: item.url,
+                            onClick: function (e, url) {
+                                if (e) e.preventDefault();
+                                postForm('/Notification/MarkRead', { id: item.id })
+                                    .catch(function () { })
+                                    .finally(function () {
+                                        window.location.href = url || item.url;
+                                    });
+                            }
+                        } : null
+                    });
+                }
+            });
+        } catch (err) { /* ignore */ }
+    }
+
+    showLiveNotificationToasts();
+    window.setInterval(showLiveNotificationToasts, 15000);
 })();
