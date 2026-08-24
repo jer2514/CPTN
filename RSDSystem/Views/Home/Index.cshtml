@@ -1,4 +1,8 @@
-﻿@using System.Text.Json
+﻿@*
+    Admin dashboard. HomeController.Index fills ViewBag (projects, schedules, pending approvals).
+    Add/Edit/Delete schedule forms post to PayrollController.
+*@
+@using System.Text.Json
 @{
     ViewData["Title"] = "Dashboard";
     var fullName = Context.Session.GetString("FullName") ?? "Admin";

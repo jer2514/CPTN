@@ -2,6 +2,9 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>
+    /// Preview DTOs: parsed rows plus which employee they matched (not database tables).
+    /// </summary>
     public class AttendancePreviewResult
     {
         public string? Error { get; set; }

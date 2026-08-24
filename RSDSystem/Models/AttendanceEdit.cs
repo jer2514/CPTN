@@ -1,5 +1,6 @@
 namespace RSDSystem.Models
 {
+    /// <summary>Form models for editing a month of attendance in the UI (not a table).</summary>
     public class AttendanceMonthEdit
     {
         public int FocusRecordId { get; set; }

@@ -1,3 +1,4 @@
+// Same rules as Validation/InputRules.cs, run in the browser before the form posts.
 (function () {
     const NAME_RE = /^[A-Za-zÑñ][A-Za-zÑñ\s.'\-]{0,79}$/;
     const MI_RE = /^[A-Za-zÑñ]{1,2}$/;

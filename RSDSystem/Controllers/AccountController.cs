@@ -11,6 +11,14 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Login and logout. Default landing page of the site.
+    ///
+    /// POST Login: look up active User by username → BCrypt-check password →
+    /// write Session (UserId, FullName, Role, PhotoPath) →
+    /// Admin goes to Home, PayrollStaff goes to PayrollStaff (to-do list).
+    /// Inactive users cannot sign in (IsActive filter).
+    /// </summary>
     public class AccountController : Controller
     {
         private readonly PayrollDbContext _db;
@@ -20,7 +28,7 @@ namespace RSDSystem.Controllers
             _db = db;
         }
 
-        // GET: /Account/Login
+        /// <summary>Show the login form, or skip it if a session already exists.</summary>
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
@@ -31,7 +39,7 @@ namespace RSDSystem.Controllers
             return View();
         }
 
-        // POST: /Account/Login
+        /// <summary>Validate username/password and start a session.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string Username, string Password, string? returnUrl)
@@ -51,6 +59,9 @@ namespace RSDSystem.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Store who is logged in. AuthCheckFilter reads these session keys on every request.
+        /// </summary>
         private void SignIn(int userId, string fullName, string role, string? photoPath)
         {
             HttpContext.Session.SetString("UserId", userId.ToString());

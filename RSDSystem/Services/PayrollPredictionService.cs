@@ -9,6 +9,13 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Services
 {
+    /// <summary>
+    /// Next-month payroll estimate.
+    /// LoadAsync(projectId): needs two finished months of Approved payroll.
+    /// Uses previous month totals → linear trend (PayrollPredictionEngine) or optional Python API.
+    /// Flags ExceedsBudget if predicted &gt; allocated monthly budget, UnusualChange if jump is large.
+    /// Admin Payroll/Prediction page calls this via GetPrediction.
+    /// </summary>
     public class PayrollPredictionService
     {
         private static readonly JsonSerializerOptions JsonOptions = new()

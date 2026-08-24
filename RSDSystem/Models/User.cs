@@ -4,6 +4,12 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// Login account. Role is "Admin" or "PayrollStaff".
+    /// PasswordHash is BCrypt, never the raw password.
+    /// UserCode is the displayed Staff ID. FullName/Age are computed, not stored.
+    /// IsActive=false blocks login (AccountController only loads active users).
+    /// </summary>
     public class User : IValidatableObject
     {
         [Key]

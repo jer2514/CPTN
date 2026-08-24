@@ -4,6 +4,11 @@ using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Machine/API import: POST /api/attendance/import with an API key (not the website login).
+    /// AuthCheckFilter allows this controller without a session. Used by scanners/scripts.
+    /// Staff still use AttendanceController for the browser Import screen.
+    /// </summary>
     [Route("api/attendance")]
     [IgnoreAntiforgeryToken]
     [ApiController]

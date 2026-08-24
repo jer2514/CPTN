@@ -1,5 +1,6 @@
 namespace RSDSystem.Models
 {
+    /// <summary>Small objects the Admin dashboard (Home/Index) sends to the view.</summary>
     public class ProjectDateBounds
     {
         public string Start { get; set; } = "";

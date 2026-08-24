@@ -3,6 +3,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// One Excel/CSV upload for a project. Child AttendanceRecord rows are the daily punches.
+    /// Preview does not write this yet; ImportFile does.
+    /// </summary>
     public class AttendanceImport
     {
         [Key]
@@ -34,6 +38,10 @@ namespace RSDSystem.Models
         public ICollection<AttendanceRecord> Records { get; set; } = new List<AttendanceRecord>();
     }
 
+    /// <summary>
+    /// One person's punches for one calendar day. AttendanceRules.Apply() fills hours and Status
+    /// (Complete, Late, Half-day, Absent, …) from TimeIn/TimeOut fields.
+    /// </summary>
     public class AttendanceRecord
     {
         [Key]

@@ -1,5 +1,6 @@
 namespace RSDSystem.Models
 {
+    /// <summary>View models for Admin View Payroll lists (not database tables).</summary>
     public class PayrollPeriodRow
     {
         public int ProjectId { get; set; }

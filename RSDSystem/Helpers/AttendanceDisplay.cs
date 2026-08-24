@@ -2,6 +2,7 @@ using System.Globalization;
 
 namespace RSDSystem.Helpers
 {
+    /// <summary>Format punch times and dates for the attendance tables (empty → ——).</summary>
     public static class AttendanceDisplay
     {
         public const string Empty = "——";

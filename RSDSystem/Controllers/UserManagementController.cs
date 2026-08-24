@@ -6,6 +6,11 @@ using BCrypt.Net;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin: create/edit/deactivate login accounts (Admin or PayrollStaff).
+    /// New PayrollStaff names appear in Project "Assigned to Payroll Staff".
+    /// Passwords are hashed with BCrypt before save. Photos go under wwwroot/Uploads/users.
+    /// </summary>
     public class UserManagementController : Controller
     {
         private readonly PayrollDbContext _db;

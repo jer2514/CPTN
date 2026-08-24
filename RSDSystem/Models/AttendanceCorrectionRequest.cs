@@ -3,6 +3,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// Staff asked to change an imported punch. Admin approves or returns it from the bell/notification page.
+    /// Proposed times sit here until approved, then they are copied onto AttendanceRecord.
+    /// </summary>
     public class AttendanceCorrectionRequest
     {
         [Key]

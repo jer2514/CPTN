@@ -3,6 +3,7 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>Creates AppNotifications and AttendanceCorrectionRequests if missing.</summary>
     public static class NotificationSchema
     {
         public static void Ensure(PayrollDbContext db)
