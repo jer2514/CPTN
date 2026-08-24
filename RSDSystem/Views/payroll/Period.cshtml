@@ -11,15 +11,15 @@
     var end = (DateTime)ViewBag.End;
     var startLabel = ViewBag.StartLabel as string ?? "";
     var endLabel = ViewBag.EndLabel as string ?? "";
+    var isFinished = ViewBag.IsFinished is true;
 }
 
 <div class="content-topbar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="page-card">
     <div class="vp-detail-heading">
@@ -28,7 +28,10 @@
             <div class="vp-detail-dates">Date: @startLabel - @endLabel</div>
         </div>
         <div class="vp-detail-actions">
-            <button type="button" class="btn-primary-blue-solid" onclick="openGenerateModal()">Generate Payslips</button>
+            @if (!isFinished)
+            {
+                <button type="button" class="btn-primary-blue-solid" onclick="openGenerateModal()">Generate Payslips</button>
+            }
         </div>
     </div>
 
@@ -40,7 +43,6 @@
                 <th>Regular Hours</th>
                 <th>OT Hours</th>
                 <th>Net Pay</th>
-                <th>Status</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -48,7 +50,7 @@
             @if (!Model.Any())
             {
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">No approved payrolls for this period.</td>
+                    <td colspan="6" class="text-center text-muted py-4">No payrolls for this period.</td>
                 </tr>
             }
             @foreach (var row in Model)
@@ -59,9 +61,6 @@
                     <td>@row.RegularHours.ToString("0.##")</td>
                     <td>@row.OtHours.ToString("0.##")</td>
                     <td>₱@row.NetPay.ToString("N2")</td>
-                    <td>
-                        <span class="badge-active">Approved</span>
-                    </td>
                     <td>
                         @if (row.PayrollId.HasValue)
                         {

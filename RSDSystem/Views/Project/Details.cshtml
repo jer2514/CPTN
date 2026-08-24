@@ -11,16 +11,17 @@
                      ?? new List<RSDSystem.Models.ProjectMonthlyBudget>();
     var statusLabel = ProjectStatusOptions.Normalize(Model.Status);
     var statusClass = ProjectStatusOptions.BadgeClass(Model.Status);
+    var isFinished = ProjectStatusOptions.IsFinished(Model.Status);
+    var employeesReadOnly = isFinished || ViewBag.EmployeesReadOnly is true;
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
 
@@ -30,13 +31,12 @@
             <span class="@statusClass">@statusLabel</span>
         </div>
         <div class="proj-view-actions">
-            <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
-                <i class="bi bi-pencil-fill"></i>
-            </a>
-            <button type="button" class="action-btn action-delete" title="Delete"
-                    onclick="openDeleteModal(@Model.ProjectId, '@Html.Raw((Model.ProjectName ?? "").Replace("'", "\\'"))')">
-                <i class="bi bi-trash-fill"></i>
-            </button>
+            @if (!isFinished)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.ProjectId" class="action-btn action-edit" title="Edit">
+                    <i class="bi bi-pencil-fill"></i>
+                </a>
+            }
         </div>
     </div>
 
@@ -108,18 +108,21 @@
 
     <div class="proj-view-group mt-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="form-lbl mb-0">Assigned Employees</span>
+            <span class="form-lbl mb-0">@(isFinished ? "Employees on this project" : "Assigned Employees")</span>
             <span class="proj-emp-count">
                 Total Employees: <strong id="empTotalCount">@employees.Count</strong>
             </span>
         </div>
         <div class="emp-action-btns">
             <button type="button" class="btn-outline-blue" onclick="openViewEmpModal()">
-                <i class="bi bi-people-fill"></i> View Employees
+                <i class="bi bi-people-fill"></i> View Employee
             </button>
-            <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
-                <i class="bi bi-person-plus-fill"></i> Add Employees
-            </button>
+            @if (!isFinished)
+            {
+                <button type="button" class="btn-primary-blue" onclick="openAddEmpModal()">
+                    <i class="bi bi-person-plus-fill"></i> Add Employee
+                </button>
+            }
         </div>
     </div>
 </div>
@@ -161,13 +164,22 @@
                         <td>@emp.JobClassification</td>
                         <td>₱@emp.DailyRate.ToString("N2")</td>
                         <td>
-                            <button type="button"
-                                    class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
-                                    data-id="@emp.EmployeeId"
-                                    data-name="@emp.FullName"
-                                    onclick="handleStatusClick(this)">
-                                @(emp.IsActive ? "Active" : "Inactive")
-                            </button>
+                            @if (employeesReadOnly)
+                            {
+                                <span class="@(emp.IsActive ? "badge-active" : "badge-inactive")">
+                                    @(emp.IsActive ? "Active" : "Inactive")
+                                </span>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        class="badge-btn @(emp.IsActive ? "badge-active" : "badge-inactive")"
+                                        data-id="@emp.EmployeeId"
+                                        data-name="@emp.FullName"
+                                        onclick="handleStatusClick(this)">
+                                    @(emp.IsActive ? "Active" : "Inactive")
+                                </button>
+                            }
                         </td>
                     </tr>
                 }
@@ -253,27 +265,6 @@
     @Html.AntiForgeryToken()
 </form>
 
-<div class="del-overlay" id="deleteOverlay" onclick="closeDeleteModal(arguments[0])">
-    <div class="del-modal">
-        <div class="del-icon-wrap">
-            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
-        </div>
-        <div class="del-title">Are you sure?</div>
-        <div class="del-msg">
-            You are about to permanently delete project:
-            <strong id="deleteProjName"></strong>.
-            This action cannot be undone.
-        </div>
-        <div class="del-actions">
-            <button class="del-btn-cancel" onclick="closeDeleteModal()">Cancel</button>
-            <form id="deleteForm" method="post">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="del-btn-delete">Delete</button>
-            </form>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <script>
         const PROJECT_ID = @Model.ProjectId;
@@ -281,17 +272,6 @@
 
         function getToken() {
             return document.querySelector('#tokenForm input[name="__RequestVerificationToken"]').value;
-        }
-
-        // ── Delete project modal ──────────────────────────
-        function openDeleteModal(id, name) {
-            document.getElementById('deleteProjName').textContent = name;
-            document.getElementById('deleteForm').action = '/Project/Delete/' + id;
-            document.getElementById('deleteOverlay').classList.add('open');
-        }
-        function closeDeleteModal(e) {
-            if (!e || e.target === document.getElementById('deleteOverlay'))
-                document.getElementById('deleteOverlay').classList.remove('open');
         }
 
         // ── View Employees modal ──────────────────────────
@@ -485,7 +465,6 @@
 
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
-                closeDeleteModal();
                 closeViewEmpModal();
                 closeAddEmpModal();
                 closeDeactivateModal();

@@ -25,16 +25,22 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly PayrollPredictionService _predictions;
         private readonly NotificationService _notifications;
+        private readonly ActivityLogService _logs;
+        private readonly AttendanceImportService _attendance;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
-        /// <summary>
-        /// Receives the database, prediction service, and notifications used after Approve or Return.
-        /// </summary>
-        public PayrollController(PayrollDbContext db, PayrollPredictionService predictions, NotificationService notifications)
+        public PayrollController(
+            PayrollDbContext db,
+            PayrollPredictionService predictions,
+            NotificationService notifications,
+            ActivityLogService logs,
+            AttendanceImportService attendance)
         {
             _db = db;
             _predictions = predictions;
             _notifications = notifications;
+            _logs = logs;
+            _attendance = attendance;
         }
 
         /// <summary>
@@ -49,24 +55,28 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        /// <summary>
-        /// GET /Payroll. Admin View Payroll list of Approved periods, filtered by project and month.
-        /// Choosing a row opens Period. Staff hitting this URL are sent to the to-do list.
-        /// </summary>
-        /// <returns>The period list view with project suggestions and month dropdown.</returns>
-        public async Task<IActionResult> Index(string? projectName, int? projectId, int? month)
+        public async Task<IActionResult> Index(string? projectName, int? projectId, int? month, int page = 1)
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
 
             await BindProjectSuggestionsAsync();
-            var periods = await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true);
+            var hasProject = (projectId ?? 0) > 0 || !string.IsNullOrWhiteSpace(projectName);
+            var periods = hasProject
+                ? await LoadPeriodsAsync(projectName, month, projectId, approvedOnly: true)
+                : new List<PayrollPeriodRow>();
+            const int pageSize = 5;
+            var totalPages = Math.Max(1, (int)Math.Ceiling(periods.Count / (double)pageSize));
+            page = Math.Clamp(page, 1, totalPages);
             ViewBag.PageTitle = "View Payroll";
             ViewBag.ProjectName = projectName ?? "";
             ViewBag.SelectedProjectId = projectId;
             ViewBag.Month = month;
             ViewBag.Months = MonthOptions();
-            return View(periods);
+            ViewBag.NeedsProject = !hasProject;
+            ViewBag.CurrentPage = page;
+            ViewBag.TotalPages = totalPages;
+            return View(periods.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
         /// <summary>
@@ -90,6 +100,7 @@ namespace RSDSystem.Controllers
             ViewBag.StartLabel = start.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.EndLabel = end.ToString("MMMM dd, yyyy", DateCulture);
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
+            ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
             return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date, approvedOnly: true));
         }
 
@@ -108,6 +119,12 @@ namespace RSDSystem.Controllers
 
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
+
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot generate payslips.";
+                return RedirectToAction(nameof(Period), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
             var employees = await _db.Employees
                 .Where(e => e.ProjectId == projectId && e.IsActive)
@@ -129,9 +146,9 @@ namespace RSDSystem.Controllers
                 await _db.Set<PayrollSchedule>().Where(s => s.ProjectId == projectId).ToListAsync(),
                 start.Date, end.Date);
 
-            var daysWorked = Math.Max(1, DateRules.CountWeekdays(start.Date, end.Date));
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
+            var skippedNoAttendance = 0;
 
             foreach (var emp in employees)
             {
@@ -141,7 +158,22 @@ namespace RSDSystem.Controllers
                 if (covering != null && existing.Any(p => PayrollPeriods.BelongsTo(p, covering) && p.EmployeeId == emp.EmployeeId))
                     continue;
 
-                var regularPay = emp.DailyRate * daysWorked;
+                var attendance = await _attendance.GetEmployeePeriodTotalsAsync(
+                    projectId, emp.EmployeeId, start.Date, end.Date, HttpContext.RequestAborted);
+                if (attendance == null)
+                {
+                    skippedNoAttendance++;
+                    continue;
+                }
+
+                var regularDaysWorked = attendance.DaysPresent > 0
+                    ? attendance.DaysPresent
+                    : attendance.DaysWorked;
+                var regularHours = attendance.RegularHours;
+                var overtimeHours = attendance.OvertimeHours;
+                var (regularPay, overtimePay, gross, net) = PayrollComputation.Compute(
+                    EmployeeRates.HourlyFromDaily(emp.DailyRate), regularHours, overtimeHours, 0);
+
                 _db.Set<Payroll>().Add(new Payroll
                 {
                     EmployeeId = emp.EmployeeId,
@@ -149,17 +181,18 @@ namespace RSDSystem.Controllers
                     PayrollScheduleId = covering?.PayrollScheduleId,
                     PayPeriodStart = start.Date,
                     PayPeriodEnd = end.Date,
-                    RegularDaysWorked = daysWorked,
-                    OvertimeHours = 0,
-                    AbsentDays = 0,
+                    RegularDaysWorked = regularDaysWorked,
+                    RegularHours = regularHours,
+                    OvertimeHours = overtimeHours,
+                    AbsentDays = attendance.DaysAbsent,
                     RegularPay = regularPay,
-                    OvertimePay = 0,
-                    GrossPay = regularPay,
+                    OvertimePay = overtimePay,
+                    GrossPay = gross,
                     CashAdvance = 0,
-                    NetPay = regularPay,
+                    NetPay = net,
                     Status = PayrollStatusOptions.Draft,
                     GeneratedBy = generatedBy,
-                    GeneratedDate = DateTime.Now
+                    GeneratedDate = PhilippinesTime.Now
                 });
                 created++;
             }
@@ -167,9 +200,20 @@ namespace RSDSystem.Controllers
             if (created > 0)
                 await _db.SaveChangesAsync();
 
-            TempData["Success"] = created > 0
-                ? $"Generated {created} payslip(s) for {project.ProjectName}."
-                : "Payslips for this period already exist.";
+            if (created > 0)
+            {
+                TempData["Success"] = skippedNoAttendance > 0
+                    ? $"Generated {created} payslip(s) for {project.ProjectName}. Skipped {skippedNoAttendance} employee(s) with no matched attendance."
+                    : $"Generated {created} payslip(s) for {project.ProjectName}.";
+            }
+            else if (skippedNoAttendance > 0)
+            {
+                TempData["Error"] = "No payslips generated. Import attendance that matches each employee ID first.";
+            }
+            else
+            {
+                TempData["Success"] = "Payslips for this period already exist.";
+            }
 
             return RedirectToAction(nameof(GeneratedPayslips), new
             {
@@ -217,7 +261,7 @@ namespace RSDSystem.Controllers
                     projectId = named.ProjectId;
             }
 
-            var page = await _predictions.LoadAsync(projectId, HttpContext.RequestAborted);
+            var page = await _predictions.LoadAsync(projectId, persistHistory: true, HttpContext.RequestAborted);
             if (page.Error != null && page.Rows.Count == 0)
             {
                 return Json(new
@@ -228,12 +272,31 @@ namespace RSDSystem.Controllers
                 });
             }
 
+            await _logs.LogAsync(
+                ActivityTypes.GeneratePrediction,
+                ActivityModules.Prediction,
+                $"Loaded payroll prediction for {page.ProjectName}.",
+                page.ProjectId);
+
+            try
+            {
+                await _notifications.NotifyPredictionReadyAsync(page, HttpContext.RequestAborted);
+            }
+            catch
+            {
+                // Forecast still returns even if the admin bell cannot be updated.
+            }
+
             return Json(new
             {
                 success = true,
                 projectId = page.ProjectId,
                 projectName = page.ProjectName,
-                generatedAt = page.GeneratedAt.ToString("MMMM dd, yyyy", DateCulture),
+                generatedAt = PhilippinesTime.FormatLongDateTime(page.GeneratedAt),
+                engine = page.Engine,
+                model = page.Model,
+                usedPythonApi = string.Equals(page.Engine, "python", StringComparison.OrdinalIgnoreCase),
+                warning = page.Error,
                 rows = page.Rows.Select(r => new
                 {
                     previousMonth1 = string.IsNullOrWhiteSpace(r.PreviousLabel1)
@@ -256,7 +319,9 @@ namespace RSDSystem.Controllers
                     unusualChange = r.UnusualChange,
                     changePercent = r.ChangePercent,
                     riskTitle = r.RiskTitle,
-                    riskDetail = r.RiskDetail
+                    riskDetail = r.RiskDetail,
+                    isPrevious = r.IsPrevious,
+                    generatedAt = PhilippinesTime.FormatLongDateTime(r.GeneratedAt == default ? page.GeneratedAt : r.GeneratedAt)
                 })
             });
         }
@@ -273,7 +338,7 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            const int pageSize = 4;
+            const int pageSize = 5;
             var slips = await _db.Set<Payroll>()
                 .Include(p => p.Employee)
                 .Include(p => p.Project)
@@ -297,6 +362,7 @@ namespace RSDSystem.Controllers
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPages;
+            ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
             return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
@@ -317,11 +383,18 @@ namespace RSDSystem.Controllers
                 .Include(p => p.Project)
                 .Where(p => p.ProjectId == projectId
                     && p.PayPeriodStart.Date == start.Date
-                    && p.PayPeriodEnd.Date == end.Date)
+                    && p.PayPeriodEnd.Date == end.Date
+                    && p.Status == PayrollStatusOptions.Approved)
                 .ToListAsync())
                 .OrderBy(p => p.Employee?.LastName)
                 .ThenBy(p => p.Employee?.FirstName)
                 .ToList();
+
+            if (slips.Count == 0)
+            {
+                TempData["Error"] = "Payslips can be printed only after admin has approved this payroll.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
             ViewBag.ProjectName = project.ProjectName;
             ViewBag.FileName = PayslipFileName(project.ProjectName, start, end);
@@ -345,19 +418,43 @@ namespace RSDSystem.Controllers
             var project = await _db.Projects.FindAsync(projectId);
             if (project == null) return NotFound();
 
-            var count = await _db.Set<Payroll>().CountAsync(p => p.ProjectId == projectId
-                && p.PayPeriodStart.Date == start.Date
-                && p.PayPeriodEnd.Date == end.Date);
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                TempData["Error"] = "Finished projects cannot send payslips.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
 
-            if (count == 0)
+            var slips = await _db.Set<Payroll>()
+                .Where(p => p.ProjectId == projectId
+                    && p.PayPeriodStart.Date == start.Date
+                    && p.PayPeriodEnd.Date == end.Date)
+                .Select(p => p.Status)
+                .ToListAsync();
+
+            if (slips.Count == 0)
             {
                 TempData["Error"] = "There are no payslips to send for this period.";
                 return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
             }
 
+            if (slips.Any(status => !PayrollStatusOptions.IsApproved(status)))
+            {
+                TempData["Error"] = "Payslips can be sent only after admin has approved this payroll.";
+                return RedirectToAction(nameof(GeneratedPayslips), new { projectId, start = start.ToString("yyyy-MM-dd"), end = end.ToString("yyyy-MM-dd") });
+            }
+
+            var count = slips.Count;
+
             var staff = string.IsNullOrWhiteSpace(project.AssignedPayrollStaff)
                 ? "payroll staff"
                 : project.AssignedPayrollStaff;
+
+            await _notifications.NotifyPayslipsSentAsync(project, start.Date, end.Date, count, HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.SendPayslips,
+                ActivityModules.Payroll,
+                $"Sent {count} approved payslip(s) for {project.ProjectName} ({PayrollPeriods.Label(start.Date, end.Date)}) to {staff}.",
+                project.ProjectId);
 
             TempData["Success"] = $"{PayslipFileName(project.ProjectName, start, end)} was sent to {staff}.";
             return RedirectToAction(nameof(GeneratedPayslips), new
@@ -454,7 +551,7 @@ namespace RSDSystem.Controllers
             }
 
             if (month is >= 1 and <= 12)
-                list = list.Where(r => r.StartDate.Month == month || r.EndDate.Month == month);
+                list = list.Where(r => r.StartDate.Month == month);
 
             return list
                 .OrderByDescending(r => r.StartDate)
@@ -490,7 +587,7 @@ namespace RSDSystem.Controllers
                         PayrollId = slip.PayrollId,
                         EmployeeName = slip.Employee?.FullName ?? "—",
                         Job = slip.Employee?.JobClassification ?? "—",
-                        RegularHours = slip.RegularDaysWorked * 8,
+                        RegularHours = PayrollComputation.PaidRegularHours(slip),
                         OtHours = slip.OvertimeHours,
                         NetPay = slip.NetPay,
                         Status = slip.Status
@@ -512,7 +609,7 @@ namespace RSDSystem.Controllers
                     PayrollId = slip?.PayrollId,
                     EmployeeName = emp.FullName,
                     Job = emp.JobClassification,
-                    RegularHours = slip == null ? 0 : slip.RegularDaysWorked * 8,
+                    RegularHours = slip == null ? 0 : PayrollComputation.PaidRegularHours(slip),
                     OtHours = slip?.OvertimeHours ?? 0,
                     NetPay = slip?.NetPay ?? 0,
                     Status = slip?.Status ?? "—"
@@ -556,6 +653,9 @@ namespace RSDSystem.Controllers
         /// <returns>The slip view, or 404 if the id is missing.</returns>
         public async Task<IActionResult> View(int id)
         {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
             var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
@@ -611,6 +711,9 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> ViewPartial(int id)
         {
+            var blocked = RequireAdmin();
+            if (blocked != null) return blocked;
+
             var payroll = await _db.Set<Payroll>()
                                    .Include(p => p.Employee)
                                    .Include(p => p.Project)
@@ -632,6 +735,9 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
         {
+            if (HttpContext.Session.GetString("Role") != "Admin")
+                return Json(new { success = false, message = "Admin access is required." });
+
             var payroll = await _db.Set<Payroll>()
                 .Include(p => p.Project)
                 .Include(p => p.Employee)
@@ -639,11 +745,20 @@ namespace RSDSystem.Controllers
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
+            if (!PayrollStatusOptions.IsSubmitted(payroll.Status))
+                return Json(new { success = false, message = "Only submitted payroll can be approved." });
+
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
 
             await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.ApprovePayroll,
+                ActivityModules.Payroll,
+                $"Approved payroll for {payroll.Employee?.FullName ?? "an employee"} on {payroll.Project?.ProjectName ?? "the project"}.",
+                payroll.ProjectId,
+                payroll.PayrollId);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -666,6 +781,9 @@ namespace RSDSystem.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReturnForCorrection(int id, string reason)
         {
+            if (HttpContext.Session.GetString("Role") != "Admin")
+                return Json(new { success = false, message = "Admin access is required." });
+
             if (string.IsNullOrWhiteSpace(reason))
                 return Json(new { success = false, message = "Please provide a reason for correction." });
 
@@ -676,11 +794,20 @@ namespace RSDSystem.Controllers
             if (payroll == null)
                 return Json(new { success = false, message = "Payroll record not found." });
 
+            if (!PayrollStatusOptions.IsSubmitted(payroll.Status))
+                return Json(new { success = false, message = "Only submitted payroll can be returned for correction." });
+
             payroll.Status = PayrollStatusOptions.Correction;
             payroll.CorrectionReason = reason.Trim();
             await _db.SaveChangesAsync();
 
             await _notifications.NotifyPayrollReturnedAsync(payroll, payroll.Project, reason.Trim(), HttpContext.RequestAborted);
+            await _logs.LogAsync(
+                ActivityTypes.ReturnPayroll,
+                ActivityModules.Payroll,
+                $"Returned payroll for {payroll.Employee?.FullName ?? "an employee"} on {payroll.Project?.ProjectName ?? "the project"}.",
+                payroll.ProjectId,
+                payroll.PayrollId);
 
             var remaining = await _db.Set<Payroll>().CountAsync(p =>
                 p.ProjectId == payroll.ProjectId && p.Status == PayrollStatusOptions.Submitted);
@@ -705,7 +832,8 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> AddSchedule(int ProjectId, string? TypeOfService,
             DateTime StartingDate, DateTime EndDate)
         {
-            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate);
+            var projectType = await ProjectTypeAsync(ProjectId);
+            var error = await ValidateScheduleAsync(ProjectId, projectType, StartingDate, EndDate);
             if (error != null)
             {
                 TempData["Error"] = error;
@@ -715,7 +843,7 @@ namespace RSDSystem.Controllers
             var schedule = new PayrollSchedule
             {
                 ProjectId = ProjectId,
-                TypeOfService = TypeOfService?.Trim(),
+                TypeOfService = projectType,
                 StartingDate = StartingDate.Date,
                 EndDate = EndDate.Date
             };
@@ -744,7 +872,8 @@ namespace RSDSystem.Controllers
             var existing = await _db.Set<PayrollSchedule>().FindAsync(PayrollScheduleId);
             if (existing == null) return NotFound();
 
-            var error = await ValidateScheduleAsync(ProjectId, TypeOfService, StartingDate, EndDate, PayrollScheduleId);
+            var projectType = await ProjectTypeAsync(ProjectId);
+            var error = await ValidateScheduleAsync(ProjectId, projectType, StartingDate, EndDate, PayrollScheduleId);
             if (error != null)
             {
                 TempData["Error"] = error;
@@ -752,7 +881,7 @@ namespace RSDSystem.Controllers
             }
 
             existing.ProjectId = ProjectId;
-            existing.TypeOfService = TypeOfService?.Trim();
+            existing.TypeOfService = projectType;
             existing.StartingDate = StartingDate.Date;
             existing.EndDate = EndDate.Date;
 
@@ -814,21 +943,21 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        /// <summary>
-        /// POST /Payroll/DeleteSchedule/{id}. Home dashboard Delete on a schedule row.
-        /// Removes the period from the staff to-do list and returns Admin to Home.
-        /// </summary>
+        private async Task<string> ProjectTypeAsync(int projectId)
+        {
+            var type = await _db.Projects.AsNoTracking()
+                .Where(p => p.ProjectId == projectId)
+                .Select(p => p.TypeOfService)
+                .FirstOrDefaultAsync();
+            return string.IsNullOrWhiteSpace(type) ? "" : type.Trim();
+        }
+
+        // POST /Payroll/DeleteSchedule/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteSchedule(int id)
+        public IActionResult DeleteSchedule(int id)
         {
-            var schedule = await _db.Set<PayrollSchedule>().FindAsync(id);
-            if (schedule != null)
-            {
-                _db.Set<PayrollSchedule>().Remove(schedule);
-                await _db.SaveChangesAsync();
-                TempData["Success"] = "Schedule deleted.";
-            }
+            TempData["Error"] = "Payroll schedules cannot be deleted. Edit the dates instead, or wait until payroll staff mark the task as done.";
             return RedirectToAction("Index", "Home");
         }
     }

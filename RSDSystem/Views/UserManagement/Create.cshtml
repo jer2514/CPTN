@@ -16,13 +16,12 @@
     var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
 }
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Create" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
@@ -97,12 +96,13 @@
                 <label class="form-lbl">Password <span class="req-star">*</span></label>
                 <div class="pwd-wrap">
                     <input type="password" name="Password" id="pwd" class="@Ctrl("Password")"
-                           data-validate="required|minlen8" data-label="Password" />
+                           data-validate="required|staffPassword" data-label="Password" />
                     <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
                         <i class="bi bi-eye-slash" id="eye1"></i>
                     </span>
                 </div>
                 <span class="field-error" data-error-for="Password">@Err("Password")</span>
+                <div style="color:#9ab0d8;font-size:12px;margin-top:4px">Must include 1 capital letter, 1 number, and 1 special character.</div>
             </div>
             <div>
                 <label class="form-lbl">Confirm Password <span class="req-star">*</span></label>
@@ -158,15 +158,9 @@
                 <span class="field-error" data-error-for="photo">@Err("photo")</span>
             </div>
             <div>
-                <label class="form-lbl">Role <span class="req-star">*</span></label>
-                <select name="Role" class="@Ctrl("Role")" data-validate="required" data-label="Role">
-                    <option value="">Select role</option>
-                    @foreach (var r in roles)
-                    {
-                        <option value="@r" selected="@(Model.Role == r)">@((r == "PayrollStaff") ? "Payroll Staff" : r)</option>
-                    }
-                </select>
-                <span class="field-error" data-error-for="Role">@Err("Role")</span>
+                <label class="form-lbl">Role</label>
+                <input type="text" class="form-ctrl" value="Payroll Staff" readonly />
+                <input type="hidden" name="Role" value="PayrollStaff" />
             </div>
         </div>
 

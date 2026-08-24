@@ -21,20 +21,31 @@
     var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
     var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
     var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
+    var regularHours = ViewBag.RegularHours is decimal rh ? rh : daysWorked * 8m;
     var cashAdvance = ViewBag.CashAdvance is decimal ca ? ca : 0m;
     var returnUrl = ViewBag.ReturnUrl as string ?? "";
+    var startLabel = DateTime.TryParse(defaultStart, out var startDt)
+        ? startDt.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+        : defaultStart;
+    var endLabel = DateTime.TryParse(defaultEnd, out var endDt)
+        ? endDt.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)
+        : defaultEnd;
     var slipConfig = JsonSerializer.Serialize(new
     {
         employeeId = Model.EmployeeId,
         projectId = project?.ProjectId ?? 0,
         dailyRate = Model.DailyRate,
-        hourlyRate = Model.RatePerHour,
+        hourlyRate = EmployeeRates.HourlyFromDaily(Model.DailyRate),
         boundMin = minDate,
         boundMax = maxDate,
         hasSchedule = ViewBag.HasPayrollSchedule is true,
         isEdit,
         payrollId,
         returnUrl,
+        regularHours,
+        overtimeHours,
+        daysWorked,
+        absentDays,
         schedules = schedules.Select(s => new
         {
             start = s.StartingDate.ToString("yyyy-MM-dd"),
@@ -103,9 +114,16 @@ else
             </div>
             <div>
                 <div class="form-lbl">Rate per hour</div>
-                <div class="slip-value">₱@Model.RatePerHour.ToString("N2")</div>
+                <div class="slip-value">₱@EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("N2")</div>
             </div>
         </div>
+
+        <input type="hidden" name="payPeriodStart" id="payPeriodStart" value="@defaultStart" />
+        <input type="hidden" name="payPeriodEnd" id="payPeriodEnd" value="@defaultEnd" />
+        <input type="hidden" name="regularDaysWorked" id="regularDaysWorked" value="@daysWorked" />
+        <input type="hidden" name="absentDays" id="absentDays" value="@absentDays" />
+        <input type="hidden" name="overtimeHours" id="overtimeHours" value="@overtimeHours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
+        <input type="hidden" name="regularHours" id="regularHours" value="@regularHours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" />
 
         @if (ViewBag.HasPayrollSchedule is true && (!string.IsNullOrEmpty(minDate) || !string.IsNullOrEmpty(maxDate)))
         {
@@ -116,7 +134,7 @@ else
                 ? DateTime.Parse(maxDate).ToString("MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
                 : "the schedule end";
             <div class="slip-schedule-hint" id="payPeriodScheduleHint">
-                Pay period must fall within the payroll schedule:
+                Pay period is taken from the payroll schedule:
                 @scheduleStartLabel – @scheduleEndLabel
             </div>
         }
@@ -129,52 +147,36 @@ else
 
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Pay Period Starting Date <span class="req-star">*</span></label>
-                <input type="date" name="payPeriodStart" id="payPeriodStart" class="form-ctrl"
-                       value="@defaultStart"
-                       min="@(string.IsNullOrEmpty(minDate) ? "2000-01-01" : minDate)"
-                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
-                       data-validate="required|dateYear|dateWithin" data-label="Pay period starting date"
-                       data-min="@minDate" data-max="@maxDate" />
-                <span class="field-error" data-error-for="payPeriodStart"></span>
+                <div class="form-lbl">Pay Period Starting Date</div>
+                <div class="slip-value">@startLabel</div>
             </div>
             <div>
-                <label class="form-lbl">Pay Period Ending Date <span class="req-star">*</span></label>
-                <input type="date" name="payPeriodEnd" id="payPeriodEnd" class="form-ctrl"
-                       value="@defaultEnd"
-                       min="@(string.IsNullOrEmpty(endMin) ? "2000-01-01" : endMin)"
-                       max="@(string.IsNullOrEmpty(maxDate) ? "2099-12-31" : maxDate)"
-                       data-validate="required|dateAfter|dateYear|dateWithin" data-after="payPeriodStart"
-                       data-label="Pay period ending date"
-                       data-min="@endMin" data-max="@maxDate" />
-                <span class="field-error" data-error-for="payPeriodEnd"></span>
+                <div class="form-lbl">Pay Period Ending Date</div>
+                <div class="slip-value">@endLabel</div>
             </div>
         </div>
         <div class="form-row form-row-2">
             <div>
-                <label class="form-lbl">Regular Days Worked <span class="req-star">*</span></label>
-                <input type="number" name="regularDaysWorked" id="regularDaysWorked" class="form-ctrl"
-                       step="1" min="0" value="@daysWorked"
-                       data-validate="nonNegInt" data-label="Regular days worked" />
-                <span class="field-error" data-error-for="regularDaysWorked"></span>
+                <div class="form-lbl">Regular Days Worked</div>
+                <div class="slip-value">@daysWorked</div>
             </div>
             <div>
-                <label class="form-lbl">Absent Days</label>
-                <input type="number" name="absentDays" id="absentDays" class="form-ctrl"
-                       step="1" min="0" value="@absentDays"
-                       data-validate="nonNegInt" data-label="Absent days" />
-                <span class="field-error" data-error-for="absentDays"></span>
+                <div class="form-lbl">Regular Hours</div>
+                <div class="slip-value">@regularHours.ToString("0.##")</div>
+            </div>
+        </div>
+        <div class="form-row form-row-2">
+            <div>
+                <div class="form-lbl">Absent Days</div>
+                <div class="slip-value">@absentDays</div>
+            </div>
+            <div>
+                <div class="form-lbl">Overtime (Hours)</div>
+                <div class="slip-value">@overtimeHours.ToString("0.##")</div>
             </div>
         </div>
 
-        <div class="form-row form-row-2">
-            <div>
-                <label class="form-lbl">Overtime (Hours)</label>
-                <input type="number" name="overtimeHours" id="overtimeHours" class="form-ctrl"
-                       step="0.5" min="0" value="@overtimeHours.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
-                       data-validate="nonNeg" data-label="Overtime hours" />
-                <span class="field-error" data-error-for="overtimeHours"></span>
-            </div>
+        <div class="slip-generate-row">
             <div>
                 <label class="form-lbl">Cash Advance</label>
                 <input type="number" name="cashAdvance" id="cashAdvance" class="form-ctrl"
@@ -182,12 +184,11 @@ else
                        data-validate="nonNeg" data-label="Cash advance" />
                 <span class="field-error" data-error-for="cashAdvance"></span>
             </div>
+            <button type="submit" id="generateBtn" class="btn-primary-blue-block"
+                    @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
+                @(isEdit ? "Save Changes" : "Generate Payroll")
+            </button>
         </div>
-
-        <button type="submit" id="generateBtn" class="btn-primary-blue-block"
-                @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
-            @(isEdit ? "Save Changes" : "Generate Payroll")
-        </button>
     </form>
 </div>
 

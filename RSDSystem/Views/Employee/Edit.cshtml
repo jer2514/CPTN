@@ -20,13 +20,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
@@ -167,11 +166,6 @@
                                 <option value="@p.ProjectId" selected="@(p.ProjectId == Model.ProjectId)">@p.ProjectName</option>
                             }
                         </select>
-                        <div id="reactivateHint" class="slip-schedule-hint" style="display:none; margin-top:8px">
-                            <i class="bi bi-info-circle-fill"></i>
-                            This employee is currently Inactive. Assigning them to a project will
-                            automatically set their status back to Active when you save.
-                        </div>
                     </div>
                 </div>
 
@@ -191,19 +185,17 @@
                     </div>
                     <div>
                         <label class="form-lbl">Rate per Day <span class="req-star">*</span></label>
-                        <input type="number" name="DailyRate" class="@Ctrl("DailyRate")"
+                        <input type="number" name="DailyRate" id="DailyRate" class="@Ctrl("DailyRate")"
                                step="0.01" min="0.01" placeholder="0.00"
                                value="@(Model.DailyRate > 0 ? Model.DailyRate.ToString("0.00") : "")"
                                data-validate="money" data-label="Rate per day" />
                         <span class="field-error" data-error-for="DailyRate">@Err("DailyRate")</span>
                     </div>
                     <div>
-                        <label class="form-lbl">Rate per Hour <span class="req-star">*</span></label>
-                        <input type="number" name="RatePerHour" class="@Ctrl("RatePerHour")"
-                               step="0.01" min="0.01" placeholder="0.00"
-                               value="@(Model.RatePerHour > 0 ? Model.RatePerHour.ToString("0.00") : "")"
-                               data-validate="money" data-label="Rate per hour" />
-                        <span class="field-error" data-error-for="RatePerHour">@Err("RatePerHour")</span>
+                        <label class="form-lbl">Rate per Hour</label>
+                        <input type="text" id="RatePerHourDisplay" class="form-ctrl" readonly tabindex="-1"
+                               placeholder="0.00"
+                               value="@(Model.DailyRate > 0 ? EmployeeRates.HourlyFromDaily(Model.DailyRate).ToString("0.00") : "")" />
                     </div>
                 </div>
 
@@ -258,8 +250,20 @@
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
+        (function () {
+            var daily = document.getElementById('DailyRate');
+            var hourly = document.getElementById('RatePerHourDisplay');
+            if (!daily || !hourly) return;
+            function syncHourly() {
+                var n = parseFloat(daily.value);
+                hourly.value = (!daily.value || Number.isNaN(n) || n <= 0) ? '' : (n / 8).toFixed(2);
+            }
+            daily.addEventListener('input', syncHourly);
+            daily.addEventListener('change', syncHourly);
+            syncHourly();
+        })();
+
         const hasAssignedProject = @(Model.ProjectId.HasValue ? "true" : "false");
-        const employeeIsActive = @(Model.IsActive ? "true" : "false");
 
         function previewPhoto(input) {
             document.getElementById('fileLabel').textContent =
@@ -306,17 +310,5 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') closeDeactivateEmpModal();
         });
-
-        // ── Reactivation hint when assigning a project to an inactive employee ──
-        const projectSelect = document.getElementById('projectSelect');
-        const reactivateHint = document.getElementById('reactivateHint');
-
-        function updateReactivateHint() {
-            const hasProjectSelected = !!projectSelect.value;
-            reactivateHint.style.display = (!employeeIsActive && hasProjectSelected) ? 'block' : 'none';
-        }
-
-        projectSelect.addEventListener('change', updateReactivateHint);
-        updateReactivateHint(); // run once on load in case a project is already selected
     </script>
 }

@@ -22,13 +22,12 @@
 }
 
 
-<div class="content-topbar">
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
-
-<a asp-action="Index" class="btn-back">
-    <i class="bi bi-arrow-left"></i> Back
-</a>
 
 <div class="form-card">
     <form asp-action="Edit" method="post" class="js-validate" novalidate>
@@ -293,6 +292,19 @@
     </form>
 </div>
 
+<div class="del-overlay" id="removeEmpOverlay" onclick="closeRemoveEmpModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-title">Remove employee?</div>
+        <div class="del-msg">
+            This employee will be unassigned from the project and set inactive.
+        </div>
+        <div class="del-actions">
+            <button type="button" class="del-btn-cancel" onclick="closeRemoveEmpModal()">Cancel</button>
+            <button type="button" class="del-btn-delete" onclick="confirmRemoveEmployee()">Remove</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
@@ -401,10 +413,21 @@
         });
 
         function removeEmployee(id) {
-            if (confirm('Remove this employee from project?')) {
-                document.getElementById('removeEmpId').value = id;
-                document.getElementById('removeEmployeeForm').submit();
-            }
+            document.getElementById('removeEmpId').value = id;
+            document.getElementById('removeEmpOverlay').classList.add('open');
         }
+
+        function confirmRemoveEmployee() {
+            document.getElementById('removeEmployeeForm').submit();
+        }
+
+        function closeRemoveEmpModal(e) {
+            if (!e || e.target === document.getElementById('removeEmpOverlay'))
+                document.getElementById('removeEmpOverlay').classList.remove('open');
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeRemoveEmpModal();
+        });
     </script>
 }

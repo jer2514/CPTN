@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Validation;
+using RSDSystem.Services;
 using BCrypt.Net;
 
 namespace RSDSystem.Controllers
@@ -15,14 +16,13 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
         private readonly IWebHostEnvironment _env;
+        private readonly ActivityLogService _logs;
 
-        /// <summary>
-        /// Receives the database and web root so user photos can be saved under wwwroot/uploads/users.
-        /// </summary>
-        public UserManagementController(PayrollDbContext db, IWebHostEnvironment env)
+        public UserManagementController(PayrollDbContext db, IWebHostEnvironment env, ActivityLogService logs)
         {
             _db = db;
             _env = env;
+            _logs = logs;
         }
 
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
@@ -80,9 +80,8 @@ namespace RSDSystem.Controllers
         /// <returns>An empty User form with Admin and PayrollStaff role choices.</returns>
         public IActionResult Create()
         {
-            ViewBag.Roles = Roles;
             ViewBag.PageTitle = "Add User";
-            return View(new User());
+            return View(new User { Role = "PayrollStaff" });
         }
 
         /// <summary>
@@ -100,11 +99,12 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
+            user.Role = "PayrollStaff";
 
             if (string.IsNullOrWhiteSpace(Password))
                 ModelState.AddModelError("Password", "Password is required.");
-            else if (Password.Length < 8)
-                ModelState.AddModelError("Password", "Password must be at least 8 characters.");
+            else if (!InputRules.TryValidateStaffPassword(Password, out var passwordError))
+                ModelState.AddModelError("Password", passwordError!);
 
             if (Password != ConfirmPassword)
                 ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
@@ -132,7 +132,8 @@ namespace RSDSystem.Controllers
 
             if (!ModelState.IsValid)
             {
-                ViewBag.Roles = Roles;
+                ViewBag.PageTitle = "Add User";
+                user.Role = "PayrollStaff";
                 return View(user);
             }
 
@@ -153,6 +154,11 @@ namespace RSDSystem.Controllers
             _db.Users.Add(user);
             user.UserCode = await GenerateUserCodeAsync();
             await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.CreateUser,
+                ActivityModules.UserManagement,
+                $"Added payroll staff user {user.FullName} ({user.Username}).",
+                relatedId: user.UserId);
             TempData["Success"] = "User added successfully.";
             return RedirectToAction(nameof(Index));
         }
@@ -178,7 +184,6 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user == null) return NotFound();
 
-            ViewBag.Roles = Roles;
             ViewBag.PageTitle = "Edit User";
             return View(user);
         }
@@ -199,10 +204,21 @@ namespace RSDSystem.Controllers
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
 
+            var existing = await _db.Users.FindAsync(user.UserId);
+            if (existing == null) return NotFound();
+
             if (!string.IsNullOrWhiteSpace(NewPassword))
             {
-                if (NewPassword.Length < 8)
+                if (string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!InputRules.TryValidateStaffPassword(NewPassword, out var passwordError))
+                        ModelState.AddModelError("NewPassword", passwordError!);
+                }
+                else if (NewPassword.Length < 8)
+                {
                     ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+                }
+
                 if (NewPassword != ConfirmPassword)
                     ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
             }
@@ -230,12 +246,12 @@ namespace RSDSystem.Controllers
 
             if (!ModelState.IsValid)
             {
-                ViewBag.Roles = Roles;
+                ViewBag.PageTitle = "Edit User";
+                user.Role = existing.Role;
+                user.PhotoPath = existing.PhotoPath;
+                user.UserCode = existing.UserCode;
                 return View(user);
             }
-
-            var existing = await _db.Users.FindAsync(user.UserId);
-            if (existing == null) return NotFound();
 
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
             existing.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
@@ -249,7 +265,6 @@ namespace RSDSystem.Controllers
             existing.Email = email;
             existing.ContactNumber = user.ContactNumber?.Trim();
             existing.Address = user.Address?.Trim();
-            existing.Role = user.Role;
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
                 existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
@@ -258,6 +273,11 @@ namespace RSDSystem.Controllers
                 existing.PhotoPath = await SavePhotoAsync(photo);
 
             await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.EditUser,
+                ActivityModules.UserManagement,
+                $"Updated user {existing.FullName} ({existing.Username}).",
+                relatedId: existing.UserId);
 
             // If the account being edited is the one currently logged in,
             // refresh Session so the sidebar reflects the change immediately.
@@ -283,15 +303,9 @@ namespace RSDSystem.Controllers
         /// <returns>A redirect back to the user list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public IActionResult Delete(int id)
         {
-            var user = await _db.Users.FindAsync(id);
-            if (user != null)
-            {
-                _db.Users.Remove(user);
-                await _db.SaveChangesAsync();
-                TempData["Success"] = "User deleted.";
-            }
+            TempData["Error"] = "Users cannot be deleted. Set payroll staff inactive to stop them from logging in.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -311,25 +325,11 @@ namespace RSDSystem.Controllers
             return $"/uploads/users/{fileName}";
         }
 
-        /// <summary>
-        /// POST /UserManagement/BulkDelete. Delete selected checkbox on the list page.
-        /// Removes every User whose id is in selectedIds, then returns to the list.
-        /// </summary>
-        /// <returns>A redirect to Index. Does nothing when the selection is empty.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> BulkDelete(List<int> selectedIds)
+        public IActionResult BulkDelete(List<int> selectedIds)
         {
-            if (selectedIds == null || selectedIds.Count == 0)
-                return RedirectToAction(nameof(Index));
-
-            var users = _db.Users
-                           .Where(u => selectedIds.Contains(u.UserId))
-                           .ToList();
-
-            _db.Users.RemoveRange(users);
-            await _db.SaveChangesAsync();
-            TempData["Success"] = "Users deleted.";
+            TempData["Error"] = "Users cannot be deleted. Set payroll staff inactive to stop them from logging in.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -345,16 +345,31 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user != null)
             {
+                if (user.IsActive && await IsLastAdminAsync(user))
+                {
+                    TempData["Error"] = "The system must keep one active admin account.";
+                    return RedirectToAction(nameof(Index));
+                }
+
                 user.IsActive = !user.IsActive;
                 await _db.SaveChangesAsync();
+                TempData["Success"] = user.IsActive
+                    ? "User is now active and can log in."
+                    : "User is now inactive and cannot log in.";
             }
             return RedirectToAction(nameof(Index));
         }
 
-        /// <summary>
-        /// Build a yyNNNN code from the highest existing code for this year (synchronous).
-        /// Create sets this first, then overwrites with GenerateUserCodeAsync before save.
-        /// </summary>
+        private async Task<bool> IsLastAdminAsync(User user)
+        {
+            if (!string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                return false;
+            return !await _db.Users.AnyAsync(u =>
+                u.UserId != user.UserId
+                && u.Role == "Admin"
+                && u.IsActive);
+        }
+
         private string GenerateUserCode()
         {
             string yearPrefix = DateTime.Now.ToString("yy");

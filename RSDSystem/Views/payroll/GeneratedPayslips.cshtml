@@ -17,6 +17,7 @@
     int currentPage = ViewBag.CurrentPage is int currentPageVal ? currentPageVal : 1;
     int totalPages = ViewBag.TotalPages is int totalPagesVal ? totalPagesVal : 1;
     var dateCulture = CultureInfo.InvariantCulture;
+    var isFinished = ViewBag.IsFinished is true;
 }
 
 <div class="pred-topbar">
@@ -42,7 +43,10 @@
            asp-route-end="@end.ToString("yyyy-MM-dd")"
            target="_blank"
            class="pred-btn-pdf">Download PDF</a>
-        <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+        @if (!isFinished)
+        {
+            <button type="button" class="pred-btn-send" onclick="openSendModal()">Send to Payroll Staff</button>
+        }
     </div>
 </div>
 
@@ -72,7 +76,7 @@
                         <div><span class="mini-lbl">Employee Name: </span><span class="mini-val">@(slip.Employee?.FullName ?? "")</span></div>
                         <div><span class="mini-lbl">Rate per day: </span><span class="mini-val">₱@((slip.Employee?.DailyRate ?? 0).ToString("N2"))</span></div>
                         <div><span class="mini-lbl">Job Classification: </span><span class="mini-val">@(slip.Employee?.JobClassification)</span></div>
-                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@((slip.Employee?.RatePerHour ?? 0).ToString("N2"))</span></div>
+                        <div><span class="mini-lbl">Rate per hour: </span><span class="mini-val">₱@EmployeeRates.HourlyFromDaily(slip.Employee?.DailyRate ?? 0).ToString("N2")</span></div>
                     </div>
 
                     <div class="mini-section">
@@ -81,6 +85,7 @@
                     </div>
                     <div class="mini-fields">
                         <span class="mini-lbl">Regular Days Worked:</span><span class="mini-val">@slip.RegularDaysWorked Days</span>
+                        <span class="mini-lbl">Regular Hours:</span><span class="mini-val">@PayrollComputation.PaidRegularHours(slip).ToString("0.##") hrs</span>
                         <span class="mini-lbl">Overtime:</span><span class="mini-val">@slip.OvertimeHours.ToString("0.##") hours</span>
                         <span class="mini-lbl">Absent:</span><span class="mini-val">@slip.AbsentDays Days</span>
                     </div>
@@ -97,7 +102,7 @@
                     <div class="mini-net">
                         <span class="mini-lbl">Net Pay:</span><span class="mini-val">₱@slip.NetPay.ToString("N2")</span>
                     </div>
-                    <div class="mini-footer">Generated Date: @slip.GeneratedDate.ToString("MMMM dd, yyyy", dateCulture)</div>
+                    <div class="mini-footer">Generated Date: @PhilippinesTime.FormatLongDate(slip.GeneratedDate)</div>
                 </a>
             }
         </div>

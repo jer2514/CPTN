@@ -197,7 +197,9 @@ namespace RSDSystem.Models
             return OnGoing;
         }
 
-        /// <summary>CSS badge class for the status pill on Project Details (finished / hold / ongoing).</summary>
+        public static bool IsFinished(string? status) =>
+            Normalize(status) == Finished;
+
         public static string BadgeClass(string? status) => Normalize(status) switch
         {
             Finished => "badge-finished",

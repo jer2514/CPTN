@@ -11,6 +11,9 @@
     var currentPage = ViewBag.Page as int? ?? 1;
     var totalPages = ViewBag.TotalPages as int? ?? 1;
     var isAdmin = ViewBag.IsAdmin as bool? ?? false;
+    var unread = ViewBag.Unread as int? ?? 0;
+    var filter = ViewBag.Filter as string ?? "all";
+    var unreadOnly = filter == "unread";
     var backController = role == "PayrollStaff" ? "PayrollStaff" : "Home";
 }
 
@@ -25,21 +28,31 @@
     <div class="notif-page-title">Notifications</div>
 
     <div class="notif-filter-bar">
-        <span class="notif-filter-active">All</span>
+        <div class="notif-filter-tabs">
+            <a class="notif-filter-tab @(unreadOnly ? "" : "is-active")"
+               asp-action="Index" asp-route-filter="all">All</a>
+            <a class="notif-filter-tab @(unreadOnly ? "is-active" : "")"
+               asp-action="Index" asp-route-filter="unread">Unread</a>
+            <span class="notif-unread-count">@unread unread</span>
+        </div>
         <button type="button" class="notif-mark-all" id="notifPageMarkAll">mark all as read</button>
     </div>
 
     <div class="notif-page-list">
         @if (Model == null || Model.Count == 0)
         {
-            <div class="text-center text-muted py-5">No notifications yet.</div>
+            <div class="text-center text-muted py-5">
+                @(unreadOnly ? "No unread notifications." : "No notifications yet.")
+            </div>
         }
         else
         {
             foreach (var item in Model)
             {
                 var url = item.Url ?? "#";
-                var correction = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionRequest && item.RelatedId.HasValue;
+                var correction = isAdmin && item.RelatedId.HasValue && (
+                    item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionRequest
+                    || item.Kind == RSDSystem.Models.NotificationKinds.AttendanceCorrectionResubmitted);
                 var task = isAdmin && item.Kind == RSDSystem.Models.NotificationKinds.TaskCompletionRequested && item.RelatedId.HasValue;
                 <button type="button"
                         class="notif-page-item @(item.IsRead ? "is-read" : "")"
@@ -71,7 +84,7 @@
     <div class="notif-pager">
         @if (currentPage > 1)
         {
-            <a class="att-page-btn" asp-action="Index" asp-route-page="@(currentPage - 1)">&lsaquo;</a>
+            <a class="att-page-btn" asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-filter="@filter">&lsaquo;</a>
         }
         else
         {
@@ -80,7 +93,7 @@
         <span>Page @currentPage of @totalPages</span>
         @if (currentPage < totalPages)
         {
-            <a class="att-page-btn" asp-action="Index" asp-route-page="@(currentPage + 1)">&rsaquo;</a>
+            <a class="att-page-btn" asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-filter="@filter">&rsaquo;</a>
         }
         else
         {

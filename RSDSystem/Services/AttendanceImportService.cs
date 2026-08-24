@@ -43,6 +43,14 @@ namespace RSDSystem.Services
                 };
             }
 
+            if (ProjectStatusOptions.IsFinished(project.Status))
+            {
+                return new AttendancePreviewResult
+                {
+                    Error = "Finished projects cannot import or open attendance records."
+                };
+            }
+
             var employees = await LoadMatchPoolAsync(project.ProjectId, cancellationToken);
             var parsed = AttendanceFileParser.Parse(file, fileName);
             if (parsed.Error != null)
@@ -103,9 +111,22 @@ namespace RSDSystem.Services
                 return new AttendanceImportResult { Error = preview.Error ?? "Import failed." };
             }
 
+            var closedPayrolls = await PayrollAttendanceLock.LoadClosedAsync(
+                _db, preview.Project.ProjectId, cancellationToken);
+            var skippedLocked = preview.Rows.Count(r =>
+                PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate));
+            preview.Rows = preview.Rows
+                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                .ToList();
+
             if (preview.Rows.Count == 0)
             {
-                return new AttendanceImportResult { Error = "The file did not contain any attendance rows." };
+                return new AttendanceImportResult
+                {
+                    Error = skippedLocked > 0
+                        ? "Payroll for these employees is already approved. Attendance cannot be imported again for that period."
+                        : "The file did not contain any attendance rows."
+                };
             }
 
             try
@@ -129,7 +150,7 @@ namespace RSDSystem.Services
                 PeriodStart = AttendanceDisplay.UsableDate(preview.PeriodStart),
                 PeriodEnd = AttendanceDisplay.UsableDate(preview.PeriodEnd),
                 ImportedBy = Clip(importedBy, 150),
-                ImportedAt = DateTime.Now,
+                ImportedAt = PhilippinesTime.Now,
                 RowCount = preview.Rows.Count
             };
 
@@ -137,10 +158,11 @@ namespace RSDSystem.Services
                 preview.Project.ProjectId,
                 AttendanceDisplay.UsableDate(preview.PeriodStart),
                 AttendanceDisplay.UsableDate(preview.PeriodEnd),
+                closedPayrolls,
                 cancellationToken);
 
             await RemoveConflictingRecordsAsync(
-                preview.Project.ProjectId, preview.Rows, cancellationToken);
+                preview.Project.ProjectId, preview.Rows, closedPayrolls, cancellationToken);
 
             foreach (var row in preview.Rows)
             {
@@ -195,7 +217,8 @@ namespace RSDSystem.Services
                 RowCount = preview.Rows.Count,
                 MatchedCount = preview.Rows.Count(r => r.Matched),
                 UnmatchedCount = preview.Rows.Count(r => !r.Matched),
-                ReplacedPrevious = replaced
+                ReplacedPrevious = replaced,
+                SkippedLockedCount = skippedLocked
             };
         }
 
@@ -414,9 +437,21 @@ namespace RSDSystem.Services
             return ToEmployeeSummary(rows);
         }
 
-        /// <summary>
-        /// Deletes all punches in the selected period and empty import headers. AttendanceController.DeletePeriod uses the deleted count or Error.
-        /// </summary>
+        public async Task<HashSet<int>> EmployeeIdsWithAttendanceAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var ids = await ApplyRecordFilters(
+                    RecordsForProject(projectId), null, null, periodStart, periodEnd)
+                .Where(r => r.EmployeeId != null)
+                .Select(r => r.EmployeeId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            return ids.ToHashSet();
+        }
+
         public async Task<(int Deleted, string? Error)> DeletePeriodAsync(
             int projectId,
             DateTime? periodStart,
@@ -541,7 +576,8 @@ namespace RSDSystem.Services
                 DisplayId = AttendanceDisplay.EmployeeId(first.Employee?.EmployeeCode ?? first.ExternalUserId),
                 EmployeeName = first.Employee?.FullName ?? first.EmployeeName,
                 Matched = rows.Any(r => r.Matched),
-                DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
+                DaysWorked = rows.Count(r => AttendanceStatuses.CountsAsFullDay(r.Status)),
+                DaysPresent = rows.Count(r => AttendanceStatuses.CountsAsWorked(r.Status)),
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),
@@ -550,26 +586,12 @@ namespace RSDSystem.Services
             };
         }
 
-        /// <summary>
-        /// Regular hours for one day: stored WorkHoursActual if already computed, otherwise AttendanceRules from the four punches.
-        /// </summary>
-        private static decimal DayRegularHours(AttendanceRecord row)
-        {
-            if (row.WorkHoursActual > 0)
-                return row.WorkHoursActual;
-            return AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
-        }
+        private static decimal DayRegularHours(AttendanceRecord row) =>
+            AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
 
-        /// <summary>
-        /// Overtime hours for one day: stored OvertimeHours if set, otherwise AttendanceRules from punches including OT in/out.
-        /// </summary>
-        private static decimal DayOvertimeHours(AttendanceRecord row)
-        {
-            if (row.OvertimeHours > 0)
-                return row.OvertimeHours;
-            return AttendanceRules.OvertimeHours(
+        private static decimal DayOvertimeHours(AttendanceRecord row) =>
+            AttendanceRules.OvertimeHours(
                 row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
-        }
 
         /// <summary>
         /// Stable period dropdown key: start and end as yyyy-MM-dd joined with a pipe.
@@ -591,6 +613,7 @@ namespace RSDSystem.Services
             int projectId,
             DateTime? periodStart,
             DateTime? periodEnd,
+            List<ClosedPayrollWindow> closedPayrolls,
             CancellationToken cancellationToken)
         {
             var start = AttendanceDisplay.UsableDate(periodStart ?? periodEnd);
@@ -610,8 +633,27 @@ namespace RSDSystem.Services
             if (toRemove.Count == 0)
                 return false;
 
-            _db.AttendanceImports.RemoveRange(toRemove);
-            return true;
+            var removedUnlocked = false;
+            foreach (var import in toRemove)
+            {
+                var locked = import.Records
+                    .Where(r => PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                    .ToList();
+                var unlocked = import.Records
+                    .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                    .ToList();
+
+                if (unlocked.Count > 0)
+                {
+                    _db.AttendanceRecords.RemoveRange(unlocked);
+                    removedUnlocked = true;
+                }
+
+                if (locked.Count == 0)
+                    _db.AttendanceImports.Remove(import);
+            }
+
+            return removedUnlocked;
         }
 
         /// <summary>
@@ -621,6 +663,7 @@ namespace RSDSystem.Services
         private async Task RemoveConflictingRecordsAsync(
             int projectId,
             List<AttendancePreviewRow> rows,
+            List<ClosedPayrollWindow> closedPayrolls,
             CancellationToken cancellationToken)
         {
             var employeeIds = rows
@@ -653,6 +696,10 @@ namespace RSDSystem.Services
                          (r.WorkDate == null || r.WorkDate.Value.Year < 1900))
                     ))
                 .ToListAsync(cancellationToken);
+
+            existing = existing
+                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                .ToList();
 
             if (existing.Count > 0)
                 _db.AttendanceRecords.RemoveRange(existing);
@@ -739,6 +786,12 @@ namespace RSDSystem.Services
                 return "Attendance row not found.";
             }
 
+            if (await PayrollAttendanceLock.IsLockedAsync(
+                    _db, record.ProjectId, record.EmployeeId, record.WorkDate, cancellationToken))
+            {
+                return "Payroll for this employee is already approved. Attendance cannot be edited.";
+            }
+
             record.TimeIn1 = EmptyToNull(timeIn1);
             record.TimeOut1 = EmptyToNull(timeOut1);
             record.TimeIn2 = EmptyToNull(timeIn2);
@@ -823,7 +876,7 @@ namespace RSDSystem.Services
                 });
             }
 
-            edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsWorked(d.Status));
+            edit.DaysWorked = edit.Days.Count(d => AttendanceStatuses.CountsAsFullDay(d.Status));
             edit.DaysAbsent = edit.Days.Count(d => d.Status == AttendanceStatuses.Absent);
             edit.DaysLate = edit.Days.Count(d => AttendanceStatuses.CountsAsLate(d.Status));
             edit.DaysIncomplete = edit.Days.Count(d => AttendanceStatuses.IsHalfDay(d.Status));
@@ -1001,14 +1054,10 @@ namespace RSDSystem.Services
         /// </summary>
         private async Task<List<Employee>> LoadMatchPoolAsync(int projectId, CancellationToken cancellationToken)
         {
-            var projectEmployees = await _db.Employees
+            return await _db.Employees
                 .AsNoTracking()
                 .Where(e => e.ProjectId == projectId)
                 .ToListAsync(cancellationToken);
-
-            return projectEmployees.Count > 0
-                ? projectEmployees
-                : await _db.Employees.AsNoTracking().ToListAsync(cancellationToken);
         }
 
         // Extracts every row from the file exactly as it appears (raw name / raw ID),

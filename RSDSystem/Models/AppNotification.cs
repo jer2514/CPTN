@@ -67,8 +67,7 @@ namespace RSDSystem.Models
     {
         /// <summary>Staff submitted slips; Admin is sent to ReviewProject.</summary>
         public const string PayrollSubmitted = "PayrollSubmitted";
-
-        /// <summary>Two approved months exist so Admin can run payroll prediction.</summary>
+        public const string PayrollResubmitted = "PayrollResubmitted";
         public const string PayrollPredictionAvailable = "PayrollPredictionAvailable";
 
         /// <summary>Staff imported attendance for a project.</summary>
@@ -82,8 +81,7 @@ namespace RSDSystem.Models
 
         /// <summary>Staff requested a punch change; Admin opens the correction modal.</summary>
         public const string AttendanceCorrectionRequest = "AttendanceCorrectionRequest";
-
-        /// <summary>Admin returned a slip; staff should edit and submit again.</summary>
+        public const string AttendanceCorrectionResubmitted = "AttendanceCorrectionResubmitted";
         public const string PayrollCorrection = "PayrollCorrection";
 
         /// <summary>Admin added a PayrollSchedule; staff see a new to-do task.</summary>
@@ -94,8 +92,7 @@ namespace RSDSystem.Models
 
         /// <summary>Admin approved the done request; task leaves the staff to-do list.</summary>
         public const string TaskCompletionApproved = "TaskCompletionApproved";
-
-        /// <summary>Admin approved a slip; staff can see it as locked/Approved.</summary>
+        public const string TaskCompletionReturned = "TaskCompletionReturned";
         public const string PayrollApproved = "PayrollApproved";
 
         /// <summary>Admin approved a punch correction; new times are on the record.</summary>
@@ -103,23 +100,30 @@ namespace RSDSystem.Models
 
         /// <summary>Admin returned a punch correction; staff see the return reason.</summary>
         public const string AttendanceCorrectionRejected = "AttendanceCorrectionRejected";
+        public const string PayslipsSent = "PayslipsSent";
+        public const string StaffAssigned = "StaffAssigned";
 
         /// <summary>Bootstrap-icons class for the round icon in the bell row.</summary>
         public static string Icon(string? kind) => (kind ?? "").Trim() switch
         {
             PayrollSubmitted => "bi-send-fill",
+            PayrollResubmitted => "bi-arrow-repeat",
             PayrollPredictionAvailable => "bi-check-circle-fill",
             AttendanceImported => "bi-calendar-event-fill",
             PayrollAnomalyBudget => "bi-exclamation-circle-fill",
             PayrollAnomalyPattern => "bi-exclamation-circle-fill",
             AttendanceCorrectionRequest => "bi-file-earmark-text-fill",
+            AttendanceCorrectionResubmitted => "bi-arrow-repeat",
             PayrollCorrection => "bi-exclamation-triangle-fill",
             NewTask => "bi-file-earmark-fill",
             TaskCompletionRequested => "bi-clipboard-check-fill",
             TaskCompletionApproved => "bi-check-circle-fill",
+            TaskCompletionReturned => "bi-arrow-return-left",
             PayrollApproved => "bi-check-circle-fill",
             AttendanceCorrectionApproved => "bi-file-earmark-text-fill",
             AttendanceCorrectionRejected => "bi-file-earmark-excel-fill",
+            PayslipsSent => "bi-file-earmark-pdf-fill",
+            StaffAssigned => "bi-person-check-fill",
             _ => "bi-bell-fill"
         };
 
@@ -127,18 +131,23 @@ namespace RSDSystem.Models
         public static string IconClass(string? kind) => (kind ?? "").Trim() switch
         {
             PayrollSubmitted => "notif-icon-send",
+            PayrollResubmitted => "notif-icon-send",
             PayrollPredictionAvailable => "notif-icon-ok",
             AttendanceImported => "notif-icon-cal",
             PayrollAnomalyBudget => "notif-icon-warn",
             PayrollAnomalyPattern => "notif-icon-warn",
             AttendanceCorrectionRequest => "notif-icon-doc",
+            AttendanceCorrectionResubmitted => "notif-icon-doc",
             PayrollCorrection => "notif-icon-warn",
             NewTask => "notif-icon-task",
             TaskCompletionRequested => "notif-icon-doc",
             TaskCompletionApproved => "notif-icon-ok",
+            TaskCompletionReturned => "notif-icon-warn",
             PayrollApproved => "notif-icon-ok",
             AttendanceCorrectionApproved => "notif-icon-task",
             AttendanceCorrectionRejected => "notif-icon-reject",
+            PayslipsSent => "notif-icon-send",
+            StaffAssigned => "notif-icon-task",
             _ => "notif-icon-task"
         };
     }

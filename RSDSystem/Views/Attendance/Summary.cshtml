@@ -12,7 +12,7 @@
     <button class="bell-btn"><i class="bi bi-bell-fill"></i></button>
 </div>
 
-<div class="page-card">
+<div class="page-card search-stretch-card">
     <div class="att-page-title">Attendance Summary</div>
 
     <div class="att-filter-grid">
@@ -43,24 +43,23 @@
         <div id="summaryChips" class="att-summary att-summary-wide"></div>
         <div id="summaryMeta" class="att-preview-meta" style="margin-bottom:12px"></div>
 
-        <div class="emp-card-head">
-            <div></div>
-            <div class="emp-controls">
+        <div class="list-controls-row att-list-toolbar">
+            <div class="list-controls-left">
+                <div class="search-wrap search-wrap-wide">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="rowSearch" placeholder="Search User" />
+                </div>
                 <div class="dropdown">
-                    <button class="btn-outline-blue dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="bi bi-funnel"></i> Filter
+                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        Filter
                     </button>
                     <ul class="dropdown-menu filter-menu">
                         <li><a class="dropdown-item" href="#" data-status="all">All</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Unmatched">Unmatched</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Absent">Has absences</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Late">Has late days</a></li>
-                        <li><a class="dropdown-item" href="#" data-status="Half-day">Has half-day</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Absent">Absent</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Half-day">Half-day</a></li>
                     </ul>
-                </div>
-                <div class="search-wrap">
-                    <i class="bi bi-search"></i>
-                    <input type="text" id="rowSearch" placeholder="Search User" />
                 </div>
             </div>
         </div>
@@ -227,27 +226,29 @@
                 const res = await fetch(url);
                 const data = await res.json();
                 if (!data.success) { empty.textContent = data.message; return; }
-                if (!data.rows.length) {
+                if (!data.rows.length && statusFilter === 'all' && !document.getElementById('rowSearch').value.trim()) {
                     empty.textContent = 'No imported attendance for this project and period.';
                     return;
                 }
 
-                const t = data.totals;
+                const t = data.totals || {};
                 document.getElementById('summaryChips').innerHTML =
                     chip('Employees', t.employees) +
                     chip('Days worked', t.daysWorked) +
                     chip('Absent', t.daysAbsent) +
                     chip('Late', t.daysLate) +
                     chip('Half-day', t.daysIncomplete) +
-                    chip('Regular hours', Number(t.regularHours).toFixed(2)) +
-                    chip('Overtime hours', Number(t.overtimeHours).toFixed(2)) +
-                    chip('Unmatched', t.unmatched);
+                    chip('Regular hours', Number(t.regularHours || 0).toFixed(2)) +
+                    chip('Overtime hours', Number(t.overtimeHours || 0).toFixed(2)) +
+                    chip('Unmatched', t.unmatched || 0);
 
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
                 document.getElementById('summaryMeta').textContent =
                     `${data.projectName} · ${data.periodLabel}${byline}`;
 
-                document.getElementById('summaryBody').innerHTML = data.rows.map(r => `
+                const rows = data.rows || [];
+                document.getElementById('summaryBody').innerHTML = rows.length
+                    ? rows.map(r => `
                     <tr class="${r.matched ? '' : 'att-row-unmatched'}">
                         <td>${r.displayId || '——'}</td>
                         <td>${r.employeeName || '——'}</td>
@@ -257,7 +258,8 @@
                         <td>${r.daysIncomplete}</td>
                         <td>${r.regularHours}</td>
                         <td>${r.overtimeHours}</td>
-                    </tr>`).join('');
+                    </tr>`).join('')
+                    : `<tr><td colspan="8" class="text-center text-muted py-4">No attendance records match this filter.</td></tr>`;
 
                 document.getElementById('summaryPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>

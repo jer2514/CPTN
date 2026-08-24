@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
+using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
@@ -22,13 +23,12 @@ namespace RSDSystem.Controllers
     public class AccountController : Controller
     {
         private readonly PayrollDbContext _db;
+        private readonly ActivityLogService _logs;
 
-        /// <summary>
-        /// Receives the payroll database from dependency injection so Login can look up users.
-        /// </summary>
-        public AccountController(PayrollDbContext db)
+        public AccountController(PayrollDbContext db, ActivityLogService logs)
         {
             _db = db;
+            _logs = logs;
         }
 
         /// <summary>
@@ -38,12 +38,17 @@ namespace RSDSystem.Controllers
         /// <param name="returnUrl">Optional URL after login. Not used for the role-based redirects.</param>
         /// <returns>The login view, or a redirect to Home or PayrollStaff.</returns>
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null)
+        public IActionResult Login(string? returnUrl = null, int? inactive = null)
         {
             // Already signed in: send each role to its dashboard instead of showing Login again.
             var role = HttpContext.Session.GetString("Role");
             if (role == "Admin") return RedirectToAction("Index", "Home");
             if (role == "PayrollStaff") return RedirectToAction("Index", "PayrollStaff");
+
+            if (inactive == 1)
+                ViewBag.Error = "This account is inactive and cannot log in.";
+            else if (TempData["LoginError"] is string loginError)
+                ViewBag.Error = loginError;
 
             return View();
         }
@@ -60,18 +65,31 @@ namespace RSDSystem.Controllers
         {
             // IsActive filters out deactivated accounts so they cannot sign in.
             var user = await _db.Users
-                                .FirstOrDefaultAsync(u => u.Username == Username && u.IsActive);
+                                .FirstOrDefaultAsync(u => u.Username == Username);
 
-            if (user != null && BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
+            if (user == null || !BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
             {
-                SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
-                return user.Role == "Admin"
-                    ? RedirectToAction("Index", "Home")
-                    : RedirectToAction("Index", "PayrollStaff");
+                ViewBag.Error = "Invalid username or password.";
+                return View();
             }
 
-            ViewBag.Error = "Invalid username or password.";
-            return View();
+            if (!user.IsActive)
+            {
+                ViewBag.Error = "This account is inactive and cannot log in.";
+                return View();
+            }
+
+            SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
+            await _logs.LogAsync(
+                user.UserId,
+                user.FullName,
+                user.Role,
+                ActivityTypes.Login,
+                ActivityModules.Authentication,
+                $"{user.FullName} signed in.");
+            return user.Role == "Admin"
+                ? RedirectToAction("Index", "Home")
+                : RedirectToAction("Index", "PayrollStaff");
         }
 
         /// <summary>
@@ -99,7 +117,10 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
-            // Sign out the cookie authentication and clear session data.
+            await _logs.LogAsync(
+                ActivityTypes.Logout,
+                ActivityModules.Authentication,
+                "User signed out.");
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             HttpContext.Session.Clear();
 

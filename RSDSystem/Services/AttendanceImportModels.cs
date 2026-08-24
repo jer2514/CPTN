@@ -139,6 +139,7 @@ namespace RSDSystem.Services
         public int UnmatchedCount { get; set; }
         /// <summary>True when an overlapping previous import for the same dates was deleted first.</summary>
         public bool ReplacedPrevious { get; set; }
+        public int SkippedLockedCount { get; set; }
     }
 
     /// <summary>One distinct date range for the Attendance Records period dropdown.</summary>
@@ -169,7 +170,7 @@ namespace RSDSystem.Services
         public bool Matched { get; set; }
         /// <summary>Days whose status counts as worked (Complete, Late, and similar).</summary>
         public int DaysWorked { get; set; }
-        /// <summary>Days with Absent status (including expanded empty days).</summary>
+        public int DaysPresent { get; set; }
         public int DaysAbsent { get; set; }
         /// <summary>Days with Late or Late/Early Off.</summary>
         public int DaysLate { get; set; }

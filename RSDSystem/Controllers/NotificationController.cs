@@ -21,6 +21,7 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly NotificationService _notifications;
         private readonly AttendanceImportService _imports;
+        private readonly ActivityLogService _logs;
 
         /// <summary>
         /// Receives the database, notification service, and attendance importer used to approve corrections.
@@ -28,30 +29,29 @@ namespace RSDSystem.Controllers
         public NotificationController(
             PayrollDbContext db,
             NotificationService notifications,
-            AttendanceImportService imports)
+            AttendanceImportService imports,
+            ActivityLogService logs)
         {
             _db = db;
             _notifications = notifications;
             _imports = imports;
+            _logs = logs;
         }
 
-        /// <summary>
-        /// GET /Notification. Opens the full Notifications page from the bell "View all" link.
-        /// Staff get the payroll-staff layout. Loads one page of 5 items for the current role.
-        /// </summary>
-        /// <returns>The notifications list view with paging and unread count.</returns>
-        public async Task<IActionResult> Index(int page = 1)
+        public async Task<IActionResult> Index(int page = 1, string? filter = null)
         {
             ViewData["Title"] = "Notifications";
             ViewBag.PageTitle = "Notifications";
             if (IsStaff)
                 ViewBag.LayoutName = "_PayrollStaffLayout";
 
+            var unreadOnly = string.Equals(filter, "unread", StringComparison.OrdinalIgnoreCase);
             var (items, total, unread) = await _notifications.ListAsync(
-                CurrentRole(), CurrentName(), page, PageSize, HttpContext.RequestAborted);
+                CurrentRole(), CurrentName(), page, PageSize, unreadOnly, HttpContext.RequestAborted);
             ViewBag.Page = page;
             ViewBag.TotalPages = Math.Max(1, (int)Math.Ceiling(total / (double)PageSize));
             ViewBag.Unread = unread;
+            ViewBag.Filter = unreadOnly ? "unread" : "all";
             ViewBag.IsAdmin = IsAdmin;
             return View(items);
         }
@@ -65,7 +65,7 @@ namespace RSDSystem.Controllers
         public async Task<IActionResult> Recent()
         {
             var items = await _notifications.RecentAsync(
-                CurrentRole(), CurrentName(), 7, HttpContext.RequestAborted);
+                CurrentRole(), CurrentName(), 15, HttpContext.RequestAborted);
             var unread = await _notifications.UnreadCountAsync(
                 CurrentRole(), CurrentName(), HttpContext.RequestAborted);
             return Json(new
@@ -146,7 +146,7 @@ namespace RSDSystem.Controllers
                 timeOut2 = AttendanceDisplay.Clock(request.TimeOut2) ?? "—",
                 overtimeIn = AttendanceDisplay.Clock(request.OvertimeIn) ?? "—",
                 overtimeOut = AttendanceDisplay.Clock(request.OvertimeOut) ?? "—",
-                reason = string.IsNullOrWhiteSpace(request.Reason) ? "Half-day attendance" : request.Reason,
+                reason = string.IsNullOrWhiteSpace(request.Reason) ? "—" : request.Reason,
                 pending = request.Status == CorrectionRequestStatuses.Pending
             });
         }
@@ -170,6 +170,19 @@ namespace RSDSystem.Controllers
                 return Json(new { success = false, message = "Correction request not found." });
             if (request.Status != CorrectionRequestStatuses.Pending)
                 return Json(new { success = false, message = "This request was already reviewed." });
+
+            var attendance = await _db.AttendanceRecords.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == request.AttendanceRecordId, HttpContext.RequestAborted);
+            if (attendance != null
+                && await PayrollAttendanceLock.IsLockedAsync(
+                    _db, attendance.ProjectId, attendance.EmployeeId, attendance.WorkDate, HttpContext.RequestAborted))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Payroll for this employee is already approved. Attendance cannot be edited."
+                });
+            }
 
             var error = await _imports.UpdateRecordAsync(
                 request.AttendanceRecordId,
@@ -201,6 +214,13 @@ namespace RSDSystem.Controllers
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
                 HttpContext.RequestAborted);
+
+            await _logs.LogAsync(
+                ActivityTypes.ApproveCorrection,
+                ActivityModules.Attendance,
+                $"Approved an attendance correction for {employee} on {projectName}.",
+                request.ProjectId,
+                request.AttendanceCorrectionRequestId);
 
             return Json(new { success = true, message = "Attendance correction approved." });
         }
@@ -247,6 +267,13 @@ namespace RSDSystem.Controllers
                 request.AttendanceCorrectionRequestId,
                 "/Attendance/Records",
                 HttpContext.RequestAborted);
+
+            await _logs.LogAsync(
+                ActivityTypes.ReturnCorrection,
+                ActivityModules.Attendance,
+                $"Returned an attendance correction for {employee} on {projectName}.",
+                request.ProjectId,
+                request.AttendanceCorrectionRequestId);
 
             return Json(new { success = true, message = "Correction request returned." });
         }
@@ -315,9 +342,35 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Task approved. It has been removed from To do task." });
         }
 
-        /// <summary>
-        /// True when the session Role is Admin. Used to gate correction and task review actions.
-        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReturnTask(int id, string? reason)
+        {
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Admin access is required." });
+
+            var note = string.IsNullOrWhiteSpace(reason)
+                ? "Please correct this payroll task and mark it done again."
+                : reason.Trim();
+
+            var schedule = await _db.PayrollSchedules
+                .Include(s => s.Project)
+                .FirstOrDefaultAsync(s => s.PayrollScheduleId == id, HttpContext.RequestAborted);
+            if (schedule == null)
+                return Json(new { success = false, message = "Task not found." });
+            if (!schedule.TaskCompleted)
+                return Json(new { success = false, message = "Payroll staff have not marked this task as done." });
+            if (schedule.TaskApproved)
+                return Json(new { success = false, message = "This task was already approved." });
+
+            schedule.TaskCompleted = false;
+            schedule.TaskApproved = false;
+            await _db.SaveChangesAsync();
+            await _notifications.NotifyTaskCompletionReturnedAsync(schedule, note, HttpContext.RequestAborted);
+
+            return Json(new { success = true, message = "Task returned for correction." });
+        }
+
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 

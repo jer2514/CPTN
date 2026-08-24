@@ -49,6 +49,9 @@ namespace RSDSystem.Models
 
         /// <summary>Staff punch-change requests waiting for Admin approve/return.</summary>
         public DbSet<AttendanceCorrectionRequest> AttendanceCorrectionRequests { get; set; }
+        public DbSet<ProjectEmployeeHistory> ProjectEmployeeHistories { get; set; }
+        public DbSet<PayrollPredictionHistory> PayrollPredictionHistories { get; set; }
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
 
         /// <summary>Defines FKs, unique indexes, optional columns, and ignored computed properties.</summary>
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -197,6 +200,34 @@ namespace RSDSystem.Models
                 .WithMany()
                 .HasForeignKey(c => c.ProjectId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasOne(h => h.Project)
+                .WithMany()
+                .HasForeignKey(h => h.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasOne(h => h.Employee)
+                .WithMany()
+                .HasForeignKey(h => h.EmployeeId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<ProjectEmployeeHistory>()
+                .HasIndex(h => new { h.ProjectId, h.EmployeeId })
+                .IsUnique();
+
+            modelBuilder.Entity<PayrollPredictionHistory>()
+                .HasOne(h => h.Project)
+                .WithMany()
+                .HasForeignKey(h => h.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<PayrollPredictionHistory>()
+                .HasIndex(h => new { h.ProjectId, h.GeneratedAt });
+
+            modelBuilder.Entity<ActivityLog>()
+                .HasIndex(a => a.CreatedAt);
         }
     }
 }

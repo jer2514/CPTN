@@ -93,34 +93,25 @@ namespace RSDSystem.Services
             return row.Status;
         }
 
-        /// <summary>
-        /// Matches a biometric User ID or printed name to Employees.EmployeeId (sequence digits, last-five tail, then full/first name).
-        /// Returns null when unmatched so the preview asks staff to pick an employee.
-        /// </summary>
-        public static int? MatchEmployeeId(IEnumerable<Employee> employees, string externalUserId, string name)
+        public static int? MatchEmployeeId(IEnumerable<Employee> employees, string externalUserId, string? name = null)
         {
+            _ = name;
             var list = employees as IList<Employee> ?? employees.ToList();
             var seq = EmployeeIds.Sequence(externalUserId);
-            if (seq.HasValue)
-            {
-                var byCode = list.FirstOrDefault(e => EmployeeIds.Sequence(e.EmployeeCode) == seq);
-                if (byCode != null) return byCode.EmployeeId;
+            if (!seq.HasValue)
+                return null;
 
-                var digits = new string((externalUserId ?? "").Where(char.IsDigit).ToArray());
-                if (digits.Length > 5 && int.TryParse(digits[^5..], out var tail) && tail > 0)
-                {
-                    var byTail = list.FirstOrDefault(e => EmployeeIds.Sequence(e.EmployeeCode) == tail);
-                    if (byTail != null) return byTail.EmployeeId;
-                }
+            var byCode = list.FirstOrDefault(e => EmployeeIds.Sequence(e.EmployeeCode) == seq);
+            if (byCode != null) return byCode.EmployeeId;
+
+            var digits = new string((externalUserId ?? "").Where(char.IsDigit).ToArray());
+            if (digits.Length > 5 && int.TryParse(digits[^5..], out var tail) && tail > 0)
+            {
+                var byTail = list.FirstOrDefault(e => EmployeeIds.Sequence(e.EmployeeCode) == tail);
+                if (byTail != null) return byTail.EmployeeId;
             }
 
-            var needle = (name ?? "").Trim();
-            if (needle.Length == 0) return null;
-
-            var byName = list.FirstOrDefault(e =>
-                string.Equals(e.FullName, needle, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.FirstName, needle, StringComparison.OrdinalIgnoreCase));
-            return byName?.EmployeeId;
+            return null;
         }
 
         /// <summary>
