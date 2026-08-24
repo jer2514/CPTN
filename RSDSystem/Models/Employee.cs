@@ -4,6 +4,11 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// Field worker on a construction project. Payroll and attendance match this row.
+    /// EmployeeCode is the displayed ID. RatePerDay (and sometimes RatePerHour) drive the slip.
+    /// ProjectId links them to the job they are paid under.
+    /// </summary>
     public class Employee : IValidatableObject
     {
         [Key]

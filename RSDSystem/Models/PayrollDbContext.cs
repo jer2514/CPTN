@@ -3,6 +3,15 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// Entity Framework map of the SQL Server database.
+    /// Each DbSet is a table. Controllers query these instead of writing SQL
+    /// (except Program.cs / *Schema.Ensure which patch older databases).
+    ///
+    /// OnModelCreating sets relationships and unique indexes:
+    /// employees belong to a project (optional), payroll belongs to employee+project,
+    /// one slip per employee per payroll schedule, attendance rows belong to an import batch.
+    /// </summary>
     public class PayrollDbContext : DbContext
     {
         public PayrollDbContext(DbContextOptions<PayrollDbContext> options)

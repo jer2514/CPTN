@@ -4,6 +4,13 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// One pay period for a project (start/end dates). Created by Admin on the dashboard.
+    ///
+    /// TaskCompleted = staff clicked "mark done" (waits for admin).
+    /// TaskApproved  = admin approved the done request; task leaves the staff to-do list.
+    /// Staff generate one slip per employee per schedule (unique index on Payroll).
+    /// </summary>
     public class PayrollSchedule : IValidatableObject
     {
         [Key]

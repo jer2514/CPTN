@@ -3,6 +3,7 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>Creates AttendanceImports / AttendanceRecords tables if this database never had them.</summary>
     public static class AttendanceSchema
     {
         public static void Ensure(PayrollDbContext db)

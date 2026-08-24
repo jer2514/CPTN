@@ -9,6 +9,17 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin payroll. RequireAdmin() sends staff away.
+    ///
+    /// View payroll:     Index → Period → View / GeneratePayslips / Print / SendToStaff
+    /// Review:           ReviewProject → Approve or ReturnForCorrection
+    /// Prediction:       Prediction page → GetPrediction (JSON for the table)
+    /// Schedules:        AddSchedule / EditSchedule / DeleteSchedule (from dashboard)
+    ///
+    /// Approve copies status to Approved. Return sets Correction + CorrectionReason
+    /// so staff can edit and submit again.
+    /// </summary>
     public class PayrollController : Controller
     {
         private readonly PayrollDbContext _db;
@@ -156,6 +167,10 @@ namespace RSDSystem.Controllers
             return View(projects);
         }
 
+        /// <summary>
+        /// JSON for the Prediction page. Needs two finished Approved months.
+        /// Returns history + current forecast rows (or an error message).
+        /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetPrediction(int projectId, string? projectName = null)
         {
@@ -532,6 +547,7 @@ namespace RSDSystem.Controllers
         }
 
 
+        /// <summary>Submitted → Approved. Staff can no longer edit this slip.</summary>
         // POST /Payroll/Approve/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -562,6 +578,7 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>Submitted → Correction with a reason. Staff edits and submits again.</summary>
         // POST /Payroll/ReturnForCorrection/{id}
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -596,6 +613,7 @@ namespace RSDSystem.Controllers
         }
 
 
+        /// <summary>Dashboard: create a pay period. It appears on the assigned staff to-do list.</summary>
         // POST /Payroll/AddSchedule
         [HttpPost]
         [ValidateAntiForgeryToken]

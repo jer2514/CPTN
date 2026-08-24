@@ -6,6 +6,11 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin dashboard after login.
+    /// Loads: counts, ongoing projects, payroll schedules (add/edit/delete live here
+    /// via PayrollController), and Submitted payroll waiting for review.
+    /// </summary>
     public class HomeController : Controller
     {
         private readonly ILogger<HomeController> _logger;
@@ -17,6 +22,7 @@ namespace RSDSystem.Controllers
             _db = db;
         }
 
+        /// <summary>Admin home: project list + pending payroll approvals.</summary>
         public async Task<IActionResult> Index()
         {
             ViewBag.ActiveProjects = await _db.Projects.Ongoing().CountAsync();

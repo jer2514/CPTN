@@ -4,6 +4,11 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin: construction projects. Assign payroll staff + employees here.
+    /// Status filter (On Going / Finished / …) is applied in Index.
+    /// After a project exists, Admin adds PayrollSchedule on the dashboard (PayrollController).
+    /// </summary>
     public class ProjectController : Controller
     {
         private readonly PayrollDbContext _db;

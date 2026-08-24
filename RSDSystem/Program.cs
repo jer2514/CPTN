@@ -1,3 +1,42 @@
+/*
+ * =============================================================================
+ * RSD PAYROLL SYSTEM — HOW THE APP STARTS AND HOW WORK FLOWS
+ * =============================================================================
+ *
+ * This file is the entry point. ASP.NET Core runs it top to bottom:
+ *   1) Register services (MVC, SQL Server, session, prediction, notifications)
+ *   2) Build the app, migrate/fix the database, seed demo logins
+ *   3) Set up the HTTP pipeline (static files → session → auth → MVC routes)
+ *   4) Listen (default URL pattern: /Account/Login)
+ *
+ * TWO ROLES
+ *   Admin        — users, employees, projects, review payroll, prediction, reports
+ *   PayrollStaff — import attendance, generate slips, submit payroll, to-do tasks
+ *
+ * MAIN BUSINESS FLOW (read this when tracing a payroll)
+ *   Admin creates a Project and assigns a payroll staff member.
+ *   Admin adds Employees and assigns them to that project.
+ *   Admin adds a PayrollSchedule (pay period dates) on the dashboard.
+ *   Staff imports an attendance file for that project/period.
+ *   Staff opens Generate Payroll → Load employees → fills the slip → saves Draft.
+ *   Staff opens Pending Payroll → Submit. Status becomes Submitted.
+ *   Admin reviews on Review Payroll → Approve (locks it) or Return (Correction).
+ *   After two finished approved months, Admin can Load Payroll Prediction.
+ *
+ * REQUEST FLOW FOR EVERY PAGE
+ *   Browser → Program.cs pipeline → AuthCheckFilter (are you logged in? right role?)
+ *   → Controller action → Service/Helper/DbContext → Razor view or JSON.
+ *
+ * WHERE TO LOOK NEXT
+ *   Filters/AuthCheckFilter.cs     session gate
+ *   Controllers/AccountController  login / logout
+ *   Models/PayrollDbContext.cs     all SQL tables
+ *   Controllers/PayrollStaffController.cs  staff work
+ *   Controllers/PayrollController.cs       admin payroll + prediction
+ *   Controllers/AttendanceController.cs    import / records / summary
+ * =============================================================================
+ */
+
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,13 +51,14 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// MVC + Razor views. AuthCheckFilter runs before almost every controller action.
 builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add<AuthCheckFilter>();
 });
 
-// Cookie authentication
+// Cookie auth is registered, but login actually stores UserId/Role/FullName in Session
+// (see AccountController.SignIn). Logout still calls SignOutAsync to clear the cookie.
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -28,12 +68,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+// Lets Excel/CSV parsers read older Windows encodings (attendance import files).
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+// Entity Framework → SQL Server. Connection string lives in appsettings.json.
 builder.Services.AddDbContext<PayrollDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// One instance per HTTP request. Controllers receive these through constructors.
 builder.Services.AddScoped<AttendanceImportService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddHttpClient("PayrollPrediction", client =>
@@ -42,6 +85,7 @@ builder.Services.AddHttpClient("PayrollPrediction", client =>
 });
 builder.Services.AddScoped<PayrollPredictionService>();
 
+// Session holds login: UserId, FullName, Role, PhotoPath (60-minute idle timeout).
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -56,7 +100,8 @@ Console.WriteLine("== DEBUG: Using connection string = " + builder.Configuration
 
 var app = builder.Build();
 
-// Seed demo users so you can login from any device
+// Startup DB work: apply EF migrations, patch older columns, then seed demo/payroll logins
+// if those usernames are missing. Safe to re-run; it skips users that already exist.
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -240,7 +285,7 @@ END");
     }
 }
 
-// Configure the HTTP request pipeline.
+// HTTP pipeline order matters: static files first, then session, then MVC routing.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -256,6 +301,7 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// First visit with no URL → AccountController.Login.
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Account}/{action=Login}/{id?}");

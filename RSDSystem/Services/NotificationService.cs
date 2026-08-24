@@ -4,6 +4,13 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>
+    /// Creates bell rows. Controllers call Notify* after a real event
+    /// (payroll submitted, attendance imported, task marked done, prediction ready, …).
+    /// NotifyAdminsAsync writes RecipientRole=Admin (all admins see it).
+    /// NotifyStaffAsync writes RecipientRole=PayrollStaff + RecipientName.
+    /// RecentlyNotifiedAsync blocks duplicate spam of the same kind for a few minutes.
+    /// </summary>
     public class NotificationService
     {
         private readonly PayrollDbContext _db;

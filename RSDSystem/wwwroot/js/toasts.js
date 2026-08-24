@@ -1,3 +1,4 @@
+// Bootstrap toast helper for TempData success/error messages.
 (function () {
     function escapeHtml(value) {
         return String(value == null ? '' : value)

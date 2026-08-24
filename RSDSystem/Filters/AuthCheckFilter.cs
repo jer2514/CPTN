@@ -3,6 +3,19 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace RSDSystem.Filters
 {
+    /// <summary>
+    /// Global gate for every MVC action (registered in Program.cs).
+    ///
+    /// Order of checks:
+    /// 1. Account and AttendanceApi are public (login page + machine import API).
+    /// 2. Everyone else needs Session UserId + Role or they are sent to Login
+    ///    (JSON callers get HTTP 401 instead of a redirect).
+    /// 3. PayrollStaff cannot open Admin controllers (Home, Users, Employees, Projects, Reports).
+    ///    They are bounced to /PayrollStaff.
+    ///
+    /// Admin screens that PayrollStaff CAN open (Payroll, Attendance, Notification)
+    /// still do a second Role check inside the controller when needed.
+    /// </summary>
     public class AuthCheckFilter : IActionFilter
     {
         // Controllers reachable without being logged in
@@ -20,7 +33,8 @@ namespace RSDSystem.Filters
 
             if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(role))
             {
-                if (WantsJson(context))
+                // Fetch/XHR endpoints must not redirect to the HTML login page.
+            if (WantsJson(context))
                 {
                     context.Result = new JsonResult(new
                     {

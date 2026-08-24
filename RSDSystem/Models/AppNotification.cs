@@ -3,6 +3,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// Bell-item stored in AppNotifications.
+    /// RecipientRole = Admin (all admins) or PayrollStaff (one person via RecipientName).
+    /// Kind constants below tell the UI which icon to show. Url is where the bell click goes.
+    /// </summary>
     public class AppNotification
     {
         [Key]
@@ -36,12 +41,14 @@ namespace RSDSystem.Models
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 
+    /// <summary>Who sees the bell item: all Admins, or one PayrollStaff by name.</summary>
     public static class NotificationRoles
     {
         public const string Admin = "Admin";
         public const string PayrollStaff = "PayrollStaff";
     }
 
+    /// <summary>Kind string stored on AppNotification. Picks the icon/color in the bell UI.</summary>
     public static class NotificationKinds
     {
         public const string PayrollSubmitted = "PayrollSubmitted";

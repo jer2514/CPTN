@@ -8,6 +8,11 @@ using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin printable reports. Index picks type + project + period;
+    /// Periods returns JSON date ranges; Generate/Print build the HTML.
+    /// Types: payroll, attendance, payslip, prediction, anomaly.
+    /// </summary>
     public class ReportController : Controller
     {
         public static readonly string[] ReportTypes =

@@ -1,3 +1,5 @@
+// Bell in the top bar: polls /Notification/UnreadCount and /Notification/Recent.
+// Admin can approve/return attendance corrections and "mark done" tasks from the panel.
 (function () {
     const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
     const token = tokenInput ? tokenInput.value : '';

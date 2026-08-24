@@ -6,6 +6,13 @@ using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Attendance UI. Staff import files; Admin views records/summary (staff cannot use Summary).
+    ///
+    /// Import flow: choose project → Preview (parse, do not save) → match unmatched rows → ImportFile (save).
+    /// Records/Summary then load JSON via GetPeriods / GetRecords / GetSummary.
+    /// Staff RequestCorrection; Admin decides in NotificationController.
+    /// </summary>
     public class AttendanceController : Controller
     {
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };

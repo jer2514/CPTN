@@ -1,3 +1,4 @@
+// Typeahead for project name fields (Generate Payroll, Attendance Import, etc.).
 (function () {
     var dataEl = document.getElementById('project-suggest-data');
     var input = document.getElementById('projectInput');

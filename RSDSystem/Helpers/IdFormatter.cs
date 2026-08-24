@@ -1,5 +1,6 @@
 ﻿namespace RSDSystem.Helpers
 {
+    /// <summary>Display Staff IDs as 26-0001. Employee IDs go through EmployeeIds (00001).</summary>
     public static class IdFormatter
     {
         // User codes stay year-prefixed: "260001" → "26-0001"

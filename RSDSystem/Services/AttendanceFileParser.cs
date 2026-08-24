@@ -8,6 +8,9 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>
+    /// Result of parsing a file before matching employees or saving.
+    /// </summary>
     public class AttendanceParseResult
     {
         public string Format { get; set; } = AttendanceFormats.Daily;
@@ -17,6 +20,10 @@ namespace RSDSystem.Services
         public string? Error { get; set; }
     }
 
+    /// <summary>
+    /// Turns .xls/.xlsx/.csv/.txt into AttendanceRecord rows (no database yet).
+    /// Detects daily vs statistic layout from headers. AttendanceRules.Apply runs per row.
+    /// </summary>
     public static class AttendanceFileParser
     {
         private static readonly Regex LabeledDateRange = new(

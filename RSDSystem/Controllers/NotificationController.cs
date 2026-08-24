@@ -6,6 +6,14 @@ using RSDSystem.Services;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Bell panel + Notifications page.
+    /// Recent/UnreadCount/MarkRead are called by wwwroot/js/notifications.js every few seconds.
+    ///
+    /// Admin extra actions from a notification:
+    ///   Attendance correction → GetCorrection / ApproveCorrection / ReturnCorrection
+    ///   Staff "mark done"     → GetTask / ApproveTask
+    /// </summary>
     public class NotificationController : Controller
     {
         private const int PageSize = 5;
@@ -233,6 +241,7 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>Admin accepts the staff "mark done". TaskApproved=true removes it from to-do.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveTask(int id)

@@ -4,6 +4,12 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// A construction job. Admin assigns PayrollStaff by name (AssignedPayrollStaff).
+    /// Staff only see projects assigned to them. Status: On Going / Finished / Upcoming / On Hold.
+    /// PayrollBudget is the overall budget; MonthlyBudgets are optional per-month caps for prediction.
+    /// Admin creates PayrollSchedule rows for this project — those become staff to-do tasks.
+    /// </summary>
     public class Project : IValidatableObject
     {
         [Key]
@@ -86,6 +92,10 @@ namespace RSDSystem.Models
         }
     }
 
+    /// <summary>
+    /// Optional budget for one calendar month of a project. Prediction compares
+    /// the next-month forecast against this amount (ExceedsBudget).
+    /// </summary>
     public class ProjectMonthlyBudget
     {
         [Key]
@@ -104,6 +114,7 @@ namespace RSDSystem.Models
         public decimal Amount { get; set; } = 0;
     }
 
+    /// <summary>Dropdown values for Project.TypeOfService / PayrollSchedule.TypeOfService.</summary>
     public static class TypeOfServiceOptions
     {
         public static readonly string[] All = new[]
@@ -134,6 +145,7 @@ namespace RSDSystem.Models
         };
     }
 
+    /// <summary>Project.Status values. Index filter and staff to-do list use On Going.</summary>
     public static class ProjectStatusOptions
     {
         public const string OnGoing = "On Going";

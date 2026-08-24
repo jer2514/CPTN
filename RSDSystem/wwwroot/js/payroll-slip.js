@@ -1,3 +1,4 @@
+// Payroll slip page: live pay math (days × rate, OT, cash advance → net) then POST generate.
 (function () {
     const slipForm = document.getElementById('payrollSlipForm');
     if (!slipForm) return;

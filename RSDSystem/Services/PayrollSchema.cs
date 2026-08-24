@@ -3,6 +3,7 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>Adds missing Payroll.PayrollScheduleId on older databases at startup.</summary>
     public static class PayrollSchema
     {
         public static void Ensure(PayrollDbContext db)

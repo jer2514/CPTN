@@ -3,6 +3,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace RSDSystem.Models
 {
+    /// <summary>
+    /// One employee's payslip for one period/schedule.
+    ///
+    /// Status flow:
+    ///   Draft → (staff Submit) Submitted → (admin Approve) Approved
+    ///                         ↘ (admin Return) Correction → (staff Submit again) Submitted
+    ///
+    /// Amounts: RegularPay + OvertimePay = GrossPay; GrossPay - CashAdvance = NetPay.
+    /// Days/hours come from imported attendance when the slip is generated.
+    /// </summary>
     public class Payroll
     {
         [Key]

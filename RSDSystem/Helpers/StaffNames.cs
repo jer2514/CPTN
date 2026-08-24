@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Http;
 
 namespace RSDSystem.Helpers
 {
+    /// <summary>
+    /// Session FullName vs Project.AssignedPayrollStaff.
+    /// Staff only work on projects assigned to their exact name (case-insensitive).
+    /// </summary>
     public static class StaffNames
     {
         public static string? FromSession(ISession session)

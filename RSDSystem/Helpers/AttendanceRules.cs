@@ -2,6 +2,11 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Helpers
 {
+    /// <summary>
+    /// Shift rules for a punch row: 8:00–12:00 morning, 13:00–17:00 afternoon,
+    /// 30 min late grace, 15 min early-out grace. Apply() sets hours + Status.
+    /// Called while parsing/importing attendance, before payroll uses the totals.
+    /// </summary>
     public static class AttendanceRules
     {
         public static readonly TimeSpan MorningStart = new(8, 0, 0);

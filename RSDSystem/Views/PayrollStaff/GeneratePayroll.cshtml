@@ -1,4 +1,8 @@
-﻿@model List<RSDSystem.Models.Project>
+﻿@*
+    Staff: Load project employees for the open payroll schedule, then open a slip.
+    GetProjectEmployees JSON fills the table. Generate needs imported attendance first.
+*@
+@model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Generate Payroll";
     Layout = "_PayrollStaffLayout";

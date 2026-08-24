@@ -1,4 +1,8 @@
-﻿@{
+﻿@*
+    Public login. Posts to Account/Login. Demo users (if seeded): demo / Demo@123 (Admin),
+    payroll / Payroll@123 (PayrollStaff). Uses _AuthLayout (no sidebar).
+*@
+@{
     Layout = "_AuthLayout";
     ViewData["Title"] = "Login";
     var returnUrl = ViewBag.ReturnUrl as string;

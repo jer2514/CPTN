@@ -4,6 +4,12 @@ using RSDSystem.Models;
 
 namespace RSDSystem.Services
 {
+    /// <summary>
+    /// Import pipeline used by AttendanceController and AttendanceApiController.
+    /// PreviewAsync: parse file, match Employee IDs/names, return rows (not saved).
+    /// ImportAsync / save methods: write AttendanceImport + AttendanceRecord.
+    /// Also used to total hours for a payroll schedule when generating a slip.
+    /// </summary>
     public class AttendanceImportService
     {
         private readonly PayrollDbContext _db;

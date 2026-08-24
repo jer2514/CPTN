@@ -7,6 +7,11 @@ using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
+    /// <summary>
+    /// Admin: employee master list. Create/Edit/Delete/ToggleStatus.
+    /// Employees are assigned to a Project so staff can generate their payroll.
+    /// Photos go under wwwroot/Uploads/employees.
+    /// </summary>
     public class EmployeeController : Controller
     {
         private readonly PayrollDbContext _db;

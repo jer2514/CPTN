@@ -1,4 +1,8 @@
-﻿@model List<RSDSystem.Models.Project>
+﻿@*
+    Staff: Draft/Correction/Submitted list. Submit → Admin review. Delete only Draft.
+    Load calls GetProjectPayrolls.
+*@
+@model List<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Pending Payroll";
     Layout = "_PayrollStaffLayout";
