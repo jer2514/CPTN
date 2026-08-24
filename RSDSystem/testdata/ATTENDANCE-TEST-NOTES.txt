@@ -1,0 +1,14 @@
+Test attendance files for Import Attendance (same 3 people as the June export).
+
+Files
+  1_(June)Attendance Report(03-09)-TEST.xls   2026-06-03 ~ 2026-06-09
+  1_(July)Attendance Report(03-09)-TEST.xls   2026-07-03 ~ 2026-07-09
+
+Employees (User ID must match Employee ID / biometric id)
+  1  patrick bateman   full week 08:00-12:00, 13:00-17:00
+                       OT 17:30-19:30 on the 3rd and 5th
+  2  travis bickle     same complete days, LATE 08:40 on the 4th, ABSENT on the 7th
+  3  louis bloom       ABSENT on the 6th, HALF-DAY (morning only) on the 9th
+
+Shift rules in the app: work 08:00-12:00 and 13:00-17:00, late after 08:30.
+Import June, generate/approve payroll, then import July so prediction has two months.
