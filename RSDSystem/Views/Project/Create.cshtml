@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.Project
+﻿@*
+    Admin: ProjectController.Create. Enter name, location, type of service, dates, budget,
+    pay frequency, assigned PayrollStaff, and optional monthly budgets; POST inserts the Project.
+*@
+@model RSDSystem.Models.Project
 @{
     ViewData["Title"] = "Add Project";
     var services = ViewBag.TypeOfServiceOptions as string[] ?? Array.Empty<string>();

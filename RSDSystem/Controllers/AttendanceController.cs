@@ -21,6 +21,9 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _imports;
         private readonly NotificationService _notifications;
 
+        /// <summary>
+        /// Receives the database, import service, and notifications used after a successful file import.
+        /// </summary>
         public AttendanceController(PayrollDbContext db, AttendanceImportService imports, NotificationService notifications)
         {
             _db = db;
@@ -28,6 +31,11 @@ namespace RSDSystem.Controllers
             _notifications = notifications;
         }
 
+        /// <summary>
+        /// GET /Attendance/Import. Staff Import Attendance screen (choose project and file).
+        /// Admin is sent to Records instead because admin import is view-only.
+        /// </summary>
+        /// <returns>The import view with this user's assigned ongoing projects, or a redirect for Admin.</returns>
         public async Task<IActionResult> Import()
         {
             if (IsAdmin)
@@ -37,6 +45,10 @@ namespace RSDSystem.Controllers
             return View(await LoadProjectsAsync());
         }
 
+        /// <summary>
+        /// GET /Attendance/Records. Attendance Records page for Admin and staff.
+        /// The table is filled later by GetPeriods and GetRecords from the page JavaScript.
+        /// </summary>
         public async Task<IActionResult> Records()
         {
             ViewBag.PageTitle = "Attendance Records";
@@ -44,6 +56,10 @@ namespace RSDSystem.Controllers
             return View(await LoadProjectsAsync());
         }
 
+        /// <summary>
+        /// GET /Attendance/Summary. Admin-only totals per employee for a chosen period.
+        /// Staff hitting this URL are sent back to Records.
+        /// </summary>
         public async Task<IActionResult> Summary()
         {
             if (!IsAdmin)
@@ -54,6 +70,11 @@ namespace RSDSystem.Controllers
             return View(await LoadProjectsAsync());
         }
 
+        /// <summary>
+        /// POST /Attendance/Preview. Import screen parses the file without saving.
+        /// Returns matched/unmatched rows and candidate employees so staff can pick names, then call ImportFile.
+        /// </summary>
+        /// <returns>JSON preview rows, or an error if the file is missing or invalid.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
@@ -95,6 +116,12 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// POST /Attendance/ImportFile. Import screen Confirm after Preview.
+        /// Saves the spreadsheet, replaces prior rows for the same dates, and notifies Admin.
+        /// overridesJson and manualMatchesJson carry staff edits from the preview table.
+        /// </summary>
+        /// <returns>JSON with import counts, or an error if save fails.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(20_000_000)]
@@ -151,6 +178,10 @@ namespace RSDSystem.Controllers
             }
         }
 
+        /// <summary>
+        /// GET /Attendance/GetPeriods. Records and Summary pages load the period dropdown for a project.
+        /// </summary>
+        /// <returns>JSON period keys, labels, and who imported each batch.</returns>
         [HttpGet]
         public async Task<IActionResult> GetPeriods(int projectId)
         {
@@ -174,6 +205,11 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Attendance/GetRecords. Records page table after a project and period are chosen.
+        /// Marks rows that already have a Pending correction so the action button shows Pending Review.
+        /// </summary>
+        /// <returns>JSON page of attendance rows with clocks, status, and action labels.</returns>
         [HttpGet]
         public async Task<IActionResult> GetRecords(
             int projectId, string? search, string? status, int page = 1,
@@ -242,6 +278,11 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Attendance/GetSummary. Admin Summary page table after a period is chosen.
+        /// Staff callers receive an error. Totals come from AttendanceImportService.QuerySummaryAsync.
+        /// </summary>
+        /// <returns>JSON employee totals for the period, or an error if the period is missing.</returns>
         [HttpGet]
         public async Task<IActionResult> GetSummary(
             int projectId, string? search, string? status, int page = 1,
@@ -300,6 +341,11 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// POST /Attendance/DeletePeriod. Admin delete on Records for one imported date range.
+        /// Staff can import the file again afterward. Payroll for those dates is not deleted here.
+        /// </summary>
+        /// <returns>JSON with how many rows were removed, or an error if the caller is not Admin.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePeriod(int projectId, string? periodStart, string? periodEnd)
@@ -321,11 +367,17 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Attendance/Edit/{id}. Old edit URL. Always sends the browser to Records; inline edit uses UpdateRecord.
+        /// </summary>
         public IActionResult Edit(int id)
         {
             return RedirectToAction(nameof(Records));
         }
 
+        /// <summary>
+        /// POST /Attendance/Edit. Old month-edit form. Always redirects to Records; current edits use UpdateRecord or RequestCorrection.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult Edit(AttendanceMonthEdit model)
@@ -333,6 +385,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Records));
         }
 
+        /// <summary>
+        /// POST /Attendance/UpdateRecord. Staff Edit on a non-Complete row in Records.
+        /// Admin is blocked (view-only). Complete rows must use RequestCorrection instead.
+        /// </summary>
+        /// <returns>JSON success after times are saved, or an error explaining why edit is not allowed.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateRecord(
@@ -377,6 +434,11 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Attendance row updated." });
         }
 
+        /// <summary>
+        /// POST /Attendance/RequestCorrection. Staff Request Edit on a Complete row.
+        /// Stores proposed times for Admin ApproveCorrection / ReturnCorrection. Does not change the record yet.
+        /// </summary>
+        /// <returns>JSON success after Admin is notified, or an error if reason is blank.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RequestCorrection(
@@ -452,6 +514,10 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Correction request sent to admin." });
         }
 
+        /// <summary>
+        /// Ongoing projects for Import/Records/Summary dropdowns.
+        /// Staff only see projects whose AssignedPayrollStaff matches the session name.
+        /// </summary>
         private async Task<List<Project>> LoadProjectsAsync()
         {
             var query = _db.Projects.AsNoTracking().Ongoing();
@@ -470,6 +536,9 @@ namespace RSDSystem.Controllers
                 .ToListAsync();
         }
 
+        /// <summary>
+        /// Staff FullName used to scope Preview/Import to assigned projects. Admin returns null (all projects).
+        /// </summary>
         private string? StaffScope()
         {
             var role = HttpContext.Session.GetString("Role");
@@ -479,12 +548,21 @@ namespace RSDSystem.Controllers
             return StaffNames.FromSession(HttpContext.Session);
         }
 
+        /// <summary>
+        /// Session FullName stored as ImportedBy on the attendance batch, or "Staff" if missing.
+        /// </summary>
         private string ImportedBy() =>
             HttpContext.Session.GetString("FullName") ?? "Staff";
 
+        /// <summary>
+        /// True when the session Role is Admin. Gates Summary, DeletePeriod, and view-only record edits.
+        /// </summary>
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Parse yyyy-MM-dd from the Records/Summary period query string. Invalid values become a usable date or null.
+        /// </summary>
         private static DateTime? ParseIsoDate(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -496,6 +574,10 @@ namespace RSDSystem.Controllers
             return AttendanceDisplay.UsableDate(DateTime.TryParse(value, out var parsed) ? parsed : null);
         }
 
+        /// <summary>
+        /// Preview and ImportFile reject empty files and extensions other than xls, xlsx, csv, or txt.
+        /// </summary>
+        /// <returns>An error sentence, or null when the file is acceptable.</returns>
         private static string? ValidateUpload(IFormFile? file)
         {
             if (file == null || file.Length == 0)
@@ -508,6 +590,10 @@ namespace RSDSystem.Controllers
             return null;
         }
 
+        /// <summary>
+        /// Shape one attendance row for Preview and GetRecords JSON.
+        /// Recomputes status with AttendanceRules so Complete rows get Request Edit instead of Edit.
+        /// </summary>
         private static object ToRowJson(AttendancePreviewRow row, int? recordId = null, string? format = null, DateTime? importedAt = null, bool pendingCorrection = false)
         {
             var computed = new AttendanceRecord

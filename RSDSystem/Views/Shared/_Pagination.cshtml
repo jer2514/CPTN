@@ -1,4 +1,8 @@
-﻿@{
+﻿@*
+    Shared pager for Admin list Index actions (Employee, UserManagement, Notifications).
+    Reads ViewBag CurrentPage/TotalPages/Search/SortBy and links to Index?page=.
+*@
+@{
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
     string search = ViewBag.Search;

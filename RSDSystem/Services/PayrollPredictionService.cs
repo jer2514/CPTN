@@ -28,6 +28,9 @@ namespace RSDSystem.Services
         private readonly IConfiguration _config;
         private readonly IHttpClientFactory _httpFactory;
 
+        /// <summary>
+        /// Stores DbContext, Prediction:ApiUrl config, and the named HttpClient used to call the optional Python forecast API.
+        /// </summary>
         public PayrollPredictionService(
             PayrollDbContext db,
             IConfiguration config,
@@ -38,6 +41,10 @@ namespace RSDSystem.Services
             _httpFactory = httpFactory;
         }
 
+        /// <summary>
+        /// Builds the Admin Payroll/Prediction page for one project. Needs two monthly budgets; forecasts the next month
+        /// (or the next month that has a previous pair). Flags ExceedsBudget vs allocated amount and UnusualChange vs last two months.
+        /// </summary>
         public async Task<PayrollPredictionPage> LoadAsync(int projectId, CancellationToken cancellationToken = default)
         {
             var project = await _db.Projects
@@ -161,6 +168,10 @@ namespace RSDSystem.Services
             };
         }
 
+        /// <summary>
+        /// Forecasts next-month payroll from two previous amounts. Tries the Python API first, then <see cref="PayrollPredictionEngine"/>.
+        /// PayrollPredictionApi and NotifyPayrollAlertsAsync also call this with explicit numbers.
+        /// </summary>
         public async Task<PayrollForecastResult> ForecastAsync(
             decimal previous1,
             decimal previous2,
@@ -180,6 +191,10 @@ namespace RSDSystem.Services
             return remote ?? PayrollPredictionEngine.Forecast(input);
         }
 
+        /// <summary>
+        /// POSTs both camelCase and snake_case fields to Prediction:ApiUrl/predict. Returns null on missing URL, HTTP error, or exception
+        /// so the C# engine can run instead.
+        /// </summary>
         private async Task<PayrollForecastResult?> TryRemoteForecastAsync(
             PayrollForecastInput input, CancellationToken cancellationToken)
         {
@@ -237,6 +252,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Looks up the two monthly budgets immediately before <paramref name="predictMonth"/> (month−2 and month−1). False if either is missing.
+        /// </summary>
         private static bool TryPreviousPair(
             IReadOnlyDictionary<DateTime, ProjectMonthlyBudget> byMonth,
             DateTime predictMonth,
@@ -252,6 +270,9 @@ namespace RSDSystem.Services
             return false;
         }
 
+        /// <summary>
+        /// Column heading for a budget month: stored MonthYear text if present, otherwise "MMMM yyyy".
+        /// </summary>
         private static string BudgetLabel(ProjectMonthlyBudget row, CultureInfo culture)
         {
             if (!string.IsNullOrWhiteSpace(row.MonthYear))
@@ -259,9 +280,15 @@ namespace RSDSystem.Services
             return MonthKey(row.MonthDate).ToString("MMMM yyyy", culture);
         }
 
+        /// <summary>
+        /// First day of that calendar month, used as the dictionary key when pairing previous budgets.
+        /// </summary>
         private static DateTime MonthKey(DateTime value) =>
             new(value.Year, value.Month, 1);
 
+        /// <summary>
+        /// Reads Prediction:AnomalyChangePercent from config, or 25% from the engine, for the unusual-change flag.
+        /// </summary>
         private decimal AnomalyPercent()
         {
             var raw = _config["Prediction:AnomalyChangePercent"];
@@ -270,15 +297,23 @@ namespace RSDSystem.Services
             return PayrollPredictionEngine.DefaultAnomalyPercent;
         }
 
+        /// <summary>
+        /// Joins base API URL and path without a double slash (for example http://host + /predict).
+        /// </summary>
         private static string Combine(string baseUrl, string path)
         {
             return baseUrl.TrimEnd('/') + path;
         }
 
+        /// <summary>
+        /// JSON DTO for the Python /predict response. Each money/flag property has a camelCase name plus a snake_case alias setter.
+        /// </summary>
         private sealed class RemoteForecastDto
         {
+            /// <summary>Predicted next-month amount from the API.</summary>
             public decimal PredictedPayroll { get; set; }
 
+            /// <summary>Snake_case alias that writes <see cref="PredictedPayroll"/>.</summary>
             [JsonPropertyName("predicted_payroll")]
             public decimal PredictedPayrollSnake
             {
@@ -286,8 +321,10 @@ namespace RSDSystem.Services
                 set => PredictedPayroll = value;
             }
 
+            /// <summary>Allocated budget returned by the API, or null to keep the C# input budget.</summary>
             public decimal? AllocatedBudget { get; set; }
 
+            /// <summary>Snake_case alias for allocated budget.</summary>
             [JsonPropertyName("allocated_budget")]
             public decimal? AllocatedBudgetSnake
             {
@@ -295,8 +332,10 @@ namespace RSDSystem.Services
                 set => AllocatedBudget = value;
             }
 
+            /// <summary>Predicted minus budget from the API, if provided.</summary>
             public decimal? BudgetDifference { get; set; }
 
+            /// <summary>Snake_case alias for budget difference.</summary>
             [JsonPropertyName("budget_difference")]
             public decimal? BudgetDifferenceSnake
             {
@@ -304,8 +343,10 @@ namespace RSDSystem.Services
                 set => BudgetDifference = value;
             }
 
+            /// <summary>API flag that predicted amount is over budget.</summary>
             public bool? ExceedsBudget { get; set; }
 
+            /// <summary>Snake_case alias for exceeds-budget.</summary>
             [JsonPropertyName("exceeds_budget")]
             public bool? ExceedsBudgetSnake
             {
@@ -313,8 +354,10 @@ namespace RSDSystem.Services
                 set => ExceedsBudget = value;
             }
 
+            /// <summary>API flag for a large month-to-month jump.</summary>
             public bool? UnusualChange { get; set; }
 
+            /// <summary>Snake_case alias for unusual change.</summary>
             [JsonPropertyName("unusual_change")]
             public bool? UnusualChangeSnake
             {
@@ -322,8 +365,10 @@ namespace RSDSystem.Services
                 set => UnusualChange = value;
             }
 
+            /// <summary>Percent change between the two previous months from the API.</summary>
             public decimal? ChangePercent { get; set; }
 
+            /// <summary>Snake_case alias for change percent.</summary>
             [JsonPropertyName("change_percent")]
             public decimal? ChangePercentSnake
             {
@@ -331,8 +376,10 @@ namespace RSDSystem.Services
                 set => ChangePercent = value;
             }
 
+            /// <summary>Optional risk heading from the API (Budget Exceeding Risk, etc.).</summary>
             public string? RiskTitle { get; set; }
 
+            /// <summary>Snake_case alias for risk title.</summary>
             [JsonPropertyName("risk_title")]
             public string? RiskTitleSnake
             {
@@ -340,8 +387,10 @@ namespace RSDSystem.Services
                 set => RiskTitle = value;
             }
 
+            /// <summary>Optional risk sentence from the API for the prediction page.</summary>
             public string? RiskDetail { get; set; }
 
+            /// <summary>Snake_case alias for risk detail.</summary>
             [JsonPropertyName("risk_detail")]
             public string? RiskDetailSnake
             {
@@ -351,33 +400,57 @@ namespace RSDSystem.Services
         }
     }
 
+    /// <summary>View model for Admin Payroll/Prediction: project header plus one forecast row or an Error string.</summary>
     public class PayrollPredictionPage
     {
+        /// <summary>Project being predicted; posted back on GetPrediction.</summary>
         public int ProjectId { get; set; }
+        /// <summary>Project name shown on the prediction page header.</summary>
         public string ProjectName { get; set; } = "—";
+        /// <summary>When this forecast was computed (local time).</summary>
         public DateTime GeneratedAt { get; set; } = DateTime.Now;
+        /// <summary>Why prediction cannot run (missing project or fewer than two monthly budgets); null on success.</summary>
         public string? Error { get; set; }
+        /// <summary>Usually a single next-month row comparing last two budgets to the forecast.</summary>
         public List<PayrollPredictionRow> Rows { get; set; } = new();
     }
 
+    /// <summary>One next-month forecast line: two previous budget months, predicted amount, allocated budget, and risk flags.</summary>
     public class PayrollPredictionRow
     {
+        /// <summary>First day of the older previous month.</summary>
         public DateTime PreviousMonth1 { get; set; }
+        /// <summary>Label for the older month (MonthYear or MMMM yyyy).</summary>
         public string PreviousLabel1 { get; set; } = "";
+        /// <summary>Allocated/used amount for the older month.</summary>
         public decimal PreviousAmount1 { get; set; }
+        /// <summary>First day of the newer previous month.</summary>
         public DateTime PreviousMonth2 { get; set; }
+        /// <summary>Label for the newer previous month.</summary>
         public string PreviousLabel2 { get; set; } = "";
+        /// <summary>Allocated/used amount for the newer previous month.</summary>
         public decimal PreviousAmount2 { get; set; }
+        /// <summary>First day of the month being predicted.</summary>
         public DateTime PredictionMonth { get; set; }
+        /// <summary>Heading for the predicted month (allocated row label or MMMM yyyy).</summary>
         public string PredictionLabel { get; set; } = "";
+        /// <summary>Linear-trend (or Python API) estimate for that month.</summary>
         public decimal PredictedPayroll { get; set; }
+        /// <summary>Admin-allocated budget for the predicted month when one exists.</summary>
         public decimal AllocatedBudget { get; set; }
+        /// <summary>True when the predicted month already has a ProjectMonthlyBudget row to compare against.</summary>
         public bool HasAllocatedBudget { get; set; }
+        /// <summary>Predicted minus allocated (or minus last month if no allocation).</summary>
         public decimal BudgetDifference { get; set; }
+        /// <summary>True when predicted amount is greater than allocated budget — triggers an admin notification.</summary>
         public bool ExceedsBudget { get; set; }
+        /// <summary>True when the last two months jumped by at least the anomaly percent.</summary>
         public bool UnusualChange { get; set; }
+        /// <summary>Absolute percent change between the two previous amounts.</summary>
         public decimal ChangePercent { get; set; }
+        /// <summary>Risk heading shown on the page, or null when both flags are off.</summary>
         public string? RiskTitle { get; set; }
+        /// <summary>Explanation under the risk heading (over budget vs sharp rise/drop).</summary>
         public string? RiskDetail { get; set; }
     }
 }

@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.Payroll
+﻿@*
+    Staff: PayrollStaffController.ViewPayroll. Read-only payslip for one Draft/Correction/
+    Submitted/Approved row; Edit is offered only while status is Draft or Correction.
+*@
+@model RSDSystem.Models.Payroll
 @{
     ViewData["Title"] = "View Payroll";
     Layout = "_PayrollStaffLayout";

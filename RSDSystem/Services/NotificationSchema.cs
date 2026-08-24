@@ -6,6 +6,10 @@ namespace RSDSystem.Services
     /// <summary>Creates AppNotifications and AttendanceCorrectionRequests if missing.</summary>
     public static class NotificationSchema
     {
+        /// <summary>
+        /// Creates AppNotifications (bell items) and AttendanceCorrectionRequests if this database never had them.
+        /// Program.cs calls this at startup so Admin/Staff notification screens and correction approve/return have tables.
+        /// </summary>
         public static void Ensure(PayrollDbContext db)
         {
             db.Database.ExecuteSqlRaw(CreateNotificationsSql);

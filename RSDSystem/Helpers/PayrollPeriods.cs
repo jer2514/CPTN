@@ -13,6 +13,10 @@ namespace RSDSystem.Helpers
     {
         private static readonly CultureInfo Dates = CultureInfo.InvariantCulture;
 
+        /// <summary>
+        /// Picks the current open payroll schedule (not TaskCompleted), newest start date first.
+        /// Staff generate slips and import attendance against this window until Admin approves the task as done.
+        /// </summary>
         public static PayrollSchedule? Open(IEnumerable<PayrollSchedule> schedules) =>
             schedules
                 .Where(s => !s.TaskCompleted)
@@ -20,6 +24,10 @@ namespace RSDSystem.Helpers
                 .ThenByDescending(s => s.PayrollScheduleId)
                 .FirstOrDefault();
 
+        /// <summary>
+        /// Finds the schedule whose start/end fully contain the given pay period dates.
+        /// Used when a payroll row has no PayrollScheduleId yet (older databases) so review screens still group by schedule.
+        /// </summary>
         public static PayrollSchedule? Covering(
             IEnumerable<PayrollSchedule> schedules, DateTime start, DateTime end)
         {
@@ -32,6 +40,10 @@ namespace RSDSystem.Helpers
                 && end <= s.EndDate.Date);
         }
 
+        /// <summary>
+        /// Resolves the schedule for one payroll slip: linked PayrollScheduleId first, otherwise date covering.
+        /// Admin review and staff pending lists use this to show the right period label.
+        /// </summary>
         public static PayrollSchedule? ForPayroll(
             IEnumerable<PayrollSchedule> schedules, Payroll payroll)
         {
@@ -45,9 +57,16 @@ namespace RSDSystem.Helpers
             return Covering(schedules, payroll.PayPeriodStart, payroll.PayPeriodEnd);
         }
 
+        /// <summary>
+        /// True when this payroll slip belongs to the given schedule (by id, or by matching dates if id is null).
+        /// </summary>
         public static bool BelongsTo(Payroll payroll, PayrollSchedule schedule) =>
             BelongsTo(payroll.PayrollScheduleId, payroll.PayPeriodStart, payroll.PayPeriodEnd, schedule);
 
+        /// <summary>
+        /// Compares a slip's schedule id and pay dates to one admin schedule. A set id must match exactly;
+        /// a null id matches only when start and end dates equal the schedule window.
+        /// </summary>
         public static bool BelongsTo(
             int? payrollScheduleId, DateTime payPeriodStart, DateTime payPeriodEnd, PayrollSchedule schedule)
         {
@@ -61,11 +80,17 @@ namespace RSDSystem.Helpers
                 && payPeriodEnd.Date == schedule.EndDate.Date;
         }
 
+        /// <summary>
+        /// Human period label from a schedule, for example <c>Aug 1, 2026 – Aug 15, 2026</c>, shown on to-do and review screens.
+        /// </summary>
         public static string Label(PayrollSchedule schedule) =>
             schedule.StartingDate.ToString("MMM d, yyyy", Dates)
             + " – "
             + schedule.EndDate.ToString("MMM d, yyyy", Dates);
 
+        /// <summary>
+        /// Same period label from raw dates (attendance imports and notifications that do not have a PayrollSchedule object).
+        /// </summary>
         public static string Label(DateTime start, DateTime end) =>
             start.ToString("MMM d, yyyy", Dates)
             + " – "

@@ -1,4 +1,8 @@
-﻿@model List<RSDSystem.Models.PayrollSchedule>
+﻿@*
+    Staff: PayrollStaffController.Index. To-do list of unapproved PayrollSchedules assigned
+    to this staff member; tick Mark as Done (ToggleTask) to wait for Admin approval.
+*@
+@model List<RSDSystem.Models.PayrollSchedule>
 @{
     ViewData["Title"] = "To do task";
     Layout = "_PayrollStaffLayout";

@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.Employee
+﻿@*
+    Admin: EmployeeController.Edit. Change an existing worker's name, rates, job, photo,
+    or project assignment; POST saves the Employee row.
+*@
+@model RSDSystem.Models.Employee
 @{
     ViewData["Title"] = "Edit Employee";
     var jobs = ViewBag.JobClassifications as string[] ?? Array.Empty<string>();

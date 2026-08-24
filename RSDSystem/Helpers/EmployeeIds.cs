@@ -6,6 +6,10 @@ namespace RSDSystem.Helpers
     /// </summary>
     public static class EmployeeIds
     {
+        /// <summary>
+        /// Displays a biometric employee code as five digits (<c>00001</c>). Non-numeric leftover text is returned trimmed.
+        /// Used on attendance tables, payroll slips, and employee lists so staff IDs and employee IDs stay distinct.
+        /// </summary>
         public static string Format(string? code)
         {
             var seq = Sequence(code);
@@ -14,6 +18,10 @@ namespace RSDSystem.Helpers
                 : (string.IsNullOrWhiteSpace(code) ? "—" : code.Trim());
         }
 
+        /// <summary>
+        /// Extracts the numeric sequence from a biometric or year-prefixed code so import can match file User IDs to Employees.
+        /// Six-or-more-digit codes keep only the last four (old <c>YY + seq</c> style, for example 260001 → 1).
+        /// </summary>
         public static int? Sequence(string? code)
         {
             if (string.IsNullOrWhiteSpace(code))

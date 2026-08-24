@@ -22,6 +22,9 @@ namespace RSDSystem.Controllers
         private readonly NotificationService _notifications;
         private readonly AttendanceImportService _imports;
 
+        /// <summary>
+        /// Receives the database, notification service, and attendance importer used to approve corrections.
+        /// </summary>
         public NotificationController(
             PayrollDbContext db,
             NotificationService notifications,
@@ -32,6 +35,11 @@ namespace RSDSystem.Controllers
             _imports = imports;
         }
 
+        /// <summary>
+        /// GET /Notification. Opens the full Notifications page from the bell "View all" link.
+        /// Staff get the payroll-staff layout. Loads one page of 5 items for the current role.
+        /// </summary>
+        /// <returns>The notifications list view with paging and unread count.</returns>
         public async Task<IActionResult> Index(int page = 1)
         {
             ViewData["Title"] = "Notifications";
@@ -48,6 +56,11 @@ namespace RSDSystem.Controllers
             return View(items);
         }
 
+        /// <summary>
+        /// GET /Notification/Recent. The header bell polls this every few seconds via notifications.js.
+        /// Returns the latest 7 items plus the unread count for the dropdown.
+        /// </summary>
+        /// <returns>JSON with unread, viewAllUrl, and item rows.</returns>
         [HttpGet]
         public async Task<IActionResult> Recent()
         {
@@ -64,6 +77,10 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Notification/UnreadCount. The bell badge calls this to refresh the red number.
+        /// </summary>
+        /// <returns>JSON with the unread count for the signed-in user.</returns>
         [HttpGet]
         public async Task<IActionResult> UnreadCount()
         {
@@ -72,6 +89,10 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, unread });
         }
 
+        /// <summary>
+        /// POST /Notification/MarkRead. Clicking one notification marks it read for this user.
+        /// </summary>
+        /// <returns>JSON success so the dropdown can drop the unread styling.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkRead(int id)
@@ -80,6 +101,10 @@ namespace RSDSystem.Controllers
             return Json(new { success = true });
         }
 
+        /// <summary>
+        /// POST /Notification/MarkAllRead. The "Mark all as read" button on the Notifications page.
+        /// </summary>
+        /// <returns>JSON success after every unread item for this user is cleared.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkAllRead()
@@ -88,6 +113,11 @@ namespace RSDSystem.Controllers
             return Json(new { success = true });
         }
 
+        /// <summary>
+        /// GET /Notification/GetCorrection/{id}. Admin opens a correction from a notification.
+        /// Loads the pending times and reason so the review modal can show Approve / Return.
+        /// </summary>
+        /// <returns>JSON with the request fields, or an error if the caller is not Admin.</returns>
         [HttpGet]
         public async Task<IActionResult> GetCorrection(int id)
         {
@@ -121,6 +151,11 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// POST /Notification/ApproveCorrection. Admin Approve on a correction modal.
+        /// Writes the requested times onto the attendance row, marks the request Approved, and notifies staff.
+        /// </summary>
+        /// <returns>JSON success after the record is updated, or an error if it was already reviewed.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveCorrection(int id)
@@ -170,6 +205,11 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Attendance correction approved." });
         }
 
+        /// <summary>
+        /// POST /Notification/ReturnCorrection. Admin Return on a correction modal, with an optional reason.
+        /// Does not change the attendance row. Staff must edit and send a new request from Attendance Records.
+        /// </summary>
+        /// <returns>JSON success after the request is marked Returned and staff are notified.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReturnCorrection(int id, string? reason)
@@ -211,6 +251,11 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Correction request returned." });
         }
 
+        /// <summary>
+        /// GET /Notification/GetTask/{id}. Admin opens a "mark done" notification.
+        /// Loads the payroll schedule so the modal can show Approve if TaskCompleted is true and TaskApproved is still false.
+        /// </summary>
+        /// <returns>JSON with schedule details and a pending flag.</returns>
         [HttpGet]
         public async Task<IActionResult> GetTask(int id)
         {
@@ -241,7 +286,11 @@ namespace RSDSystem.Controllers
             });
         }
 
-        /// <summary>Admin accepts the staff "mark done". TaskApproved=true removes it from to-do.</summary>
+        /// <summary>
+        /// Admin accepts the staff "mark done". TaskApproved=true removes it from to-do.
+        /// POST /Notification/ApproveTask from the task modal. Staff already clicked Mark as Done (ToggleTask).
+        /// </summary>
+        /// <returns>JSON success after the schedule is approved and staff are notified.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveTask(int id)
@@ -266,15 +315,27 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Task approved. It has been removed from To do task." });
         }
 
+        /// <summary>
+        /// True when the session Role is Admin. Used to gate correction and task review actions.
+        /// </summary>
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// True when the session Role is PayrollStaff. Index uses this to pick the staff layout.
+        /// </summary>
         private bool IsStaff =>
             string.Equals(HttpContext.Session.GetString("Role"), "PayrollStaff", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Session Role string passed into NotificationService so Admin and staff see different lists.
+        /// </summary>
         private string CurrentRole() =>
             HttpContext.Session.GetString("Role") ?? "";
 
+        /// <summary>
+        /// Session FullName used to match staff-targeted notifications.
+        /// </summary>
         private string CurrentName() =>
             HttpContext.Session.GetString("FullName") ?? "";
     }

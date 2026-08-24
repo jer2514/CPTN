@@ -16,6 +16,9 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly IWebHostEnvironment _env;
 
+        /// <summary>
+        /// Receives the database and web root so user photos can be saved under wwwroot/uploads/users.
+        /// </summary>
         public UserManagementController(PayrollDbContext db, IWebHostEnvironment env)
         {
             _db = db;
@@ -24,7 +27,11 @@ namespace RSDSystem.Controllers
 
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
 
-        // GET /UserManagement
+        /// <summary>
+        /// GET /UserManagement. Admin User Management list with search, sort, and 10 users per page.
+        /// Search matches first name, last name, email, or role. The Add User button goes to Create.
+        /// </summary>
+        /// <returns>The user list view for the current page.</returns>
         public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
             const int pageSize = 10;
@@ -67,7 +74,10 @@ namespace RSDSystem.Controllers
             return View(items);
         }
 
-        // GET /UserManagement/Create
+        /// <summary>
+        /// GET /UserManagement/Create. Opens the Add User form from the list page button.
+        /// </summary>
+        /// <returns>An empty User form with Admin and PayrollStaff role choices.</returns>
         public IActionResult Create()
         {
             ViewBag.Roles = Roles;
@@ -75,7 +85,12 @@ namespace RSDSystem.Controllers
             return View(new User());
         }
 
-        // POST /UserManagement/Create
+        /// <summary>
+        /// POST /UserManagement/Create. Save on the Add User form.
+        /// Hashes the password, assigns a user code, stores an optional photo, then returns to the list.
+        /// Duplicate username or email is rejected. Names are title-cased before save.
+        /// </summary>
+        /// <returns>The list after a successful save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(User user, string Password,
@@ -142,6 +157,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Build a yyNNNN user code from how many codes already start with this year.
+        /// Create calls this after Add so the sequence includes the new row being saved.
+        /// </summary>
         private async Task<string> GenerateUserCodeAsync()
         {
             var year = DateTime.Now.ToString("yy");
@@ -150,7 +169,10 @@ namespace RSDSystem.Controllers
             return $"{year}{seq}";
         }
 
-        // GET /UserManagement/Edit/{id}
+        /// <summary>
+        /// GET /UserManagement/Edit/{id}. Opens the Edit User form from a row's Edit button.
+        /// </summary>
+        /// <returns>The filled form, or 404 if the user id does not exist.</returns>
         public async Task<IActionResult> Edit(int id)
         {
             var user = await _db.Users.FindAsync(id);
@@ -161,6 +183,12 @@ namespace RSDSystem.Controllers
             return View(user);
         }
 
+        /// <summary>
+        /// POST /UserManagement/Edit. Save on the Edit User form.
+        /// Password is optional; a blank NewPassword keeps the old hash. If this is the signed-in account,
+        /// session FullName/Role/PhotoPath are refreshed so the sidebar updates immediately.
+        /// </summary>
+        /// <returns>The user list after save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(User user, string? NewPassword,
@@ -249,7 +277,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /UserManagement/Delete/{id}
+        /// <summary>
+        /// POST /UserManagement/Delete/{id}. Row Delete button. Permanently removes the login account.
+        /// </summary>
+        /// <returns>A redirect back to the user list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
@@ -264,6 +295,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Save an uploaded photo under wwwroot/uploads/users with a new GUID file name.
+        /// Create and Edit call this when a photo file is present.
+        /// </summary>
+        /// <returns>The public URL path stored on User.PhotoPath.</returns>
         private async Task<string> SavePhotoAsync(IFormFile photo)
         {
             var folder = Path.Combine(_env.WebRootPath, "uploads", "users");
@@ -275,7 +311,11 @@ namespace RSDSystem.Controllers
             return $"/uploads/users/{fileName}";
         }
 
-        //delete multiple users
+        /// <summary>
+        /// POST /UserManagement/BulkDelete. Delete selected checkbox on the list page.
+        /// Removes every User whose id is in selectedIds, then returns to the list.
+        /// </summary>
+        /// <returns>A redirect to Index. Does nothing when the selection is empty.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> BulkDelete(List<int> selectedIds)
@@ -293,6 +333,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// POST /UserManagement/ToggleStatus/{id}. Active/Inactive switch on a user row.
+        /// Inactive users fail the Login IsActive filter and cannot sign in.
+        /// </summary>
+        /// <returns>A redirect back to the user list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleStatus(int id)
@@ -306,6 +351,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Build a yyNNNN code from the highest existing code for this year (synchronous).
+        /// Create sets this first, then overwrites with GenerateUserCodeAsync before save.
+        /// </summary>
         private string GenerateUserCode()
         {
             string yearPrefix = DateTime.Now.ToString("yy");

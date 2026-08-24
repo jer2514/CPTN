@@ -25,6 +25,7 @@
     let redirectProjectId = null;
     let savedPayrollId = existingPayrollId;
 
+    // Shows ISO yyyy-mm-dd as mm/dd/yyyy in schedule-bound error messages.
     function formatIsoDate(iso) {
         if (!iso) return '';
         const parts = String(iso).split('-');
@@ -32,18 +33,21 @@
         return parts[1] + '/' + parts[2] + '/' + parts[0];
     }
 
+    // Returns the later of two ISO dates (used to clamp the start picker min).
     function laterDate(a, b) {
         if (!a) return b || '';
         if (!b) return a;
         return a.localeCompare(b) >= 0 ? a : b;
     }
 
+    // Returns the earlier of two ISO dates (used to clamp the end picker max).
     function earlierDate(a, b) {
         if (!a) return b || '';
         if (!b) return a;
         return a.localeCompare(b) <= 0 ? a : b;
     }
 
+    // Finds the Admin payroll schedule that contains this start date.
     function coveringSchedule(startIso) {
         if (!startIso) return null;
         return schedules.find(function (s) {
@@ -51,6 +55,7 @@
         }) || null;
     }
 
+    // Finds a schedule that fully contains both the chosen start and end dates.
     function coveringScheduleForRange(startIso, endIso) {
         if (!startIso || !endIso) return null;
         return schedules.find(function (s) {
@@ -58,6 +63,7 @@
         }) || null;
     }
 
+    // Formats a date like "Jan 5, 2026" in the "must fall within …" hint under the pickers.
     function formatHintDate(iso) {
         if (!iso) return '';
         const date = new Date(iso + 'T00:00:00');
@@ -65,6 +71,7 @@
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    // Updates the gray hint that tells staff which schedule window the pay period must sit in.
     function updateScheduleHint(cover) {
         const hint = document.getElementById('payPeriodScheduleHint');
         if (!hint || !hasSchedule) return;
@@ -77,6 +84,7 @@
             + (formatHintDate(endIso) || 'the schedule end');
     }
 
+    // Keeps date min/max inside 2000–2099 so the native picker cannot pick an invalid year.
     function clampBounds(min, max) {
         const calendarMin = '2000-01-01';
         const calendarMax = '2099-12-31';
@@ -88,6 +96,7 @@
         return { min: nextMin, max: nextMax };
     }
 
+    // Sets min/max on the start/end date pickers from the covering schedule (and each other).
     function syncPeriodBounds() {
         const startEl = document.getElementById('payPeriodStart');
         const endEl = document.getElementById('payPeriodEnd');
@@ -125,6 +134,7 @@
         else endEl.removeAttribute('data-max');
     }
 
+    // Shows a red error under one named slip field (days, OT, cash advance, dates).
     function showFieldError(name, message) {
         const field = slipForm.querySelector('[name="' + name + '"]');
         const dest = slipForm.querySelector('[data-error-for="' + name + '"]');
@@ -132,11 +142,13 @@
         if (dest) dest.textContent = message || '';
     }
 
+    // Clears previous server/client errors before a new Generate click.
     function clearServerErrors() {
         ['payPeriodStart', 'payPeriodEnd', 'regularDaysWorked', 'absentDays', 'overtimeHours', 'cashAdvance']
             .forEach(function (name) { showFieldError(name, ''); });
     }
 
+    // Inclusive calendar-day count between two ISO dates (null if the range is invalid).
     function inclusiveDays(startIso, endIso) {
         if (!startIso || !endIso) return null;
         const start = new Date(startIso + 'T00:00:00');
@@ -145,6 +157,7 @@
         return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
     }
 
+    // Counts Mon–Fri in the range; used as a fallback if attendance totals cannot load.
     function weekdayCount(startIso, endIso) {
         const total = inclusiveDays(startIso, endIso);
         if (total === null) return 0;
@@ -159,6 +172,7 @@
         return days;
     }
 
+    // Writes a number into a slip input and clears any error under it.
     function setNumberValue(id, value) {
         const el = document.getElementById(id);
         if (!el) return;
@@ -168,6 +182,7 @@
         if (dest) dest.textContent = '';
     }
 
+    // GETs GetAttendanceTotals and fills days worked / absent / OT for the chosen period.
     async function fillAttendanceFromPeriod() {
         const start = document.getElementById('payPeriodStart').value;
         const end = document.getElementById('payPeriodEnd').value;
@@ -193,6 +208,7 @@
         }
     }
 
+    // Extra checks the HTML5 form cannot do: days vs period, OT cap, cash advance vs gross, schedule window.
     function validateSlipExtras() {
         let ok = true;
         const start = document.getElementById('payPeriodStart').value;

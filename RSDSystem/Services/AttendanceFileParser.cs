@@ -13,10 +13,15 @@ namespace RSDSystem.Services
     /// </summary>
     public class AttendanceParseResult
     {
+        /// <summary>Daily punch layout or Statistic totals, detected from headers.</summary>
         public string Format { get; set; } = AttendanceFormats.Daily;
+        /// <summary>First day from an "Attendance date: yyyy-MM-dd ~ yyyy-MM-dd" banner, if present.</summary>
         public DateTime? PeriodStart { get; set; }
+        /// <summary>Last day of that banner range; ExpandToDateRange fills missing days as Absent through this date.</summary>
         public DateTime? PeriodEnd { get; set; }
+        /// <summary>Parsed punch rows (not yet matched to Employees or saved).</summary>
         public List<AttendanceRecord> Rows { get; set; } = new();
+        /// <summary>Why parse failed (empty sheet, no headers); null when Rows can be previewed.</summary>
         public string? Error { get; set; }
     }
 
@@ -48,6 +53,10 @@ namespace RSDSystem.Services
             @"^(Name|User\s*ID|Employee\s*ID)\s*:?\s*(.+)$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+        /// <summary>
+        /// Entry point for attendance import: reads .xls/.xlsx/.csv/.txt from <paramref name="file"/> and returns punch rows (no database).
+        /// Picks the Excel sheet that looks most like a time card. PreviewAsync calls this before matching employees.
+        /// </summary>
         public static AttendanceParseResult Parse(Stream file, string fileName)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -74,12 +83,20 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Runs <see cref="AttendanceRules.Apply"/> on one row and returns the resulting Status (Complete, Late, Absent, …).
+        /// Used while parsing so preview badges match what payroll will count later.
+        /// </summary>
         public static string DeriveStatus(AttendanceRecord row)
         {
             AttendanceRules.Apply(row);
             return row.Status;
         }
 
+        /// <summary>
+        /// Matches a biometric User ID or printed name to Employees.EmployeeId (sequence digits, last-five tail, then full/first name).
+        /// Returns null when unmatched so the preview asks staff to pick an employee.
+        /// </summary>
         public static int? MatchEmployeeId(IEnumerable<Employee> employees, string externalUserId, string name)
         {
             var list = employees as IList<Employee> ?? employees.ToList();
@@ -106,6 +123,9 @@ namespace RSDSystem.Services
             return byName?.EmployeeId;
         }
 
+        /// <summary>
+        /// Chooses time-card block parsing vs a flat User-ID table after looking at the first rows of the sheet.
+        /// </summary>
         private static AttendanceParseResult ParseTable(DataTable table, string fileName)
         {
             if (LooksLikeEmployeeTimeCard(table))
@@ -114,6 +134,9 @@ namespace RSDSystem.Services
             return ParseFlatTable(table, fileName);
         }
 
+        /// <summary>
+        /// True when the sheet text looks like a biometric employee time card (Name/User ID blocks, before noon / after noon).
+        /// </summary>
         private static bool LooksLikeEmployeeTimeCard(DataTable table)
         {
             var scan = table.Rows.Count;
@@ -133,6 +156,9 @@ namespace RSDSystem.Services
             return false;
         }
 
+        /// <summary>
+        /// Reads side-by-side employee time-card blocks (typical .xls export). Fills result.Rows or sets Error if no Name/User ID found.
+        /// </summary>
         private static AttendanceParseResult ParseEmployeeTimeCard(DataTable table, string fileName)
         {
             var result = new AttendanceParseResult { Format = AttendanceFormats.Daily };
@@ -156,6 +182,10 @@ namespace RSDSystem.Services
             return result;
         }
 
+        /// <summary>
+        /// For each employee, fills every calendar day from <paramref name="start"/> to <paramref name="end"/>; days with no punch become Absent.
+        /// Import uses this after resolving the open payroll-schedule window so payroll totals include missing days.
+        /// </summary>
         public static void ExpandToDateRange(AttendanceParseResult result, DateTime start, DateTime end)
         {
             if (result.Rows.Count == 0)
@@ -212,6 +242,9 @@ namespace RSDSystem.Services
             result.Rows = expanded;
         }
 
+        /// <summary>
+        /// Finds left/right column ranges for each employee card by scanning the header for Name / User ID labels.
+        /// </summary>
         private static List<EmployeeBlock> FindEmployeeBlocks(DataTable table)
         {
             var starts = new SortedSet<int>();
@@ -245,6 +278,9 @@ namespace RSDSystem.Services
             return blocks;
         }
 
+        /// <summary>
+        /// Walks left from a Name/User ID cell to the Dept/Date edge so one employee's columns are grouped together.
+        /// </summary>
         private static int SnapBlockStart(DataTable table, int anchor)
         {
             var start = anchor;
@@ -266,6 +302,9 @@ namespace RSDSystem.Services
             return start;
         }
 
+        /// <summary>
+        /// Normalized header keys found in the first 25 cells of one column (used to detect Dept/Date edges).
+        /// </summary>
         private static HashSet<string> ColumnKeys(DataTable table, int col)
         {
             var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -281,6 +320,9 @@ namespace RSDSystem.Services
             return keys;
         }
 
+        /// <summary>
+        /// Reads Name and User ID from a column range. Returns null if both are empty so that range is not treated as a card.
+        /// </summary>
         private static EmployeeBlock? ReadEmployeeHeader(DataTable table, int colStart, int colEnd)
         {
             var block = new EmployeeBlock { ColStart = colStart, ColEnd = colEnd };
@@ -317,6 +359,9 @@ namespace RSDSystem.Services
             return block;
         }
 
+        /// <summary>
+        /// Copies a header value into block.Name or block.UserId, ignoring label text that is not a real name/id.
+        /// </summary>
         private static void AssignHeader(EmployeeBlock block, string label, string value)
         {
             if (string.IsNullOrWhiteSpace(value) || IsFieldLabel(value))
@@ -330,6 +375,9 @@ namespace RSDSystem.Services
                 block.UserId = value.Trim();
         }
 
+        /// <summary>
+        /// Finds the value for a Name/User ID label: cell to the right first, then the cell below (time-card layout).
+        /// </summary>
         private static string ValueBesideOrBelow(DataTable table, int row, int col, int colEnd)
         {
             var values = RowValues(table, row);
@@ -352,6 +400,9 @@ namespace RSDSystem.Services
             return "";
         }
 
+        /// <summary>
+        /// Walks data rows of one employee card, maps In/Out columns, builds an AttendanceRecord per date, then DeriveStatus.
+        /// </summary>
         private static void ReadTimeCardBlock(DataTable table, EmployeeBlock block, AttendanceParseResult result)
         {
             var columns = MapTimeCardColumns(table, block.ColStart, block.ColEnd);
@@ -400,6 +451,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// When mapped DateCol is blank, scans the block for a cell that looks like a card date (day + month or yyyy-MM-dd).
+        /// </summary>
         private static int? FindDateColumn(string[] values, int colStart, int colEnd)
         {
             for (var c = colStart; c <= colEnd && c < values.Length; c++)
@@ -411,6 +465,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// True if the cell is a time-card date (for example "15 Aug" or a parseable date), not a section label or period banner.
+        /// </summary>
         private static bool LooksLikeCardDate(string? value)
         {
             if (string.IsNullOrWhiteSpace(value) || IsSectionLabel(value) || IsPeriodText(value))
@@ -423,6 +480,9 @@ namespace RSDSystem.Services
             return false;
         }
 
+        /// <summary>
+        /// Locates Date / Before noon In-Out / After noon / Overtime columns from two header rows. Null if In/Out headers are missing.
+        /// </summary>
         private static TimeCardColumns? MapTimeCardColumns(DataTable table, int colStart, int colEnd)
         {
             for (var r = 0; r < table.Rows.Count; r++)
@@ -487,6 +547,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// Assigns an In column to morning (In1), afternoon (In2), or overtime (OtIn) based on the parent header group.
+        /// </summary>
         private static void AssignIn(TimeCardColumns map, string group, int col)
         {
             if (group == "am") map.In1 = col;
@@ -497,6 +560,9 @@ namespace RSDSystem.Services
             else map.OtIn ??= col;
         }
 
+        /// <summary>
+        /// Same as AssignIn for Out columns (Out1 / Out2 / OtOut).
+        /// </summary>
         private static void AssignOut(TimeCardColumns map, string group, int col)
         {
             if (group == "am") map.Out1 = col;
@@ -507,6 +573,9 @@ namespace RSDSystem.Services
             else map.OtOut ??= col;
         }
 
+        /// <summary>
+        /// Fallback when headers have In/Out but groups are missing: In1..OtOut are DateCol+1 through DateCol+6.
+        /// </summary>
         private static void ApplyPositionalTimeColumns(TimeCardColumns map)
         {
             var offset = 1;
@@ -518,6 +587,9 @@ namespace RSDSystem.Services
             map.OtOut ??= map.DateCol + offset + 5;
         }
 
+        /// <summary>
+        /// True when all six punch fields are blank so the parser should try fallback time columns.
+        /// </summary>
         private static bool TimesEmpty(AttendanceRecord row) =>
             string.IsNullOrWhiteSpace(row.TimeIn1)
             && string.IsNullOrWhiteSpace(row.TimeOut1)
@@ -526,6 +598,9 @@ namespace RSDSystem.Services
             && string.IsNullOrWhiteSpace(row.OvertimeIn)
             && string.IsNullOrWhiteSpace(row.OvertimeOut);
 
+        /// <summary>
+        /// Collects every parseable time in the block (skipping the date and weekday cells) and AssignTimeList into the six punch slots.
+        /// </summary>
         private static void ApplyFallbackTimes(
             string[] values, int colStart, int colEnd, string dateText, AttendanceRecord row)
         {
@@ -544,6 +619,9 @@ namespace RSDSystem.Services
             AssignTimeList(row, times);
         }
 
+        /// <summary>
+        /// Reads the six cells immediately to the right of the date column as In1, Out1, In2, Out2, OtIn, OtOut.
+        /// </summary>
         private static void ApplyTimesFromDateColumn(
             string[] values, int dateCol, int colEnd, string dateText, AttendanceRecord row)
         {
@@ -566,6 +644,9 @@ namespace RSDSystem.Services
             row.OvertimeOut = slots[5];
         }
 
+        /// <summary>
+        /// Copies a list of HH:mm strings into the six punch fields in order (first time → TimeIn1, second → TimeOut1, …).
+        /// </summary>
         private static void AssignTimeList(AttendanceRecord row, List<string> times)
         {
             if (times.Count > 0) row.TimeIn1 = times[0];
@@ -576,6 +657,9 @@ namespace RSDSystem.Services
             if (times.Count > 5) row.OvertimeOut = times[5];
         }
 
+        /// <summary>
+        /// Parses a rectangular table with User ID / Date / Time In columns (CSV or statistic Excel). Sets Error if no User ID header.
+        /// </summary>
         private static AttendanceParseResult ParseFlatTable(DataTable table, string fileName)
         {
             var result = new AttendanceParseResult();
@@ -664,6 +748,9 @@ namespace RSDSystem.Services
             return result;
         }
 
+        /// <summary>
+        /// Reads PeriodStart/PeriodEnd from the first rows ("Attendance date: 2026-08-01 ~ 2026-08-15" or a bare date range).
+        /// </summary>
         private static void ApplyPeriod(DataTable table, AttendanceParseResult result)
         {
             for (var r = 0; r < Math.Min(table.Rows.Count, 20); r++)
@@ -683,6 +770,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Turns a card date cell into a full DateTime using the period year/month when the cell is only "15" or "15 Aug".
+        /// </summary>
         private static DateTime? ResolveCardDate(string text, DateTime? periodStart, DateTime? periodEnd, bool allowBareDay)
         {
             if (string.IsNullOrWhiteSpace(text) || IsPeriodText(text) || IsSectionLabel(text))
@@ -715,6 +805,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// Maps statistic sub-headers (Work time Normal/Actual, Late minute, Overtime Normal) onto the header dictionary.
+        /// </summary>
         private static void MapSubHeaders(Dictionary<string, int> map, string[] main, string[] sub)
         {
             for (var c = 0; c < Math.Max(main.Length, sub.Length); c++)
@@ -738,18 +831,27 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// True if the normalized header is a known attendance column (userid, date, timein1, late, …).
+        /// </summary>
         private static bool IsKnownHeader(string key) =>
             key is "userid" or "employeeid" or "name" or "employeename" or "date"
                 or "timein1" or "timeout1" or "timein2" or "timeout2"
                 or "overtimein" or "overtimeout" or "status"
                 or "worktime" or "late" or "early" or "overtime" or "absence" or "absenceday";
 
+        /// <summary>
+        /// True if a data cell is actually a leftover header word (userid, name, normal) so that row is skipped.
+        /// </summary>
         private static bool LooksLikeHeader(string value)
         {
             var key = NormalizeHeader(value);
             return key is "userid" or "employeeid" or "name" or "normal" or "actual" or "times" or "minute";
         }
 
+        /// <summary>
+        /// True if the cell is a field label (Name, Dept, Date) rather than a value, so it is not stored as a name or time.
+        /// </summary>
         private static bool IsFieldLabel(string value)
         {
             var key = NormalizeHeader(value);
@@ -758,6 +860,9 @@ namespace RSDSystem.Services
                 or "normal" or "special" or "times" or "minute" or "timecard";
         }
 
+        /// <summary>
+        /// True if the cell is a time-card section title (Time Card, Before Noon, In, Out) rather than a date or punch.
+        /// </summary>
         private static bool IsSectionLabel(string value)
         {
             var key = NormalizeHeader(value);
@@ -765,6 +870,9 @@ namespace RSDSystem.Services
                 or "overtime" or "in" or "out" or "name" or "userid";
         }
 
+        /// <summary>
+        /// Lowercases a header and strips spaces/punctuation so "User ID" and "UserID" both become "userid".
+        /// </summary>
         private static string NormalizeHeader(string value)
         {
             var chars = (value ?? "").ToLowerInvariant()
@@ -775,6 +883,9 @@ namespace RSDSystem.Services
             return new string(chars);
         }
 
+        /// <summary>
+        /// Reads every Excel sheet into DataTables (no header row assumed — ParseTable finds headers itself).
+        /// </summary>
         private static List<DataTable> ReadExcelTables(IExcelDataReader reader)
         {
             var tables = new List<DataTable>();
@@ -800,6 +911,9 @@ namespace RSDSystem.Services
             return tables;
         }
 
+        /// <summary>
+        /// Reads one Excel cell, trying GetValue then number/date/string fallbacks because biometric exports mix types.
+        /// </summary>
         private static object ReadExcelValue(IExcelDataReader reader, int index)
         {
             if (index < 0 || index >= reader.FieldCount)
@@ -853,6 +967,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Scores a sheet higher when it contains "time card", "before noon", card dates, and colon times so Parse picks the right tab.
+        /// </summary>
         private static int ScoreTimeCardSheet(DataTable table)
         {
             var score = table.Columns.Count;
@@ -878,6 +995,9 @@ namespace RSDSystem.Services
             return score;
         }
 
+        /// <summary>
+        /// Loads a CSV/TXT stream into a DataTable (one row per line, SplitCsv cells). UTF-8 with BOM detection.
+        /// </summary>
         private static DataTable ReadCsv(Stream file)
         {
             using var reader = new StreamReader(file, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
@@ -903,6 +1023,9 @@ namespace RSDSystem.Services
             return table;
         }
 
+        /// <summary>
+        /// Splits one CSV line on commas, respecting double-quoted fields (quotes themselves are not kept).
+        /// </summary>
         private static string[] SplitCsv(string line)
         {
             var values = new List<string>();
@@ -930,6 +1053,9 @@ namespace RSDSystem.Services
             return values.ToArray();
         }
 
+        /// <summary>
+        /// Formats every cell in a DataTable row as display text (dates, times, numbers) for header scanning and parsing.
+        /// </summary>
         private static string[] RowValues(DataTable table, int row)
         {
             var values = new string[table.Columns.Count];
@@ -938,6 +1064,9 @@ namespace RSDSystem.Services
             return values;
         }
 
+        /// <summary>
+        /// Converts an Excel/CSV cell object to a string: DateTime → date or HH:mm, TimeSpan → hours:minutes, OA-date numbers similarly.
+        /// </summary>
         private static string FormatCell(object? value)
         {
             if (value == null || value == DBNull.Value)
@@ -966,6 +1095,9 @@ namespace RSDSystem.Services
             return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim() ?? "";
         }
 
+        /// <summary>
+        /// Formats a DateTime from Excel: year ≤ 1900 or a time-of-day as HH:mm; midnight calendar dates as yyyy-MM-dd.
+        /// </summary>
         private static string FormatDateTime(DateTime dt)
         {
             if (dt.Year <= 1900)
@@ -975,6 +1107,9 @@ namespace RSDSystem.Services
             return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
         }
 
+        /// <summary>
+        /// Interprets Excel serial numbers: 0–1 as a time of day, larger OA dates as HH:mm or yyyy-MM-dd. Null if not a time/date.
+        /// </summary>
         private static string? FormatNumericCell(double number)
         {
             if (double.IsNaN(number) || double.IsInfinity(number))
@@ -1005,6 +1140,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// Inclusive slice of a row's cells from column start through end (used when joining a card's header text).
+        /// </summary>
         private static string[] Slice(string[] values, int start, int end)
         {
             var list = new List<string>();
@@ -1013,6 +1151,9 @@ namespace RSDSystem.Services
             return list.ToArray();
         }
 
+        /// <summary>
+        /// Safe index into a row: empty string when the column index is null or out of range.
+        /// </summary>
         private static string CellAt(string[] values, int? index)
         {
             if (!index.HasValue || index.Value < 0 || index.Value >= values.Length)
@@ -1020,6 +1161,9 @@ namespace RSDSystem.Services
             return values[index.Value];
         }
 
+        /// <summary>
+        /// Looks up the first matching header key in the map and returns that column's text (userid or employeeid, etc.).
+        /// </summary>
         private static string Cell(string[] values, Dictionary<string, int> map, params string[] keys)
         {
             foreach (var key in keys)
@@ -1031,6 +1175,9 @@ namespace RSDSystem.Services
             return "";
         }
 
+        /// <summary>
+        /// Normalizes a punch cell to HH:mm, or null if it is a label, a date, or unparseable. Used for all six time fields.
+        /// </summary>
         private static string? NormalizeTime(string? value)
         {
             if (string.IsNullOrWhiteSpace(value) || IsFieldLabel(value) || IsSectionLabel(value) || IsPeriodText(value))
@@ -1062,6 +1209,9 @@ namespace RSDSystem.Services
             return text.Contains(':') ? text : null;
         }
 
+        /// <summary>
+        /// True if the cell is a period banner (contains ~, "Attendance", or a yyyy-MM-dd ~ yyyy-MM-dd range), not a work date.
+        /// </summary>
         private static bool IsPeriodText(string value)
         {
             var text = (value ?? "").Trim();
@@ -1069,6 +1219,9 @@ namespace RSDSystem.Services
                 || BareDateRange.IsMatch(text);
         }
 
+        /// <summary>
+        /// Parses a decimal hours/absence cell (commas stripped; "8/8" keeps the left side). Returns 0 when not a number.
+        /// </summary>
         private static decimal ParseDec(string value)
         {
             var text = (value ?? "").Replace(",", "").Trim();
@@ -1077,12 +1230,18 @@ namespace RSDSystem.Services
             return decimal.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var n) ? n : 0;
         }
 
+        /// <summary>
+        /// Parses late/early minute cells. Returns 0 when the text is not an integer.
+        /// </summary>
         private static int ParseInt(string value)
         {
             var text = (value ?? "").Replace(",", "").Trim();
             return int.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var n) ? n : 0;
         }
 
+        /// <summary>
+        /// Parses a work date (yyyy-MM-dd, US slash dates, month names). Ignores time-only text and years before 1900.
+        /// </summary>
         private static DateTime? ParseDate(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return null;
@@ -1104,23 +1263,41 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// One employee's column range on a multi-card Excel sheet, plus the Name / User ID read from the header.
+        /// </summary>
         private sealed class EmployeeBlock
         {
+            /// <summary>Leftmost column of this card (often Dept or Date).</summary>
             public int ColStart { get; set; }
+            /// <summary>Rightmost column of this card (before the next employee's Name).</summary>
             public int ColEnd { get; set; }
+            /// <summary>Biometric User ID printed on the card.</summary>
             public string UserId { get; set; } = "";
+            /// <summary>Employee name printed on the card.</summary>
             public string Name { get; set; } = "";
         }
 
+        /// <summary>
+        /// Column indexes for Date and the six punch times on one time card.
+        /// </summary>
         private sealed class TimeCardColumns
         {
+            /// <summary>Column that holds the work date / weekday.</summary>
             public int DateCol { get; set; }
+            /// <summary>First data row after In/Out headers (used when scanning, though ReadTimeCardBlock still scans all rows).</summary>
             public int DataStartRow { get; set; }
+            /// <summary>Morning in column.</summary>
             public int? In1 { get; set; }
+            /// <summary>Morning out column.</summary>
             public int? Out1 { get; set; }
+            /// <summary>Afternoon in column.</summary>
             public int? In2 { get; set; }
+            /// <summary>Afternoon out column.</summary>
             public int? Out2 { get; set; }
+            /// <summary>Overtime in column.</summary>
             public int? OtIn { get; set; }
+            /// <summary>Overtime out column.</summary>
             public int? OtOut { get; set; }
         }
     }

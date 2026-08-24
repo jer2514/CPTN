@@ -16,13 +16,21 @@ namespace RSDSystem.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly PayrollDbContext _db;
 
+        /// <summary>
+        /// Receives logging and the payroll database used to fill the admin dashboard.
+        /// </summary>
         public HomeController(ILogger<HomeController> logger, PayrollDbContext db)
         {
             _logger = logger;
             _db = db;
         }
 
-        /// <summary>Admin home: project list + pending payroll approvals.</summary>
+        /// <summary>
+        /// Admin home: project list + pending payroll approvals.
+        /// GET /Home (after Admin login). Fills counts, ongoing projects, payroll schedules, and Submitted slips.
+        /// The dashboard Add/Edit/Delete schedule buttons post to PayrollController, not here.
+        /// </summary>
+        /// <returns>Views/Home/Index.cshtml with ViewBag data for the dashboard cards and tables.</returns>
         public async Task<IActionResult> Index()
         {
             ViewBag.ActiveProjects = await _db.Projects.Ongoing().CountAsync();
@@ -120,6 +128,7 @@ namespace RSDSystem.Controllers
                 })
                 .ToListAsync();
 
+            // One pending-approval card per project: the latest Submitted slip represents the batch.
             ViewBag.PendingApprovals = submitted
                 .GroupBy(p => p.ProjectId)
                 .Select(g =>
@@ -132,7 +141,7 @@ namespace RSDSystem.Controllers
                     {
                         ProjectId = g.Key,
                         StaffName = string.IsNullOrWhiteSpace(staffName) ? "Payroll Staff" : staffName,
-                        ProjectName = string.IsNullOrWhiteSpace(latest.ProjectName) ? "—" : latest.ProjectName,
+                        ProjectName = string.IsNullOrWhiteSpace(latest.ProjectName) ? "â€”" : latest.ProjectName,
                         Date = latest.GeneratedDate
                     };
                 })
@@ -142,11 +151,17 @@ namespace RSDSystem.Controllers
             return View();
         }
 
+        /// <summary>
+        /// GET /Home/Privacy. Shows the privacy policy page from the footer link.
+        /// </summary>
         public IActionResult Privacy()
         {
             return View();
         }
 
+        /// <summary>
+        /// GET /Home/Error. ASP.NET sends failed requests here. Shows a request id, nothing from the database.
+        /// </summary>
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

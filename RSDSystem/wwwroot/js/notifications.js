@@ -5,6 +5,7 @@
     const token = tokenInput ? tokenInput.value : '';
     const isAdmin = document.body.dataset.role === 'Admin';
 
+    // Wraps each .bell-btn with a badge + dropdown panel if the layout has not done so yet.
     function wrapBells() {
         document.querySelectorAll('.bell-btn').forEach(function (btn) {
             if (btn.closest('.notif-bell-wrap')) return;
@@ -22,6 +23,7 @@
         });
     }
 
+    // Builds the hidden dropdown (header, list, View All link) under the bell.
     function buildPanel() {
         const panel = document.createElement('div');
         panel.className = 'notif-panel';
@@ -36,12 +38,14 @@
         return panel;
     }
 
+    // Hides every open bell dropdown (click outside or after opening a modal).
     function closeAll() {
         document.querySelectorAll('.notif-panel').forEach(function (panel) {
             panel.hidden = true;
         });
     }
 
+    // GETs /Notification/Recent and paints the dropdown rows (icon, title, time ago).
     async function loadPanel(panel) {
         const list = panel.querySelector('.notif-panel-list');
         list.innerHTML = '<div class="notif-empty">Loading...</div>';
@@ -79,6 +83,7 @@
         }
     }
 
+    // Shows "3" or "9+" on the red badge, or hides it when unread is 0.
     function setBadges(count) {
         document.querySelectorAll('.notif-badge').forEach(function (badge) {
             if (count > 0) {
@@ -90,6 +95,7 @@
         });
     }
 
+    // Escapes title/message text so notification HTML cannot inject tags.
     function escapeHtml(value) {
         return String(value == null ? '' : value)
             .replace(/&/g, '&amp;')
@@ -98,6 +104,7 @@
             .replace(/"/g, '&quot;');
     }
 
+    // POSTs a form (anti-forgery token included) to MarkRead / ApproveCorrection / ApproveTask.
     async function postForm(url, fields) {
         const body = new FormData();
         Object.keys(fields || {}).forEach(function (key) {
@@ -112,6 +119,7 @@
         return res.json();
     }
 
+    // Marks the row read, then opens an Admin modal or navigates to item.url.
     async function openItem(el) {
         const id = el.dataset.id;
         const kind = el.dataset.kind;
@@ -132,6 +140,7 @@
         if (el.dataset.url) window.location.href = el.dataset.url;
     }
 
+    // Fills #attendanceCorrectionOverlay with GetCorrection JSON so Admin can Approve/Return.
     async function openCorrectionModal(id) {
         const overlay = document.getElementById('attendanceCorrectionOverlay');
         if (!overlay) {
@@ -174,6 +183,7 @@
 
     window.rsdOpenCorrection = openCorrectionModal;
 
+    // Fills #taskApprovalOverlay with GetTask JSON so Admin can approve "Mark as Done".
     async function openTaskModal(id) {
         const overlay = document.getElementById('taskApprovalOverlay');
         if (!overlay) {

@@ -23,15 +23,24 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
 
+        /// <summary>
+        /// Receives the payroll database from dependency injection so Login can look up users.
+        /// </summary>
         public AccountController(PayrollDbContext db)
         {
             _db = db;
         }
 
-        /// <summary>Show the login form, or skip it if a session already exists.</summary>
+        /// <summary>
+        /// Show the login form at GET /Account/Login (the site landing page).
+        /// If a session already exists, skip the form and send Admin to Home or staff to the to-do list.
+        /// </summary>
+        /// <param name="returnUrl">Optional URL after login. Not used for the role-based redirects.</param>
+        /// <returns>The login view, or a redirect to Home or PayrollStaff.</returns>
         [HttpGet]
         public IActionResult Login(string? returnUrl = null)
         {
+            // Already signed in: send each role to its dashboard instead of showing Login again.
             var role = HttpContext.Session.GetString("Role");
             if (role == "Admin") return RedirectToAction("Index", "Home");
             if (role == "PayrollStaff") return RedirectToAction("Index", "PayrollStaff");
@@ -39,11 +48,17 @@ namespace RSDSystem.Controllers
             return View();
         }
 
-        /// <summary>Validate username/password and start a session.</summary>
+        /// <summary>
+        /// Validate username/password from the Login button and start a session.
+        /// Looks up an active User, checks the BCrypt hash, then calls SignIn.
+        /// Admin is sent to Home; PayrollStaff is sent to the to-do list. Failed logins stay on the form.
+        /// </summary>
+        /// <returns>A redirect to the role dashboard, or the login view with an error.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string Username, string Password, string? returnUrl)
         {
+            // IsActive filters out deactivated accounts so they cannot sign in.
             var user = await _db.Users
                                 .FirstOrDefaultAsync(u => u.Username == Username && u.IsActive);
 
@@ -61,6 +76,7 @@ namespace RSDSystem.Controllers
 
         /// <summary>
         /// Store who is logged in. AuthCheckFilter reads these session keys on every request.
+        /// Called after a successful password check. PhotoPath is removed when the user has no photo.
         /// </summary>
         private void SignIn(int userId, string fullName, string role, string? photoPath)
         {
@@ -75,7 +91,11 @@ namespace RSDSystem.Controllers
         }
 
 
-        // GET: /Account/Logout
+        /// <summary>
+        /// Sign out from GET /Account/Logout (sidebar Logout).
+        /// Clears the auth cookie and session, then returns to the login page.
+        /// </summary>
+        /// <returns>A redirect to /Account/Login with a success message.</returns>
         [HttpGet]
         public async Task<IActionResult> Logout()
         {

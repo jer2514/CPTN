@@ -6,6 +6,10 @@ namespace RSDSystem.Services
     /// <summary>Creates AttendanceImports / AttendanceRecords tables if this database never had them.</summary>
     public static class AttendanceSchema
     {
+        /// <summary>
+        /// Creates AttendanceImports / AttendanceRecords if missing and patches columns/indexes on older SQL Server databases.
+        /// Called at app startup and again before a file import so hosted DBs (Somee) gain ProjectId without a full migration.
+        /// </summary>
         public static void Ensure(PayrollDbContext db)
         {
             db.Database.ExecuteSqlRaw(CreateImportsSql);
@@ -36,6 +40,9 @@ namespace RSDSystem.Services
             PatchUniqueDateIndex(db);
         }
 
+        /// <summary>
+        /// Async version of <see cref="Ensure"/> used by AttendanceImportService right before SaveChanges on an import batch.
+        /// </summary>
         public static async Task EnsureAsync(PayrollDbContext db, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -64,6 +71,9 @@ namespace RSDSystem.Services
             await PatchUniqueDateIndexAsync(db);
         }
 
+        /// <summary>
+        /// Runs each SQL batch in its own try/catch so a failed ALTER on one hosted database does not block import or startup.
+        /// </summary>
         private static void ApplyOptionalSql(PayrollDbContext db, IEnumerable<string> batches)
         {
             foreach (var sql in batches)
@@ -79,6 +89,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Async optional patches (ProjectId add/backfill, unique employee+date index). Failures are ignored on purpose.
+        /// </summary>
         private static async Task ApplyOptionalSqlAsync(PayrollDbContext db, IEnumerable<string> batches)
         {
             foreach (var sql in batches)
@@ -94,9 +107,16 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Drops old unique constraints, nulls dummy dates, deletes duplicate employee+date rows, then creates a filtered unique index.
+        /// Prevents two imported punches for the same employee on the same work date.
+        /// </summary>
         private static void PatchUniqueDateIndex(PayrollDbContext db) =>
             ApplyOptionalSql(db, UniqueDateIndexSqls);
 
+        /// <summary>
+        /// Async unique-date index patch used from <see cref="EnsureAsync"/> during import.
+        /// </summary>
         private static Task PatchUniqueDateIndexAsync(PayrollDbContext db) =>
             ApplyOptionalSqlAsync(db, UniqueDateIndexSqls);
 

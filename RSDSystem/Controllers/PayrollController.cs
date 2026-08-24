@@ -27,6 +27,9 @@ namespace RSDSystem.Controllers
         private readonly NotificationService _notifications;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
+        /// <summary>
+        /// Receives the database, prediction service, and notifications used after Approve or Return.
+        /// </summary>
         public PayrollController(PayrollDbContext db, PayrollPredictionService predictions, NotificationService notifications)
         {
             _db = db;
@@ -34,6 +37,11 @@ namespace RSDSystem.Controllers
             _notifications = notifications;
         }
 
+        /// <summary>
+        /// Block PayrollStaff from admin payroll screens. Sends them to the to-do list.
+        /// Index, Period, Prediction, and related actions call this first.
+        /// </summary>
+        /// <returns>A redirect to PayrollStaff, or null when the session Role is Admin.</returns>
         private IActionResult? RequireAdmin()
         {
             if (HttpContext.Session.GetString("Role") != "Admin")
@@ -41,6 +49,11 @@ namespace RSDSystem.Controllers
             return null;
         }
 
+        /// <summary>
+        /// GET /Payroll. Admin View Payroll list of Approved periods, filtered by project and month.
+        /// Choosing a row opens Period. Staff hitting this URL are sent to the to-do list.
+        /// </summary>
+        /// <returns>The period list view with project suggestions and month dropdown.</returns>
         public async Task<IActionResult> Index(string? projectName, int? projectId, int? month)
         {
             var blocked = RequireAdmin();
@@ -56,6 +69,11 @@ namespace RSDSystem.Controllers
             return View(periods);
         }
 
+        /// <summary>
+        /// GET /Payroll/Period. Admin list of Approved slips for one project date range.
+        /// From here Admin can open View, GeneratePayslips, PrintPayslips, or SendToStaff.
+        /// </summary>
+        /// <returns>The period employee table, or 404 if the project is missing.</returns>
         public async Task<IActionResult> Period(int projectId, DateTime start, DateTime end)
         {
             var blocked = RequireAdmin();
@@ -75,6 +93,12 @@ namespace RSDSystem.Controllers
             return View(await LoadPeriodEmployeesAsync(projectId, start.Date, end.Date, approvedOnly: true));
         }
 
+        /// <summary>
+        /// POST /Payroll/GeneratePayslips. Generate Payslips on the Period page.
+        /// Creates Draft rows for active employees who do not already have a slip in this range.
+        /// Regular pay is DailyRate times weekday count; overtime starts at zero.
+        /// </summary>
+        /// <returns>A redirect to GeneratedPayslips with a count of new slips.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GeneratePayslips(int projectId, DateTime start, DateTime end)
@@ -111,6 +135,7 @@ namespace RSDSystem.Controllers
 
             foreach (var emp in employees)
             {
+                // Skip anyone who already has a slip for these dates or for the covering schedule.
                 if (existing.Any(p => p.EmployeeId == emp.EmployeeId))
                     continue;
                 if (covering != null && existing.Any(p => PayrollPeriods.BelongsTo(p, covering) && p.EmployeeId == emp.EmployeeId))
@@ -154,6 +179,9 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Payroll/Prediction. Admin Payroll Prediction page. The table is filled by GetPrediction after a project is chosen.
+        /// </summary>
         public async Task<IActionResult> Prediction()
         {
             var blocked = RequireAdmin();
@@ -170,7 +198,10 @@ namespace RSDSystem.Controllers
         /// <summary>
         /// JSON for the Prediction page. Needs two finished Approved months.
         /// Returns history + current forecast rows (or an error message).
+        /// GET /Payroll/GetPrediction. The page JavaScript calls this when a project is selected.
+        /// projectName is used only when projectId is 0.
         /// </summary>
+        /// <returns>JSON forecast rows, or an error when Admin is missing or two months are not ready.</returns>
         [HttpGet]
         public async Task<IActionResult> GetPrediction(int projectId, string? projectName = null)
         {
@@ -230,6 +261,10 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Payroll/GeneratedPayslips. Paginated slip cards after GeneratePayslips (4 per page).
+        /// Print and Send to Staff buttons on this page call PrintPayslips and SendToStaff.
+        /// </summary>
         public async Task<IActionResult> GeneratedPayslips(int projectId, DateTime start, DateTime end, int page = 1)
         {
             var blocked = RequireAdmin();
@@ -265,6 +300,10 @@ namespace RSDSystem.Controllers
             return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
+        /// <summary>
+        /// GET /Payroll/PrintPayslips. Printable layout of all slips for the period, ordered by employee name.
+        /// Opened from the Print button on GeneratedPayslips.
+        /// </summary>
         public async Task<IActionResult> PrintPayslips(int projectId, DateTime start, DateTime end)
         {
             var blocked = RequireAdmin();
@@ -291,6 +330,11 @@ namespace RSDSystem.Controllers
             return View(slips);
         }
 
+        /// <summary>
+        /// POST /Payroll/SendToStaff. Send to Staff on GeneratedPayslips.
+        /// Does not email; it only confirms that slips exist and shows a TempData message naming the assigned staff.
+        /// </summary>
+        /// <returns>A redirect back to GeneratedPayslips with success or an empty-period error.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SendToStaff(int projectId, DateTime start, DateTime end)
@@ -324,6 +368,9 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// JSON list of projects for the View Payroll search box. Index calls this before rendering.
+        /// </summary>
         private async Task BindProjectSuggestionsAsync()
         {
             var projects = await _db.Projects
@@ -339,6 +386,10 @@ namespace RSDSystem.Controllers
             ViewBag.ProjectSuggestionsJson = JsonSerializer.Serialize(projects);
         }
 
+        /// <summary>
+        /// Build period rows for Index. When approvedOnly is true, only Approved slips appear (View Payroll).
+        /// Otherwise schedules and all payrolls are merged. Filters by project id, name, and month.
+        /// </summary>
         private async Task<List<PayrollPeriodRow>> LoadPeriodsAsync(
             string? projectName, int? month, int? projectId = null, bool approvedOnly = false)
         {
@@ -350,6 +401,7 @@ namespace RSDSystem.Controllers
                 payrolls = payrolls.Where(IsApproved).ToList();
             var rows = new Dictionary<string, PayrollPeriodRow>(StringComparer.OrdinalIgnoreCase);
 
+            // Merge schedule and payroll groups onto one row per project+date range. Fill staff if a later source has it.
             void Add(int projectId, string name, DateTime start, DateTime end, string? staff)
             {
                 var key = projectId + "|" + start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
@@ -411,6 +463,10 @@ namespace RSDSystem.Controllers
                 .ToList();
         }
 
+        /// <summary>
+        /// Employee rows for one period. Approved-only mode lists saved slips.
+        /// Otherwise every active project employee is listed, with zeros when no slip exists yet.
+        /// </summary>
         private async Task<List<PayrollPeriodEmployeeRow>> LoadPeriodEmployeesAsync(
             int projectId, DateTime start, DateTime end, bool approvedOnly = false)
         {
@@ -464,9 +520,15 @@ namespace RSDSystem.Controllers
             }).ToList();
         }
 
+        /// <summary>
+        /// True when Status is Approved. View Payroll Index and Period hide Draft, Submitted, and Correction slips.
+        /// </summary>
         private static bool IsApproved(Payroll payroll) =>
             string.Equals(payroll.Status?.Trim(), PayrollStatusOptions.Approved, StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Month number to English name for the View Payroll month filter dropdown.
+        /// </summary>
         private static Dictionary<int, string> MonthOptions()
         {
             return Enumerable.Range(1, 12).ToDictionary(
@@ -474,6 +536,9 @@ namespace RSDSystem.Controllers
                 m => DateCulture.DateTimeFormat.GetMonthName(m));
         }
 
+        /// <summary>
+        /// Display file name shown on GeneratedPayslips and Print, e.g. SiteName_Payslip_Jan01-Jan15.pdf.
+        /// </summary>
         private static string PayslipFileName(string projectName, DateTime start, DateTime end)
         {
             var safe = new string((projectName ?? "Project").Where(char.IsLetterOrDigit).ToArray());
@@ -485,7 +550,10 @@ namespace RSDSystem.Controllers
                 + ".pdf";
         }
 
-        // GET /Payroll/View/{id}
+        /// <summary>
+        /// GET /Payroll/View/{id}. Full payslip page for one Payroll row, from Period or review.
+        /// </summary>
+        /// <returns>The slip view, or 404 if the id is missing.</returns>
         public async Task<IActionResult> View(int id)
         {
             var payroll = await _db.Set<Payroll>()
@@ -499,7 +567,11 @@ namespace RSDSystem.Controllers
             return View(payroll);
         }
 
-        // GET /Payroll/ReviewProject?projectId=
+        /// <summary>
+        /// GET /Payroll/ReviewProject?projectId=. Admin review from a Home pending-approval card.
+        /// Shows Submitted slips two per page. Approve and Return buttons post to Approve / ReturnForCorrection.
+        /// When none remain, the admin is sent back to Home.
+        /// </summary>
         public async Task<IActionResult> ReviewProject(int projectId, int page = 1)
         {
             var blocked = RequireAdmin();
@@ -532,6 +604,10 @@ namespace RSDSystem.Controllers
             return View(slips.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
+        /// <summary>
+        /// GET /Payroll/ViewPartial/{id}. HTML fragment of one slip for the review modal.
+        /// </summary>
+        /// <returns>Partial view _PayrollPartial, or 404 if the slip is missing.</returns>
         [HttpGet]
         public async Task<IActionResult> ViewPartial(int id)
         {
@@ -547,8 +623,11 @@ namespace RSDSystem.Controllers
         }
 
 
-        /// <summary>Submitted → Approved. Staff can no longer edit this slip.</summary>
-        // POST /Payroll/Approve/{id}
+        /// <summary>
+        /// Submitted → Approved. Staff can no longer edit this slip.
+        /// POST /Payroll/Approve/{id} from the Review Approve button. Notifies staff. remaining tells the page when to leave.
+        /// </summary>
+        /// <returns>JSON with remaining Submitted count for this project.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Approve(int id)
@@ -578,8 +657,11 @@ namespace RSDSystem.Controllers
             });
         }
 
-        /// <summary>Submitted → Correction with a reason. Staff edits and submits again.</summary>
-        // POST /Payroll/ReturnForCorrection/{id}
+        /// <summary>
+        /// Submitted → Correction with a reason. Staff edits and submits again.
+        /// POST /Payroll/ReturnForCorrection/{id} from the Review Return button. Reason is required.
+        /// </summary>
+        /// <returns>JSON with remaining Submitted count after this slip is returned.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReturnForCorrection(int id, string reason)
@@ -613,8 +695,11 @@ namespace RSDSystem.Controllers
         }
 
 
-        /// <summary>Dashboard: create a pay period. It appears on the assigned staff to-do list.</summary>
-        // POST /Payroll/AddSchedule
+        /// <summary>
+        /// Dashboard: create a pay period. It appears on the assigned staff to-do list.
+        /// POST /Payroll/AddSchedule from Home Add Schedule. Overlapping dates for the same project are rejected.
+        /// </summary>
+        /// <returns>A redirect to Home with success, or TempData error when validation fails.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddSchedule(int ProjectId, string? TypeOfService,
@@ -647,7 +732,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // POST /Payroll/EditSchedule
+        /// <summary>
+        /// POST /Payroll/EditSchedule. Home dashboard Edit on a payroll schedule row.
+        /// Same date and overlap rules as AddSchedule. Returns Admin to Home.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditSchedule(int PayrollScheduleId, int ProjectId,
@@ -673,6 +761,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction("Index", "Home");
         }
 
+        /// <summary>
+        /// Shared Add/Edit schedule rules: project and type required, dates inside the project window,
+        /// and no overlap with another schedule on the same project.
+        /// </summary>
+        /// <returns>The first error sentence, or null when the schedule is valid.</returns>
         private async Task<string?> ValidateScheduleAsync(
             int projectId,
             string? typeOfService,
@@ -721,7 +814,10 @@ namespace RSDSystem.Controllers
             return null;
         }
 
-        // POST /Payroll/DeleteSchedule/{id}
+        /// <summary>
+        /// POST /Payroll/DeleteSchedule/{id}. Home dashboard Delete on a schedule row.
+        /// Removes the period from the staff to-do list and returns Admin to Home.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteSchedule(int id)

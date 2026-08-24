@@ -1,4 +1,8 @@
-﻿@model IEnumerable<RSDSystem.Models.Project>
+﻿@*
+    Admin: ProjectController.Index. Search and filter jobs by On Going / On Hold / Finished;
+    open Details or add a new project.
+*@
+@model IEnumerable<RSDSystem.Models.Project>
 @{
     ViewData["Title"] = "Projects";
     var search = ViewBag.Search as string;

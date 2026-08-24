@@ -6,6 +6,10 @@ namespace RSDSystem.Services
     /// <summary>Adds missing Payroll.PayrollScheduleId on older databases at startup.</summary>
     public static class PayrollSchema
     {
+        /// <summary>
+        /// Adds Payroll.PayrollScheduleId, FK, indexes, and back-fills slips from matching schedule dates on older databases.
+        /// Startup uses this so generate-per-schedule and unique employee+schedule payroll rows work without a new migration.
+        /// </summary>
         public static void Ensure(PayrollDbContext db)
         {
             db.Database.ExecuteSqlRaw(@"
