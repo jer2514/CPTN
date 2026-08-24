@@ -1,4 +1,8 @@
-﻿@model List<RSDSystem.Models.PayrollPeriodRow>
+﻿@*
+    Admin: PayrollController.Index. Search by project/month, then open a pay period of
+    Approved slips (Period). Staff are redirected away by RequireAdmin().
+*@
+@model List<RSDSystem.Models.PayrollPeriodRow>
 @{
     ViewData["Title"] = "View Payroll";
     var projectName = ViewBag.ProjectName as string ?? "";

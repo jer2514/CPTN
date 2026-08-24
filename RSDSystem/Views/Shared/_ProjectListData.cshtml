@@ -1,3 +1,7 @@
+@*
+    Shared JSON blob of project id/name for page scripts (Prediction typeahead, etc.).
+    Included by views that need a client-side project list; not a user-facing page.
+*@
 @model IEnumerable<RSDSystem.Models.Project>
 @{
     var items = Model ?? Enumerable.Empty<RSDSystem.Models.Project>();

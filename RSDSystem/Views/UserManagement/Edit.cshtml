@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.User
+﻿@*
+    Admin: UserManagementController.Edit. Update profile, role, or password for an existing
+    login account; POST saves the User (new password is optional).
+*@
+@model RSDSystem.Models.User
 @{
     ViewData["Title"] = "Edit User";
     var roles = ViewBag.Roles as string[] ?? Array.Empty<string>();

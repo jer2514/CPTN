@@ -1,3 +1,7 @@
+@*
+    Shared project-name typeahead (input + hidden id + JSON). Used on Admin payroll/Index
+    and similar filters; project-suggest.js wires the dropdown.
+*@
 @{
     var currentName = ViewBag.SuggestProjectName as string ?? "";
     var currentId = ViewBag.SelectedProjectId is int selectedId ? selectedId : 0;

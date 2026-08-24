@@ -1,5 +1,6 @@
 // Bootstrap toast helper for TempData success/error messages.
 (function () {
+    // Escapes toast text so TempData messages cannot inject HTML.
     function escapeHtml(value) {
         return String(value == null ? '' : value)
             .replace(/&/g, '&amp;')
@@ -8,6 +9,7 @@
             .replace(/"/g, '&quot;');
     }
 
+    // Finds or creates the top-right .toast-container where popups stack.
     function container() {
         var el = document.querySelector('.toast-container');
         if (el) return el;
@@ -18,6 +20,7 @@
         return el;
     }
 
+    // Shows a green success or red error popup for 5 seconds (called after save/import/approve).
     window.showToast = function (message, type) {
         if (!message || !window.bootstrap) return;
         var kind = type === 'success' ? 'success' : 'error';

@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.Employee
+﻿@*
+    Admin: EmployeeController.Create. Fill worker identity, rates, job, optional photo,
+    and assign a project; POST creates the Employee row.
+*@
+@model RSDSystem.Models.Employee
 @{
     ViewData["Title"] = "Add Employee";
     var jobs = ViewBag.JobClassifications as string[] ?? Array.Empty<string>();

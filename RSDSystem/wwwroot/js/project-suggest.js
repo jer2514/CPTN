@@ -13,6 +13,7 @@
         projects = [];
     }
 
+    // Escapes project names so suggestion HTML cannot inject tags.
     function escapeHtml(value) {
         return String(value || '')
             .replace(/&/g, '&amp;')
@@ -21,6 +22,7 @@
             .replace(/"/g, '&quot;');
     }
 
+    // Bolds the typed characters inside a matching project name in the dropdown.
     function highlight(name, query) {
         var text = String(name || '');
         if (!query) return escapeHtml(text);
@@ -33,6 +35,7 @@
             + escapeHtml(text.slice(index + query.length));
     }
 
+    // Filters the JSON project list by name or location (max 12 rows).
     function matchesFor(query) {
         if (!query) return projects.slice(0, 12);
         return projects.filter(function (project) {
@@ -42,6 +45,7 @@
         }).slice(0, 12);
     }
 
+    // Draws the dropdown under #projectInput (or "No matching project").
     function render(query) {
         var matches = matchesFor(query);
         if (matches.length === 0) {

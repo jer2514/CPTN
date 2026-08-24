@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.User
+﻿@*
+    Admin: UserManagementController.Create. Enter name, username, password, email, role
+    (Admin or PayrollStaff), and optional photo; POST hashes the password and inserts the User.
+*@
+@model RSDSystem.Models.User
 @{
     ViewData["Title"] = "Add User";
     var roles = ViewBag.Roles as string[] ?? Array.Empty<string>();

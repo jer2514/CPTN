@@ -15,6 +15,7 @@
     const DATE_MIN = '2000-01-01';
     const DATE_MAX = '2099-12-31';
 
+    // Turns an <input type="date"> value into whole years of age (or null if blank/invalid).
     function ageFrom(isoDate) {
         if (!isoDate) return null;
         const birth = new Date(isoDate + 'T00:00:00');
@@ -26,6 +27,7 @@
         return age;
     }
 
+    // Shows ISO yyyy-mm-dd as mm/dd/yyyy in "must be on or after …" error text.
     function formatIsoDate(iso) {
         if (!iso) return '';
         const parts = iso.split('-');
@@ -33,12 +35,14 @@
         return parts[1] + '/' + parts[2] + '/' + parts[0];
     }
 
+    // Reads the trimmed value, or the chosen file name for photo uploads.
     function valueOf(el) {
         if (!el) return '';
         if (el.type === 'file') return el.files && el.files.length ? el.files[0].name : '';
         return (el.value || '').trim();
     }
 
+    // Walks data-validate="required|name|…" and returns the first error string for that field.
     function messageFor(el) {
         const rules = (el.getAttribute('data-validate') || '').split('|').filter(Boolean);
         const value = valueOf(el);
@@ -144,6 +148,7 @@
         return '';
     }
 
+    // Finds the <span data-error-for="FieldName"> next to this input.
     function errorEl(field) {
         const name = field.getAttribute('name') || field.id;
         if (!name) return null;
@@ -152,6 +157,7 @@
         return form.querySelector('[data-error-for="' + name + '"]');
     }
 
+    // Toggles the red is-invalid class and writes the message under the field.
     function show(field, message) {
         field.classList.toggle('is-invalid', !!message);
         const dest = errorEl(field);
@@ -159,11 +165,13 @@
         return !message;
     }
 
+    // Validates one data-validate field on blur/input; returns true if it is OK.
     function validateField(field) {
         if (!field.hasAttribute('data-validate')) return true;
         return show(field, messageFor(field));
     }
 
+    // Validates every field on submit, focuses the first error, and blocks the POST if any fail.
     function validateForm(form) {
         let ok = true;
         let firstInvalid = null;
@@ -178,11 +186,13 @@
         return ok;
     }
 
+    // Keeps the read-only Age box in sync when Date of Birth changes on employee/user forms.
     function bindAge(form) {
         const dob = form.querySelector('#dobInput');
         const age = form.querySelector('#ageInput');
         if (!dob || !age) return;
 
+        // Recalculates Age from #dobInput so the user sees years as they pick a date.
         function sync() {
             const years = ageFrom(dob.value);
             age.value = years !== null && years >= 0 ? years : '';
@@ -193,10 +203,12 @@
         sync();
     }
 
+    // True if data-validate includes this rule name (phone, mi, dob, …).
     function hasRule(el, rule) {
         return (el.getAttribute('data-validate') || '').split('|').indexOf(rule) !== -1;
     }
 
+    // Strips non-digits and caps contact numbers at 11 characters as the user types.
     function bindPhone(form) {
         form.querySelectorAll('[data-validate]').forEach(function (el) {
             if (!hasRule(el, 'phone')) return;
@@ -206,6 +218,7 @@
         });
     }
 
+    // Sets min/max 2000–2099 on date inputs that are not date-of-birth.
     function applyDefaultDateBounds(el) {
         if (!el || el.type !== 'date' || hasRule(el, 'dob')) return;
         if (!el.min) el.min = DATE_MIN;
@@ -215,6 +228,7 @@
         }
     }
 
+    // Truncates years longer than 4 digits and clears dates after 2099 in the date picker.
     function sanitizeDateValue(el) {
         if (!el || el.type !== 'date') return;
         applyDefaultDateBounds(el);
@@ -236,6 +250,7 @@
         }
     }
 
+    // Wires every date input so typing a year cannot go past 2099.
     function bindDateInputs(root) {
         (root || document).querySelectorAll('input[type="date"]').forEach(function (el) {
             if (el.getAttribute('data-date-bound') === '1') return;
@@ -247,6 +262,7 @@
         });
     }
 
+    // Forces middle-initial inputs to 1–2 letters, uppercase, as the user types.
     function bindMi(form) {
         form.querySelectorAll('[data-validate]').forEach(function (el) {
             if (!hasRule(el, 'mi')) return;
@@ -256,6 +272,7 @@
         });
     }
 
+    // Attaches blur/submit listeners to one form.js-validate (Create/Edit Employee, User, Project).
     function initForm(form) {
         if (form.getAttribute('data-validation-bound') === '1') return;
         form.setAttribute('data-validation-bound', '1');

@@ -1,4 +1,8 @@
-﻿@model RSDSystem.Models.Project
+﻿@*
+    Admin: ProjectController.Details. Read-only job card with status, budgets, and assigned
+    workers; Admin can edit, delete, assign, or remove employees from here.
+*@
+@model RSDSystem.Models.Project
 @{
     ViewData["Title"] = "View Project";
     var employees = ViewBag.Employees as List<RSDSystem.Models.Employee> ?? new();

@@ -1,4 +1,8 @@
-﻿@{
+﻿@*
+    Shared sidebar profile: Session FullName, Role, and PhotoPath (or initials).
+    Included from _Layout and _PayrollStaffLayout for both Admin and Staff.
+*@
+@{
     var fullName = Context.Session.GetString("FullName") ?? "Guest";
     var role = Context.Session.GetString("Role");
     var photo = Context.Session.GetString("PhotoPath");
