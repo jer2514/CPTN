@@ -21,16 +21,22 @@ namespace RSDSystem.Filters
         // Controllers reachable without being logged in
         private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
 
+        /// <summary>
+        /// Runs before every MVC action. Input is the current request (controller name + session UserId/Role).
+        /// Output is either continue, HTTP 401 JSON, redirect to Login, or bounce PayrollStaff off Admin-only controllers.
+        /// </summary>
         public void OnActionExecuting(ActionExecutingContext context)
         {
             var controllerName = context.RouteData.Values["controller"]?.ToString();
 
+            // Step 1: login page and biometric AttendanceApi stay public (no session required).
             if (controllerName != null && PublicControllers.Contains(controllerName))
                 return;
 
             var userId = context.HttpContext.Session.GetString("UserId");
             var role = context.HttpContext.Session.GetString("Role");
 
+            // Step 2: everyone else needs a logged-in session; JSON callers get 401 instead of an HTML redirect.
             if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(role))
             {
                 // Fetch/XHR endpoints must not redirect to the HTML login page.
@@ -49,7 +55,7 @@ namespace RSDSystem.Filters
                 return;
             }
 
-            // Keep PayrollStaff out of Admin-only areas
+            // Step 3: Keep PayrollStaff out of Admin-only areas (Home, Users, Employees, Projects, Reports).
             var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
@@ -57,8 +63,15 @@ namespace RSDSystem.Filters
             }
         }
 
+        /// <summary>
+        /// Required by <see cref="IActionFilter"/>; this app does not post-process actions here.
+        /// </summary>
         public void OnActionExecuted(ActionExecutedContext context) { }
 
+        /// <summary>
+        /// True when the request should receive JSON (Accept header or known AJAX actions for attendance import,
+        /// payroll prediction, notifications, and reports). Used so an expired session returns 401 instead of the login HTML page.
+        /// </summary>
         private static bool WantsJson(ActionExecutingContext context)
         {
             var request = context.HttpContext.Request;

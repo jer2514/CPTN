@@ -19,6 +19,10 @@ namespace RSDSystem.Helpers
         public static TimeSpan LateAfter => MorningStart + LateGrace;
         public static TimeSpan EarlyBefore => ShiftEnd - EarlyGrace;
 
+        /// <summary>
+        /// Fills hours, late/early minutes, and <see cref="AttendanceRecord.Status"/> for one punch row.
+        /// Called during file parse, import preview, records list, and month-edit save so payroll later totals the same Status values.
+        /// </summary>
         public static void Apply(AttendanceRecord row)
         {
             if (row == null)
@@ -36,6 +40,10 @@ namespace RSDSystem.Helpers
             row.Status = Status(row);
         }
 
+        /// <summary>
+        /// Paid regular hours: overlap of the four punch times with 8:00–12:00 and 13:00–17:00 only.
+        /// Punches outside those windows do not count here; they may count as overtime instead.
+        /// </summary>
         public static decimal RegularHours(string? in1, string? out1, string? in2, string? out2)
         {
             decimal hours = 0;
@@ -48,6 +56,9 @@ namespace RSDSystem.Helpers
             return Math.Round(hours, 2);
         }
 
+        /// <summary>
+        /// Overtime hours after 17:00. Prefers dedicated OT in/out punches; otherwise uses any regular punches past shift end.
+        /// </summary>
         public static decimal OvertimeHours(
             string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
         {
@@ -61,6 +72,10 @@ namespace RSDSystem.Helpers
                 + OverlapHours(in2, out2, ShiftEnd, dayEnd), 2);
         }
 
+        /// <summary>
+        /// Minutes past the 8:00 start when the first punch is after the 30-minute grace (8:30).
+        /// Returns 0 when on time or when time-in is missing. Feeds Late / LateEarlyOff status.
+        /// </summary>
         public static int LateMinutes(string? timeIn)
         {
             if (!AttendanceDisplay.TryParseTime(timeIn, out var firstIn) || firstIn <= LateAfter)
@@ -69,6 +84,10 @@ namespace RSDSystem.Helpers
             return Math.Max(0, (int)(firstIn - MorningStart).TotalMinutes);
         }
 
+        /// <summary>
+        /// Minutes before 17:00 when the last afternoon punch is before the 15-minute early-out grace (16:45).
+        /// Uses TimeOut2 if present, otherwise TimeOut1 when it is an afternoon punch.
+        /// </summary>
         public static int EarlyMinutes(string? timeOut1, string? timeOut2)
         {
             TimeSpan? lastOut = null;
@@ -83,6 +102,10 @@ namespace RSDSystem.Helpers
             return Math.Max(0, (int)(ShiftEnd - lastOut.Value).TotalMinutes);
         }
 
+        /// <summary>
+        /// Classifies the day as Absent, Half-day, Late, Early Off, Late/Early Off, or Complete from which punches exist.
+        /// Payroll generation later counts Complete/Late days as worked and Half-day as incomplete.
+        /// </summary>
         public static string Status(AttendanceRecord row)
         {
             var hasIn1 = !string.IsNullOrWhiteSpace(row.TimeIn1);
@@ -121,6 +144,9 @@ namespace RSDSystem.Helpers
             return AttendanceStatuses.HalfDay;
         }
 
+        /// <summary>
+        /// True when the row has at least one of the six punch fields filled. Apply skips hour math when this is false.
+        /// </summary>
         private static bool HasAnyPunch(AttendanceRecord row) =>
             !string.IsNullOrWhiteSpace(row.TimeIn1)
             || !string.IsNullOrWhiteSpace(row.TimeOut1)
@@ -129,6 +155,10 @@ namespace RSDSystem.Helpers
             || !string.IsNullOrWhiteSpace(row.OvertimeIn)
             || !string.IsNullOrWhiteSpace(row.OvertimeOut);
 
+        /// <summary>
+        /// Hours where a punch pair overlaps a shift window (morning, afternoon, or after 17:00).
+        /// Overnight punch-out is shifted +1 day. Returns 0 if either punch cannot be parsed.
+        /// </summary>
         private static decimal OverlapHours(string? timeIn, string? timeOut, TimeSpan windowStart, TimeSpan windowEnd)
         {
             if (!AttendanceDisplay.TryParseTime(timeIn, out var start)

@@ -14,11 +14,18 @@ namespace RSDSystem.Services
     {
         private readonly PayrollDbContext _db;
 
+        /// <summary>
+        /// Stores the payroll database used to preview, save, query, and edit attendance for a project.
+        /// </summary>
         public AttendanceImportService(PayrollDbContext db)
         {
             _db = db;
         }
 
+        /// <summary>
+        /// Parses an uploaded file, matches biometric IDs/names to project employees, and returns preview rows (nothing saved yet).
+        /// AttendanceController.Preview and ImportAsync both start here. Staff may only see projects assigned to assignedStaff.
+        /// </summary>
         public async Task<AttendancePreviewResult> PreviewAsync(
             int? projectId,
             string? projectName,
@@ -63,6 +70,10 @@ namespace RSDSystem.Services
             };
         }
 
+        /// <summary>
+        /// Full import: preview, apply manual matches and punch overrides, ensure tables, replace overlapping periods, then SaveChanges.
+        /// Called from AttendanceController.ImportFile and AttendanceApi. Returns counts plus ReplacedPrevious for the success toast.
+        /// </summary>
         public async Task<AttendanceImportResult> ImportAsync(
             int? projectId,
             string? projectName,
@@ -188,6 +199,10 @@ namespace RSDSystem.Services
             };
         }
 
+        /// <summary>
+        /// Paged Attendance Records grid for one project: search, status, and period filters, then AttendanceRules.Apply on each row.
+        /// Returns the page of rows plus Total for the pager.
+        /// </summary>
         public async Task<(List<AttendanceRecord> Rows, int Total)> QueryRecordsAsync(
             int projectId,
             string? search,
@@ -227,6 +242,9 @@ namespace RSDSystem.Services
             return (rows.Skip((page - 1) * pageSize).Take(pageSize).ToList(), total);
         }
 
+        /// <summary>
+        /// Distinct imported date windows for the Records period dropdown (newest first), labeled with who imported them.
+        /// </summary>
         public async Task<List<AttendancePeriodOption>> ListPeriodsAsync(
             int projectId,
             CancellationToken cancellationToken = default)
@@ -292,6 +310,9 @@ namespace RSDSystem.Services
                 .ToList();
         }
 
+        /// <summary>
+        /// Per-employee totals for the Records summary tab (days worked/absent/late, regular and OT hours) with the same filters as the grid.
+        /// </summary>
         public async Task<AttendanceSummaryResult> QuerySummaryAsync(
             int projectId,
             DateTime? periodStart,
@@ -354,6 +375,9 @@ namespace RSDSystem.Services
             };
         }
 
+        /// <summary>
+        /// True if the project already has at least one stored punch in the date window. Staff generate-payroll uses this before creating slips.
+        /// </summary>
         public async Task<bool> HasImportedAttendanceAsync(
             int projectId,
             DateTime? periodStart,
@@ -365,6 +389,10 @@ namespace RSDSystem.Services
                 .AnyAsync(cancellationToken);
         }
 
+        /// <summary>
+        /// Regular/OT hour totals for one employee in a schedule window. PayrollStaff.GetAttendanceTotals fills the generate-slip form from this.
+        /// Returns null when that employee has no punches in the period.
+        /// </summary>
         public async Task<AttendanceEmployeeSummary?> GetEmployeePeriodTotalsAsync(
             int projectId,
             int employeeId,
@@ -386,6 +414,9 @@ namespace RSDSystem.Services
             return ToEmployeeSummary(rows);
         }
 
+        /// <summary>
+        /// Deletes all punches in the selected period and empty import headers. AttendanceController.DeletePeriod uses the deleted count or Error.
+        /// </summary>
         public async Task<(int Deleted, string? Error)> DeletePeriodAsync(
             int projectId,
             DateTime? periodStart,
@@ -425,6 +456,9 @@ namespace RSDSystem.Services
             return (records.Count, null);
         }
 
+        /// <summary>
+        /// Base query: AttendanceRecords for this project, including Import and Employee, no tracking (read screens).
+        /// </summary>
         private IQueryable<AttendanceRecord> RecordsForProject(int projectId) =>
             _db.AttendanceRecords
                 .AsNoTracking()
@@ -432,6 +466,9 @@ namespace RSDSystem.Services
                 .Include(r => r.Employee)
                 .Where(r => r.Import != null && r.Import.ProjectId == projectId);
 
+        /// <summary>
+        /// Applies period (work date or import window), optional status, and name/code search to a records query before paging.
+        /// </summary>
         private static IQueryable<AttendanceRecord> ApplyRecordFilters(
             IQueryable<AttendanceRecord> query,
             string? search,
@@ -477,6 +514,9 @@ namespace RSDSystem.Services
             return query;
         }
 
+        /// <summary>
+        /// Keeps one stored row per employee (or biometric id) per work date so re-imports do not double-count hours on the grid.
+        /// </summary>
         private static List<AttendanceRecord> DeduplicateStoredRows(List<AttendanceRecord> rows) =>
             rows
                 .GroupBy(r => (
@@ -489,6 +529,9 @@ namespace RSDSystem.Services
                 .ThenBy(r => r.WorkDate)
                 .ToList();
 
+        /// <summary>
+        /// Rolls a list of daily punches into one AttendanceEmployeeSummary (days worked/absent/late and hour sums) for summary and payroll.
+        /// </summary>
         private static AttendanceEmployeeSummary ToEmployeeSummary(List<AttendanceRecord> rows)
         {
             var first = rows[0];
@@ -507,6 +550,9 @@ namespace RSDSystem.Services
             };
         }
 
+        /// <summary>
+        /// Regular hours for one day: stored WorkHoursActual if already computed, otherwise AttendanceRules from the four punches.
+        /// </summary>
         private static decimal DayRegularHours(AttendanceRecord row)
         {
             if (row.WorkHoursActual > 0)
@@ -514,6 +560,9 @@ namespace RSDSystem.Services
             return AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
         }
 
+        /// <summary>
+        /// Overtime hours for one day: stored OvertimeHours if set, otherwise AttendanceRules from punches including OT in/out.
+        /// </summary>
         private static decimal DayOvertimeHours(AttendanceRecord row)
         {
             if (row.OvertimeHours > 0)
@@ -522,12 +571,22 @@ namespace RSDSystem.Services
                 row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
         }
 
+        /// <summary>
+        /// Stable period dropdown key: start and end as yyyy-MM-dd joined with a pipe.
+        /// </summary>
         private static string PeriodKey(DateTime start, DateTime end) =>
             start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
 
+        /// <summary>
+        /// English long-date label for a period option ("August 1, 2026 - August 15, 2026").
+        /// </summary>
         private static string PeriodLabel(DateTime start, DateTime end) =>
             AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end);
 
+        /// <summary>
+        /// Deletes previous AttendanceImports whose dates overlap this file's window so a re-import replaces rather than doubles payroll hours.
+        /// Returns false (and does nothing) when the file has no usable period, so the whole project is not wiped.
+        /// </summary>
         private async Task<bool> ReplaceOverlappingImportsAsync(
             int projectId,
             DateTime? periodStart,
@@ -555,6 +614,10 @@ namespace RSDSystem.Services
             return true;
         }
 
+        /// <summary>
+        /// Removes existing punches that would collide with the unique EmployeeId+WorkDate index (including dummy pre-1900 dates).
+        /// Runs globally, not just this project, because the unique index is on the table.
+        /// </summary>
         private async Task RemoveConflictingRecordsAsync(
             int projectId,
             List<AttendancePreviewRow> rows,
@@ -595,6 +658,9 @@ namespace RSDSystem.Services
                 _db.AttendanceRecords.RemoveRange(existing);
         }
 
+        /// <summary>
+        /// One preview row per employee (or unmatched name) per date; if duplicates exist, keeps the row with the most punches.
+        /// </summary>
         private static List<AttendancePreviewRow> DeduplicateRows(List<AttendancePreviewRow> rows)
         {
             foreach (var row in rows)
@@ -613,6 +679,9 @@ namespace RSDSystem.Services
                 .ToList();
         }
 
+        /// <summary>
+        /// Counts how many of the six punch fields are filled so DeduplicateRows prefers the richer of two same-day rows.
+        /// </summary>
         private static int PunchScore(AttendancePreviewRow row)
         {
             var score = 0;
@@ -625,6 +694,9 @@ namespace RSDSystem.Services
             return score;
         }
 
+        /// <summary>
+        /// True when an existing import's period (or min/max work dates) overlaps [start, end], so it should be replaced.
+        /// </summary>
         private static bool PeriodsOverlap(AttendanceImport import, DateTime start, DateTime end)
         {
             var recordDates = import.Records
@@ -646,6 +718,9 @@ namespace RSDSystem.Services
             return importStart.Value <= end && importEnd.Value >= start;
         }
 
+        /// <summary>
+        /// Saves punch edits from the Records grid for one AttendanceRecordId, then AttendanceRules.Apply. Returns an error string or null.
+        /// </summary>
         public async Task<string?> UpdateRecordAsync(
             int recordId,
             string? timeIn1,
@@ -676,6 +751,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// Loads the month-edit screen for one employee in an import: every day in the import period with punches or Absent placeholders.
+        /// </summary>
         public async Task<AttendanceMonthEdit?> GetMonthEditAsync(int recordId, CancellationToken cancellationToken = default)
         {
             var focus = await _db.AttendanceRecords
@@ -754,6 +832,9 @@ namespace RSDSystem.Services
             return edit;
         }
 
+        /// <summary>
+        /// Writes the month-edit grid (inserts missing days, Apply rules, updates import RowCount). Returns null on success.
+        /// </summary>
         public async Task<string?> SaveMonthEditAsync(AttendanceMonthEdit model, CancellationToken cancellationToken = default)
         {
             var import = await _db.AttendanceImports
@@ -816,6 +897,9 @@ namespace RSDSystem.Services
             return null;
         }
 
+        /// <summary>
+        /// Expands parsed rows to the open payroll-schedule dates so missing days become Absent before preview/import.
+        /// </summary>
         private async Task ApplyAdminTaskWindowAsync(
             int projectId,
             AttendanceParseResult parsed,
@@ -831,6 +915,9 @@ namespace RSDSystem.Services
             AttendanceFileParser.ExpandToDateRange(parsed, window.Value.Start, window.Value.End);
         }
 
+        /// <summary>
+        /// Picks the date window to expand into: open (not completed) schedules on the project, preferring ones that overlap the file dates.
+        /// </summary>
         private async Task<(DateTime Start, DateTime End)?> ResolveTaskWindowAsync(
             int projectId,
             DateTime? fileStart,
@@ -867,6 +954,9 @@ namespace RSDSystem.Services
             return (pool.Min(s => s.StartingDate.Date), pool.Max(s => s.EndDate.Date));
         }
 
+        /// <summary>
+        /// Finds the project by id or name. When assignedStaff is set (PayrollStaff), only that person's projects are visible.
+        /// </summary>
         private async Task<Project?> ResolveProjectAsync(
             int? projectId,
             string? projectName,
@@ -906,6 +996,9 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
+        /// <summary>
+        /// Employees used for auto-match: everyone on the project, or all employees if the project has none yet.
+        /// </summary>
         private async Task<List<Employee>> LoadMatchPoolAsync(int projectId, CancellationToken cancellationToken)
         {
             var projectEmployees = await _db.Employees
@@ -920,6 +1013,9 @@ namespace RSDSystem.Services
 
         // Extracts every row from the file exactly as it appears (raw name / raw ID),
         // and separately records whether the auto-matcher found a system employee for it.
+        /// <summary>
+        /// Maps parsed AttendanceRecords to preview DTOs: raw file name/id kept, MatchEmployeeId + AttendanceRules.Apply applied.
+        /// </summary>
         private static List<AttendancePreviewRow> MapRows(AttendanceParseResult parsed, IReadOnlyList<Employee> employees)
         {
             var rows = new List<AttendancePreviewRow>();
@@ -968,6 +1064,9 @@ namespace RSDSystem.Services
 
         // Applies staff-selected matches (from the "Select employee" dropdown in the preview)
         // onto the raw rows before saving.
+        /// <summary>
+        /// Applies staff "Select employee" JSON onto unmatched preview rows before save (sets EmployeeId, Matched, system name).
+        /// </summary>
         private static void ApplyManualMatches(
             List<AttendancePreviewRow> rows, string? manualMatchesJson, IReadOnlyList<Employee> employees)
         {
@@ -1009,6 +1108,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Applies punch-time edits from the preview grid JSON, then re-runs AttendanceRules so Status and hours stay consistent.
+        /// </summary>
         private static void ApplyOverrides(List<AttendancePreviewRow> rows, string? overridesJson)
         {
             if (string.IsNullOrWhiteSpace(overridesJson) || rows.Count == 0)
@@ -1063,6 +1165,9 @@ namespace RSDSystem.Services
             }
         }
 
+        /// <summary>
+        /// Treats blank, em dash, and double dash as no punch (null) so the database and rules see an empty time.
+        /// </summary>
         private static string? EmptyToNull(string? value)
         {
             var text = (value ?? "").Trim();
@@ -1071,6 +1176,9 @@ namespace RSDSystem.Services
             return text;
         }
 
+        /// <summary>
+        /// Maps SQL exceptions to short import errors (missing tables, unique date, FK) instead of dumping the raw server message.
+        /// </summary>
         private static string DescribeSaveError(Exception ex)
         {
             var sql = ex.GetBaseException().Message;
@@ -1110,6 +1218,9 @@ namespace RSDSystem.Services
             return sql;
         }
 
+        /// <summary>
+        /// Trims and caps a string to a column length (file name 260, names 150, ids 40). Blank becomes null.
+        /// </summary>
         private static string? Clip(string? value, int max)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -1119,6 +1230,9 @@ namespace RSDSystem.Services
             return text.Length <= max ? text : text[..max];
         }
 
+        /// <summary>
+        /// Formats a punch through AttendanceDisplay.Clock then Clip(40) for TimeIn1-style nvarchar columns.
+        /// </summary>
         private static string? ClipTime(string? value)
         {
             var clock = AttendanceDisplay.Clock(value);
