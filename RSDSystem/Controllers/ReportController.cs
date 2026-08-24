@@ -30,6 +30,9 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _imports;
         private readonly PayrollPredictionService _predictions;
 
+        /// <summary>
+        /// Receives the database, attendance summaries, and prediction service used to build report HTML.
+        /// </summary>
         public ReportController(
             PayrollDbContext db,
             AttendanceImportService imports,
@@ -40,6 +43,10 @@ namespace RSDSystem.Controllers
             _predictions = predictions;
         }
 
+        /// <summary>
+        /// GET /Report. Admin Reports page: choose type, project, and period, then Generate or Print.
+        /// Staff hitting this URL are sent to the to-do list.
+        /// </summary>
         public async Task<IActionResult> Index()
         {
             if (!IsAdmin)
@@ -55,6 +62,10 @@ namespace RSDSystem.Controllers
             return View();
         }
 
+        /// <summary>
+        /// GET /Report/Periods?projectId=. Reports page fills the period dropdown from schedules, payrolls, and attendance.
+        /// </summary>
+        /// <returns>JSON start/end/label rows, or an error if the caller is not Admin.</returns>
         [HttpGet]
         public async Task<IActionResult> Periods(int projectId)
         {
@@ -74,6 +85,11 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Report/Generate. Reports page Generate button. Builds HTML for the preview pane via BuildAsync.
+        /// Prediction and anomaly reports do not require a period.
+        /// </summary>
+        /// <returns>JSON title and html, or an error when type, project, or period is missing.</returns>
         [HttpGet]
         public async Task<IActionResult> Generate(string? reportType, int projectId, string? periodStart, string? periodEnd)
         {
@@ -92,6 +108,9 @@ namespace RSDSystem.Controllers
             });
         }
 
+        /// <summary>
+        /// GET /Report/Print. Reports page Print opens a printer-friendly view of the same HTML as Generate.
+        /// </summary>
         public async Task<IActionResult> Print(string? reportType, int projectId, string? periodStart, string? periodEnd)
         {
             if (!IsAdmin)
@@ -104,6 +123,10 @@ namespace RSDSystem.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Pick the report builder from reportType. Generate and Print both call this.
+        /// Payroll, attendance, and payslip need a period; prediction and anomaly do not.
+        /// </summary>
         private async Task<ReportBuild> BuildAsync(string? reportType, int projectId, string? periodStart, string? periodEnd)
         {
             var type = (reportType ?? "").Trim();
@@ -138,6 +161,9 @@ namespace RSDSystem.Controllers
             };
         }
 
+        /// <summary>
+        /// Payroll Report table: days, OT, gross, net, and status for each slip in the period, plus total net pay.
+        /// </summary>
         private async Task<ReportBuild> PayrollReportAsync(Project project, DateTime start, DateTime end, string periodLabel)
         {
             var slips = await _db.Payrolls.AsNoTracking()
@@ -178,6 +204,9 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Payroll Report — " + project.ProjectName, Html = html.ToString() };
         }
 
+        /// <summary>
+        /// Attendance Report: KPI totals plus per-employee days worked, absent, late, half-day, regular, and OT hours.
+        /// </summary>
         private async Task<ReportBuild> AttendanceReportAsync(Project project, DateTime start, DateTime end, string periodLabel)
         {
             var summary = await _imports.QuerySummaryAsync(
@@ -213,6 +242,9 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Attendance Report — " + project.ProjectName, Html = html.ToString() };
         }
 
+        /// <summary>
+        /// Payslip Report: one mini table per employee with regular/OT/gross/cash advance/net for the period.
+        /// </summary>
         private async Task<ReportBuild> PayslipReportAsync(Project project, DateTime start, DateTime end, string periodLabel)
         {
             var slips = await _db.Payrolls.AsNoTracking()
@@ -251,6 +283,10 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Payslip Report — " + project.ProjectName, Html = html.ToString() };
         }
 
+        /// <summary>
+        /// Payroll Prediction Report: previous two months, predicted amount, allocated budget, and exceed-budget flag.
+        /// Uses the same LoadAsync math as the Prediction page (needs two finished Approved months).
+        /// </summary>
         private async Task<ReportBuild> PredictionReportAsync(Project project)
         {
             var page = await _predictions.LoadAsync(project.ProjectId, HttpContext.RequestAborted);
@@ -283,6 +319,9 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Payroll Prediction Report — " + project.ProjectName, Html = html.ToString() };
         }
 
+        /// <summary>
+        /// Payroll Anomaly Report: lists budget-exceed and unusual-change flags, plus period net vs project PayrollBudget.
+        /// </summary>
         private async Task<ReportBuild> AnomalyReportAsync(Project project, DateTime? start, DateTime? end, string periodLabel)
         {
             var page = await _predictions.LoadAsync(project.ProjectId, HttpContext.RequestAborted);
@@ -322,10 +361,14 @@ namespace RSDSystem.Controllers
             return new ReportBuild { Title = "Payroll Anomaly Report — " + project.ProjectName, Html = html.ToString() };
         }
 
+        /// <summary>
+        /// Unique date ranges for the Reports period dropdown: payroll schedules, saved slips, and imported attendance.
+        /// </summary>
         private async Task<List<(DateTime Start, DateTime End)>> LoadPeriodsAsync(int projectId)
         {
             var map = new Dictionary<string, (DateTime Start, DateTime End)>(StringComparer.OrdinalIgnoreCase);
 
+            // Deduplicate the same start/end coming from schedules, payrolls, and attendance.
             void Add(DateTime start, DateTime end)
             {
                 var key = start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
@@ -356,12 +399,21 @@ namespace RSDSystem.Controllers
                 .ToList();
         }
 
+        /// <summary>
+        /// HTML heading block used at the top of every generated report (type, project, period).
+        /// </summary>
         private static string Header(string? projectName, string reportType, string period) =>
             $"<div class=\"report-head\"><div>{Esc(reportType)}</div><div>{Esc(projectName)}</div><div>{Esc(period)}</div></div>";
 
+        /// <summary>
+        /// HTML-encode a cell value. Blank strings become an em dash so empty names do not break the table.
+        /// </summary>
         private static string Esc(string? value) =>
             System.Net.WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(value) ? "—" : value);
 
+        /// <summary>
+        /// Parse yyyy-MM-dd from the Reports period query string. Other formats fall back to DateTime.TryParse.
+        /// </summary>
         private static DateTime? ParseIso(string? value)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -371,6 +423,9 @@ namespace RSDSystem.Controllers
             return DateTime.TryParse(value, out var parsed) ? parsed.Date : null;
         }
 
+        /// <summary>
+        /// True when the session Role is Admin. Index, Periods, Generate, and Print all require this.
+        /// </summary>
         private bool IsAdmin =>
             string.Equals(HttpContext.Session.GetString("Role"), "Admin", StringComparison.OrdinalIgnoreCase);
 

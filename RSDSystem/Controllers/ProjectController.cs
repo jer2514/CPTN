@@ -13,11 +13,18 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollDbContext _db;
 
+        /// <summary>
+        /// Receives the payroll database used for project CRUD and employee assignment.
+        /// </summary>
         public ProjectController(PayrollDbContext db)
         {
             _db = db;
         }
 
+        /// <summary>
+        /// Fill type-of-service, distribution, and active PayrollStaff dropdowns for Create and Edit.
+        /// Staff names here are what Index and payroll to-do use for AssignedPayrollStaff.
+        /// </summary>
         private void PopulateViewBag()
         {
             ViewBag.TypeOfServiceOptions = TypeOfServiceOptions.All;
@@ -29,7 +36,11 @@ namespace RSDSystem.Controllers
                                               .ToList();
         }
 
-        // GET /Project
+        /// <summary>
+        /// GET /Project. Admin project list. Search matches name, location, or type.
+        /// Status filter uses ProjectStatusOptions (On Going, Finished, and others). Add Project opens Create.
+        /// </summary>
+        /// <returns>The project list view for the chosen status.</returns>
         public async Task<IActionResult> Index(string? search, string? status)
         {
             var filter = ProjectStatusOptions.Normalize(status);
@@ -51,7 +62,10 @@ namespace RSDSystem.Controllers
             return View(await query.OrderBy(p => p.ProjectName).ToListAsync());
         }
 
-        // GET /Project/Details/{id}
+        /// <summary>
+        /// GET /Project/Details/{id}. View Project page: monthly budgets, assigned employees, and unassigned actives to add.
+        /// </summary>
+        /// <returns>The details view, or 404 if the project does not exist.</returns>
         public async Task<IActionResult> Details(int id)
         {
             var project = await _db.Projects
@@ -75,7 +89,10 @@ namespace RSDSystem.Controllers
             return View(project);
         }
 
-        // GET /Project/Create
+        /// <summary>
+        /// GET /Project/Create. Opens the Add Project form from the list page button.
+        /// </summary>
+        /// <returns>An empty Project form with staff and type dropdowns.</returns>
         public IActionResult Create()
         {
             ViewBag.PageTitle = "Add Project";
@@ -83,7 +100,12 @@ namespace RSDSystem.Controllers
             return View(new Project());
         }
 
-        // POST /Project/Create
+        /// <summary>
+        /// POST /Project/Create. Save on the Add Project form, including monthly budget rows for the date range.
+        /// Duplicate names are rejected. Monthly totals cannot exceed PayrollBudget.
+        /// After save, Admin adds a PayrollSchedule from the Home dashboard.
+        /// </summary>
+        /// <returns>The project list after save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Project project,
@@ -126,7 +148,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // GET /Project/Edit/{id}
+        /// <summary>
+        /// GET /Project/Edit/{id}. Opens the Edit Project form with monthly budgets and currently assigned employees.
+        /// </summary>
+        /// <returns>The filled form, or 404 if the project does not exist.</returns>
         public async Task<IActionResult> Edit(int id)
         {
             var project = await _db.Projects
@@ -145,7 +170,12 @@ namespace RSDSystem.Controllers
             return View(project);
         }
 
-        // POST /Project/Edit
+        /// <summary>
+        /// POST /Project/Edit. Save on the Edit Project form.
+        /// Monthly budget rows are replaced from the posted MonthYears / MonthAmounts lists.
+        /// Changing AssignedPayrollStaff is what puts this project on a staff member's to-do list.
+        /// </summary>
+        /// <returns>The project list after save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(Project project,
@@ -206,6 +236,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Trim text fields and normalize Status before Create/Edit validation.
+        /// Blank optional fields become null so dropdowns can stay empty.
+        /// </summary>
         private static void NormalizeProject(Project project)
         {
             project.ProjectName = project.ProjectName?.Trim() ?? string.Empty;
@@ -216,6 +250,10 @@ namespace RSDSystem.Controllers
             project.Status = ProjectStatusOptions.Normalize(project.Status);
         }
 
+        /// <summary>
+        /// Create/Edit rules: unique project name, monthly rows required when dates exist,
+        /// amounts cannot be negative, and monthly totals cannot exceed PayrollBudget.
+        /// </summary>
         private async Task ValidateProjectAsync(
             Project project,
             List<string> monthYears,
@@ -255,7 +293,10 @@ namespace RSDSystem.Controllers
             }
         }
 
-        // POST /Project/Delete/{id}
+        /// <summary>
+        /// POST /Project/Delete/{id}. Row Delete button. Removes the project and its monthly budget rows.
+        /// </summary>
+        /// <returns>A redirect back to the project list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
@@ -271,7 +312,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /Project/RemoveEmployee
+        /// <summary>
+        /// POST /Project/RemoveEmployee. Unassign button on Edit Project.
+        /// Sets Employee.ProjectId to null so the person can be assigned to another project.
+        /// </summary>
+        /// <returns>A redirect back to Edit for this project.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RemoveEmployee(int employeeId, int projectId)
@@ -286,7 +331,11 @@ namespace RSDSystem.Controllers
         }
 
 
-        // POST /Project/AssignEmployee
+        /// <summary>
+        /// POST /Project/AssignEmployee. Add employee from the Details/Edit picker.
+        /// Sets ProjectId and forces IsActive so the person appears on Generate Payroll.
+        /// </summary>
+        /// <returns>JSON with the assigned employee row for the page to append.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignEmployee(int employeeId, int projectId)
@@ -313,7 +362,11 @@ namespace RSDSystem.Controllers
             });
         }
 
-        // POST /Project/DeactivateAndRemove
+        /// <summary>
+        /// POST /Project/DeactivateAndRemove. Deactivate on the project employee list.
+        /// Marks the employee Inactive and clears ProjectId in one step.
+        /// </summary>
+        /// <returns>JSON with the employee id and name so the row can be removed from the table.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeactivateAndRemove(int employeeId, int projectId)

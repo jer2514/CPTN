@@ -29,6 +29,9 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _attendance;
         private readonly NotificationService _notifications;
 
+        /// <summary>
+        /// Receives the database, attendance totals, and notifications used when staff submit payroll or mark a task done.
+        /// </summary>
         public PayrollStaffController(PayrollDbContext db, AttendanceImportService attendance, NotificationService notifications)
         {
             _db = db;
@@ -36,7 +39,12 @@ namespace RSDSystem.Controllers
             _notifications = notifications;
         }
 
-        // GET /PayrollStaff  → "To do task" dashboard
+        /// <summary>
+        /// GET /PayrollStaff. Staff To do task dashboard after login.
+        /// Lists PayrollSchedules for this staff member that are not yet TaskApproved, on ongoing projects.
+        /// Mark as Done posts to ToggleTask.
+        /// </summary>
+        /// <returns>The to-do list view, or an empty list when the session name is missing.</returns>
         public async Task<IActionResult> Index()
         {
             var staffName = StaffName();
@@ -68,7 +76,9 @@ namespace RSDSystem.Controllers
         /// <summary>
         /// Staff clicked Mark as Done. Sets TaskCompleted and notifies Admin.
         /// The task stays on the list until Admin ApproveTask.
+        /// POST /PayrollStaff/ToggleTask/{id}. Ignored if the schedule is already completed or not assigned to this staff.
         /// </summary>
+        /// <returns>A redirect back to the to-do list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleTask(int id)
@@ -92,8 +102,14 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Session FullName used to match Project.AssignedPayrollStaff. Empty means no assigned projects.
+        /// </summary>
         private string? StaffName() => StaffNames.FromSession(HttpContext.Session);
 
+        /// <summary>
+        /// Ongoing projects assigned to the signed-in staff member. GeneratePayroll and PendingPayroll use this list.
+        /// </summary>
         private async Task<List<Project>> AssignedOngoingProjectsAsync()
         {
             var staffName = StaffName();
@@ -110,8 +126,10 @@ namespace RSDSystem.Controllers
 
 
 
-        /// <summary>Page: pick a project and Load employees for the current open schedule.</summary>
-        // GET /PayrollStaff/GeneratePayroll
+        /// <summary>
+        /// Page: pick a project and Load employees for the current open schedule.
+        /// GET /PayrollStaff/GeneratePayroll. The Load employees button then calls GetProjectEmployees.
+        /// </summary>
         public async Task<IActionResult> GeneratePayroll(int? projectId)
         {
             var projects = await AssignedOngoingProjectsAsync();
@@ -121,7 +139,12 @@ namespace RSDSystem.Controllers
             return View(projects);
         }
 
-        // GET /PayrollStaff/GetProjectEmployees?projectId=5
+        /// <summary>
+        /// GET /PayrollStaff/GetProjectEmployees?projectId=5.
+        /// Generate Payroll JavaScript loads active employees, the open schedule, and who already has a slip.
+        /// Generate is blocked until attendance exists for that schedule.
+        /// </summary>
+        /// <returns>JSON employees plus hasSchedule / hasAttendance flags and a guidance message.</returns>
         [HttpGet]
         public async Task<IActionResult> GetProjectEmployees(int projectId)
         {
@@ -152,6 +175,7 @@ namespace RSDSystem.Controllers
                 }
                 catch
                 {
+                    // Older databases may lack PayrollScheduleId; retry matching slips by dates only.
                     try
                     {
                         generatedEmployeeIds = await GeneratedEmployeeIdsAsync(projectId, openSchedule, includeScheduleId: false);
@@ -204,6 +228,10 @@ namespace RSDSystem.Controllers
             }
         }
 
+        /// <summary>
+        /// Employee ids that already have a payroll row in the open schedule.
+        /// includeScheduleId uses PayrollScheduleId when the column exists; the fallback matches by dates only.
+        /// </summary>
         private async Task<HashSet<int>> GeneratedEmployeeIdsAsync(
             int projectId, PayrollSchedule? openSchedule, bool includeScheduleId)
         {
@@ -239,8 +267,9 @@ namespace RSDSystem.Controllers
         /// <summary>
         /// Slip form. Hours/days are filled from imported attendance for this schedule.
         /// Save posts to GeneratePayrollSlip (Draft).
+        /// GET /PayrollStaff/PayrollSlip. Submitted or Approved slips open ViewPayroll instead of this form.
+        /// New slips require imported attendance; otherwise staff are sent back to GeneratePayroll.
         /// </summary>
-        // GET /PayrollStaff/PayrollSlip?employeeId=1&projectId=5&payrollId=9
         public async Task<IActionResult> PayrollSlip(int employeeId, int projectId, int? payrollId = null,
             int? scheduleId = null, string? returnUrl = null,
             int? daysWorked = null, int? absentDays = null, decimal? overtimeHours = null)
@@ -390,6 +419,11 @@ namespace RSDSystem.Controllers
             return View(emp);
         }
 
+        /// <summary>
+        /// GET /PayrollStaff/GetAttendanceTotals. Slip form refreshes days/OT when the pay period dates change.
+        /// If no attendance exists, daysWorked falls back to weekday count.
+        /// </summary>
+        /// <returns>JSON daysWorked, daysAbsent, and overtimeHours for the chosen range.</returns>
         [HttpGet]
         public async Task<IActionResult> GetAttendanceTotals(
             int employeeId, int projectId, string? periodStart, string? periodEnd)
@@ -431,8 +465,12 @@ namespace RSDSystem.Controllers
             });
         }
 
-        /// <summary>Save the slip as Draft (or update a Correction). Then staff Submit from Pending.</summary>
-        // POST /PayrollStaff/GeneratePayrollSlip
+        /// <summary>
+        /// Save the slip as Draft (or update a Correction). Then staff Submit from Pending.
+        /// POST /PayrollStaff/GeneratePayrollSlip from the slip Save button.
+        /// New slips need imported attendance. Days+absences cannot exceed the period; cash advance cannot exceed gross.
+        /// </summary>
+        /// <returns>JSON with the new payrollId and a return URL, or field errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GeneratePayrollSlip(int employeeId, int projectId,
@@ -518,6 +556,7 @@ namespace RSDSystem.Controllers
                 }
             }
 
+            // Regular pay is daily rate × days; OT is hourly rate × hours; net is gross minus cash advance.
             decimal regularPay = emp.DailyRate * regularDaysWorked;
             decimal overtimePay = overtimeHours * emp.RatePerHour;
             decimal gross = regularPay + overtimePay;
@@ -634,7 +673,11 @@ namespace RSDSystem.Controllers
             });
         }
 
-        // POST /PayrollStaff/GeneratePayrollForEmployee
+        /// <summary>
+        /// POST /PayrollStaff/GeneratePayrollForEmployee. Quick generate from the employee table.
+        /// Currently only confirms the employee exists; it does not insert a Payroll row. Use PayrollSlip to save.
+        /// </summary>
+        /// <returns>JSON success with the employee name, or not found.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GeneratePayrollForEmployee(int employeeId, int projectId)
@@ -648,8 +691,10 @@ namespace RSDSystem.Controllers
 
 
 
-        /// <summary>List Draft / Correction / Submitted slips. Submit sends them to Admin review.</summary>
-        // GET /PayrollStaff/PendingPayroll?projectId=5
+        /// <summary>
+        /// List Draft / Correction / Submitted slips. Submit sends them to Admin review.
+        /// GET /PayrollStaff/PendingPayroll. Choosing a project then calls GetProjectPayrolls.
+        /// </summary>
         public async Task<IActionResult> PendingPayroll(int? projectId)
         {
             var projects = await AssignedOngoingProjectsAsync();
@@ -659,7 +704,11 @@ namespace RSDSystem.Controllers
             return View(projects);
         }
 
-        // GET /PayrollStaff/GetProjectPayrolls?projectId=5
+        /// <summary>
+        /// GET /PayrollStaff/GetProjectPayrolls?projectId=5.
+        /// Pending Payroll table: status, net pay, and period label. Submit and Delete buttons use these ids.
+        /// </summary>
+        /// <returns>JSON payroll rows for the project, ordered by status then date.</returns>
         [HttpGet]
         public async Task<IActionResult> GetProjectPayrolls(int projectId)
         {
@@ -703,7 +752,10 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, projectName = project.ProjectName, payrolls = ordered });
         }
 
-        // GET /PayrollStaff/ViewPayroll/{id}
+        /// <summary>
+        /// GET /PayrollStaff/ViewPayroll/{id}. Read-only slip after save, or when status is Submitted/Approved.
+        /// </summary>
+        /// <returns>The slip view, or 404 if the id is missing.</returns>
         public async Task<IActionResult> ViewPayroll(int id)
         {
             var payroll = await _db.Set<Payroll>()
@@ -718,8 +770,11 @@ namespace RSDSystem.Controllers
             return View(payroll);
         }
 
-        /// <summary>Draft or Correction → Submitted. Notifies Admin (and may fire prediction alerts).</summary>
-        // POST /PayrollStaff/SubmitPayroll/{id}
+        /// <summary>
+        /// Draft or Correction → Submitted. Notifies Admin (and may fire prediction alerts).
+        /// POST /PayrollStaff/SubmitPayroll/{id} from Pending Payroll Submit. Approved slips cannot be submitted again.
+        /// </summary>
+        /// <returns>JSON success after Admin is notified.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitPayroll(int id)
@@ -745,7 +800,11 @@ namespace RSDSystem.Controllers
              return Json(new { success = true, message = "Payroll has been submitted for admin review." });
         }
 
-        // POST /PayrollStaff/DeletePayroll/{id}
+        /// <summary>
+        /// POST /PayrollStaff/DeletePayroll/{id}. Pending Payroll Delete.
+        /// Only Draft can be removed. Submitted, Approved, and Correction must stay for history and review.
+        /// </summary>
+        /// <returns>JSON success after the row is deleted, or an error if status blocks delete.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePayroll(int id)
@@ -767,12 +826,20 @@ namespace RSDSystem.Controllers
             return Json(new { success = true, message = "Payroll record deleted." });
         }
 
+        /// <summary>
+        /// GET /PayrollStaff/Logout. Staff sidebar leftover. Does not clear the session; it only reloads the to-do list.
+        /// Real sign-out is AccountController.Logout.
+        /// </summary>
         public IActionResult Logout()
         {
              // TODO: clear auth/session once login is implemented
              return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Allow only same-site returnUrl values on PayrollSlip so open-redirects cannot leave this app.
+        /// </summary>
+        /// <returns>The local URL, or null when missing or external.</returns>
         private string? SafeReturnUrl(string? returnUrl)
         {
             if (string.IsNullOrWhiteSpace(returnUrl))

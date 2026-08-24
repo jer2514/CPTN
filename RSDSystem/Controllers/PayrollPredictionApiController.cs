@@ -16,18 +16,28 @@ namespace RSDSystem.Controllers
     {
         private readonly PayrollPredictionService _predictions;
 
+        /// <summary>
+        /// Receives the prediction service so POST /api/payroll/predict can run the forecast math.
+        /// </summary>
         public PayrollPredictionApiController(PayrollPredictionService predictions)
         {
             _predictions = predictions;
         }
 
+        /// <summary>
+        /// GET /api/payroll/health. Callers use this to confirm the prediction API is running.
+        /// </summary>
+        /// <returns>JSON with success and the service name.</returns>
         [HttpGet("health")]
         public IActionResult Health() =>
             Ok(new { success = true, service = "payroll-prediction" });
 
         /// <summary>
         /// Proposed prediction API: previous two payroll months in, next-month estimate and risk flags out.
+        /// POST /api/payroll/predict. Scripts send previousPayroll1, previousPayroll2, and allocatedBudget.
+        /// The website Prediction page does not use this; it calls PayrollController.GetPrediction instead.
         /// </summary>
+        /// <returns>JSON with predicted payroll, budget difference, and risk flags, or 400 if the body is missing.</returns>
         [HttpPost("predict")]
         public async Task<IActionResult> Predict([FromBody] PayrollForecastInput? body)
         {

@@ -19,12 +19,19 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _imports;
         private readonly IConfiguration _config;
 
+        /// <summary>
+        /// Receives the import service and app settings so this API can save files and check X-Api-Key.
+        /// </summary>
         public AttendanceApiController(AttendanceImportService imports, IConfiguration config)
         {
             _imports = imports;
             _config = config;
         }
 
+        /// <summary>
+        /// GET /api/attendance/health. Scripts call this to verify the API key before uploading a file.
+        /// </summary>
+        /// <returns>200 with a service name, or 401 if X-Api-Key is missing or wrong.</returns>
         [HttpGet("health")]
         public IActionResult Health()
         {
@@ -34,6 +41,11 @@ namespace RSDSystem.Controllers
             return Ok(new { success = true, service = "attendance-import" });
         }
 
+        /// <summary>
+        /// POST /api/attendance/import. n8n or a scanner sends a spreadsheet plus projectId or projectName.
+        /// Saves rows through AttendanceImportService and reports how many matched employees.
+        /// </summary>
+        /// <returns>JSON with import counts, or 400/401 when the key, file, or project is invalid.</returns>
         [HttpPost("import")]
         [RequestSizeLimit(20_000_000)]
         [RequestFormLimits(MultipartBodyLengthLimit = 20_000_000)]
@@ -52,6 +64,7 @@ namespace RSDSystem.Controllers
             if (!AllowedExtensions.Contains(ext))
                 return BadRequest(new { success = false, message = "Use an .xls, .xlsx, or .csv attendance file." });
 
+            // Callers may identify the project by id or by name; one of the two is required.
             if (!projectId.HasValue && string.IsNullOrWhiteSpace(projectName))
                 return BadRequest(new { success = false, message = "Provide projectId or projectName." });
 
@@ -98,6 +111,10 @@ namespace RSDSystem.Controllers
             }
         }
 
+        /// <summary>
+        /// Build the success sentence for Import. Mentions a replace when the same dates were imported before,
+        /// and appends unmatched row counts so the caller can fix employee names.
+        /// </summary>
         private static string ImportMessage(AttendanceImportResult result)
         {
             var message = result.ReplacedPrevious
@@ -112,6 +129,11 @@ namespace RSDSystem.Controllers
             return message;
         }
 
+        /// <summary>
+        /// Compare the X-Api-Key header to Attendance:ApiKey in configuration.
+        /// A blank config key always fails so the endpoint cannot run unsecured.
+        /// </summary>
+        /// <returns>True only when the header matches the configured key exactly.</returns>
         private bool HasValidApiKey()
         {
             var expected = _config["Attendance:ApiKey"];

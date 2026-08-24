@@ -17,6 +17,9 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly IWebHostEnvironment _env;
 
+        /// <summary>
+        /// Receives the database and web root so employee photos can be saved under wwwroot/uploads/employees.
+        /// </summary>
         public EmployeeController(PayrollDbContext db, IWebHostEnvironment env)
         {
             _db = db;
@@ -30,7 +33,11 @@ namespace RSDSystem.Controllers
             "Mason", "Carpenter", "Electrician"
         };
 
-        // GET /Employee
+        /// <summary>
+        /// GET /Employee. Admin employee list with search, sort, and 10 rows per page.
+        /// Search matches name, job, employee code, email, or project. Add Employee opens Create.
+        /// </summary>
+        /// <returns>The employee list view for the current page.</returns>
         public async Task<IActionResult> Index(string? search, string? sortBy, int page = 1)
         {
             const int pageSize = 10;
@@ -75,7 +82,10 @@ namespace RSDSystem.Controllers
             return View(items);
         }
 
-        // GET /Employee/Create
+        /// <summary>
+        /// GET /Employee/Create. Opens the Add Employee form. Only ongoing projects can be assigned.
+        /// </summary>
+        /// <returns>An empty Employee form with job and project dropdowns.</returns>
         public IActionResult Create()
         {
             ViewBag.JobClassifications = JobClassifications;
@@ -86,7 +96,11 @@ namespace RSDSystem.Controllers
             return View(new Employee());
         }
 
-        // POST /Employee/Create
+        /// <summary>
+        /// POST /Employee/Create. Save on the Add Employee form.
+        /// Assigns a 5-digit biometric code, stores an optional photo, and blocks duplicate name+DOB or email.
+        /// </summary>
+        /// <returns>The employee list after save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Employee emp, IFormFile? photo)
@@ -137,7 +151,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // GET /Employee/Edit/{id}
+        /// <summary>
+        /// GET /Employee/Edit/{id}. Opens the Edit Employee form from a row's Edit button.
+        /// </summary>
+        /// <returns>The filled form, or EmployeeNotFound when the id is missing.</returns>
         public async Task<IActionResult> Edit(int id)
         {
             var emp = await _db.Employees.Include(e => e.Project)
@@ -153,7 +170,11 @@ namespace RSDSystem.Controllers
             return View(emp);
         }
 
-        // POST /Employee/Edit
+        /// <summary>
+        /// POST /Employee/Edit. Save on the Edit Employee form.
+        /// Assigning an inactive employee to a project turns them Active. Duplicate name+DOB or email is blocked.
+        /// </summary>
+        /// <returns>The employee list after save, or the form with validation errors.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(Employee emp, IFormFile? photo)
@@ -217,6 +238,10 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Trim and title-case name fields before Create/Edit validation and save.
+        /// Empty email and middle initial become null so optional fields stay optional.
+        /// </summary>
         private static void NormalizeEmployee(Employee emp)
         {
             var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
@@ -235,18 +260,28 @@ namespace RSDSystem.Controllers
                 : emp.JobClassification.Trim();
         }
 
+        /// <summary>
+        /// Title-case a name: trim, lower, then capitalize each word. Empty input becomes "".
+        /// </summary>
         private static string TitleCase(string? value, System.Globalization.TextInfo ti)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             return ti.ToTitleCase(value.Trim().ToLowerInvariant());
         }
 
+        /// <summary>
+        /// Add a ModelState error when the uploaded photo fails InputRules (type or size).
+        /// </summary>
         private void ValidatePhoto(IFormFile? photo)
         {
             if (!InputRules.TryValidatePhoto(photo, out var error) && error != null)
                 ModelState.AddModelError("photo", error);
         }
 
+        /// <summary>
+        /// Replace ASP.NET "not valid" messages on DailyRate and RatePerHour with "is required."
+        /// Binding fails the same way for blank and non-numeric input, so the form wording is clearer.
+        /// </summary>
         private static void ClarifyNumericErrors(ModelStateDictionary modelState)
         {
             foreach (var key in new[] { "DailyRate", "RatePerHour" })
@@ -266,8 +301,11 @@ namespace RSDSystem.Controllers
             }
         }
 
-        // Returns true if another employee already has the same
-        // (FirstName + LastName + DateOfBirth) OR the same Email.
+        /// <summary>
+        /// Returns true if another employee already has the same
+        /// (FirstName + LastName + DateOfBirth) OR the same Email.
+        /// Create and Edit call this so the same person cannot be added twice.
+        /// </summary>
         private async Task<bool> IsDuplicateEmployeeAsync(Employee emp, int excludeId = 0)
         {
             var query = _db.Employees.Where(e => e.EmployeeId != excludeId);
@@ -291,7 +329,11 @@ namespace RSDSystem.Controllers
             return false;
         }
 
-        // POST /Employee/Delete/{id}
+        /// <summary>
+        /// POST /Employee/Delete/{id}. Row Delete button.
+        /// If payroll history exists, the delete is blocked and the admin is told to set Inactive instead.
+        /// </summary>
+        /// <returns>A redirect to the employee list with success or error in TempData.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
@@ -314,6 +356,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        /// <summary>
+        /// Save an uploaded photo under wwwroot/uploads/employees with a new GUID file name.
+        /// Create and Edit call this when a photo file is present.
+        /// </summary>
+        /// <returns>The public URL path stored on Employee.PhotoPath.</returns>
         private async Task<string> SavePhotoAsync(IFormFile photo)
         {
             var folder = Path.Combine(_env.WebRootPath, "uploads", "employees");
@@ -325,7 +372,10 @@ namespace RSDSystem.Controllers
             return $"/uploads/employees/{fileName}";
         }
 
-        // Unique 5-digit biometric ID: 00001, 00002, ...
+        /// <summary>
+        /// Unique 5-digit biometric ID: 00001, 00002, ...
+        /// Create assigns this before save. Uses the highest existing sequence, then skips collisions.
+        /// </summary>
         private async Task<string> GenerateEmployeeCodeAsync()
         {
             var codes = await _db.Employees
@@ -352,7 +402,11 @@ namespace RSDSystem.Controllers
             return candidate;
         }
 
-        //delete multiple employees
+        /// <summary>
+        /// POST /Employee/BulkDelete. Delete selected checkbox on the list.
+        /// Each employee is deleted one at a time so payroll FK failures can be listed by name.
+        /// </summary>
+        /// <returns>A redirect to Index with success, or an error naming employees that still have payroll.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> BulkDelete(List<int> selectedIds)
@@ -375,6 +429,7 @@ namespace RSDSystem.Controllers
                 }
                 catch (DbUpdateException)
                 {
+                    // Keep the row: payroll history must stay, so detach the failed delete.
                     _db.Entry(emp).State = EntityState.Unchanged;
                     blocked.Add(emp.FullName);
                 }
@@ -387,7 +442,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /Employee/ToggleStatus/{id}
+        /// <summary>
+        /// POST /Employee/ToggleStatus/{id}. Active/Inactive switch on a row.
+        /// Inactive employees are unassigned from their project so they drop off payroll generate lists.
+        /// </summary>
+        /// <returns>A redirect back to the employee list.</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleStatus(int id)
@@ -406,7 +465,11 @@ namespace RSDSystem.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // POST /Employee/ToggleStatusAjax
+        /// <summary>
+        /// POST /Employee/ToggleStatusAjax. Same Active/Inactive rule as ToggleStatus, for the list switch without a full reload.
+        /// Clearing ProjectId when inactive keeps the employee off Generate Payroll.
+        /// </summary>
+        /// <returns>JSON with the new isActive flag and projectId (null when inactivated).</returns>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleStatusAjax(int id)
