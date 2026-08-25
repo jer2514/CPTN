@@ -580,20 +580,17 @@ namespace RSDSystem.Services
             var removedUnlocked = false;
             foreach (var import in toRemove)
             {
-                var locked = import.Records
-                    .Where(r => PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
-                    .ToList();
-                var unlocked = import.Records
-                    .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
-                    .ToList();
+                var replaceable = AttendanceReplaceWindow.UnlockedInWindow(
+                    import.Records, start.Value, end.Value, closedPayrolls);
 
-                if (unlocked.Count > 0)
+                if (replaceable.Count > 0)
                 {
-                    _db.AttendanceRecords.RemoveRange(unlocked);
+                    _db.AttendanceRecords.RemoveRange(replaceable);
                     removedUnlocked = true;
                 }
 
-                if (locked.Count == 0)
+                var replaceableSet = replaceable.ToHashSet();
+                if (import.Records.Count == 0 || import.Records.All(replaceableSet.Contains))
                     _db.AttendanceImports.Remove(import);
             }
 
