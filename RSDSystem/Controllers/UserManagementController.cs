@@ -161,6 +161,7 @@ namespace RSDSystem.Controllers
             if (user == null) return NotFound();
 
             ViewBag.PageTitle = "Edit User";
+            ViewBag.IsLastActiveAdmin = await IsLastAdminAsync(user);
             return View(user);
         }
 
@@ -305,7 +306,7 @@ namespace RSDSystem.Controllers
                 if (user.IsActive && await IsLastAdminAsync(user))
                 {
                     TempData["Error"] = "The system must keep one active admin account.";
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Edit), new { id });
                 }
 
                 user.IsActive = !user.IsActive;
@@ -314,7 +315,7 @@ namespace RSDSystem.Controllers
                     ? "User is now active and can log in."
                     : "User is now inactive and cannot log in.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Edit), new { id });
         }
 
         private async Task<bool> IsLastAdminAsync(User user)

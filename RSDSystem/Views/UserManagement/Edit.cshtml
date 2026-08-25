@@ -55,11 +55,11 @@
                 <input type="file" id="photoInput" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                        class="d-none" data-validate="fileImage" onchange="previewPhoto(this)" />
 
-                <!-- Status toggle button -->
+                <!-- Status toggle: Active asks for confirmation; last admin cannot be turned off. -->
                 @if (Model.IsActive)
                 {
                     <button type="button" class="status-toggle-btn status-toggle-inactive"
-                            onclick="toggleUserStatus(@Model.UserId)">
+                            onclick="confirmToggleUserStatus(@Model.UserId)">
                         <i class="bi bi-toggle-on"></i> Active
                     </button>
                 }
@@ -219,6 +219,37 @@
     </form>
 </div>
 
+<div class="del-overlay" id="deactivateUserOverlay" onclick="closeDeactivateUserModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Set as Inactive?</div>
+        <div class="del-msg">
+            <strong>@Model.FullName</strong> will not be able to log in until they are set Active again.
+        </div>
+        <div class="del-actions">
+            <button type="button" class="del-btn-cancel" onclick="closeDeactivateUserModal()">Cancel</button>
+            <button type="button" class="del-btn-delete" onclick="toggleUserStatus(@Model.UserId)">Set Inactive</button>
+        </div>
+    </div>
+</div>
+
+<div class="del-overlay" id="lastAdminOverlay" onclick="closeLastAdminModal(arguments[0])">
+    <div class="del-modal">
+        <div class="del-icon-wrap">
+            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
+        </div>
+        <div class="del-title">Cannot set inactive</div>
+        <div class="del-msg">
+            The system must keep one active admin account.
+        </div>
+        <div class="del-actions">
+            <button type="button" class="del-btn-cancel" onclick="closeLastAdminModal()">OK</button>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
@@ -249,10 +280,37 @@
             }
         }
 
+        const isLastActiveAdmin = @(ViewBag.IsLastActiveAdmin is true ? "true" : "false");
+
+        function confirmToggleUserStatus(userId) {
+            if (isLastActiveAdmin) {
+                document.getElementById('lastAdminOverlay').classList.add('open');
+                return;
+            }
+            document.getElementById('deactivateUserOverlay').classList.add('open');
+        }
+
+        function closeDeactivateUserModal(e) {
+            if (!e || e.target === document.getElementById('deactivateUserOverlay'))
+                document.getElementById('deactivateUserOverlay').classList.remove('open');
+        }
+
+        function closeLastAdminModal(e) {
+            if (!e || e.target === document.getElementById('lastAdminOverlay'))
+                document.getElementById('lastAdminOverlay').classList.remove('open');
+        }
+
         function toggleUserStatus(userId) {
             const form = document.getElementById('toggleStatusForm');
             form.action = '/UserManagement/ToggleStatus/' + userId;
             form.submit();
         }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeDeactivateUserModal();
+                closeLastAdminModal();
+            }
+        });
     </script>
 }
