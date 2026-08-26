@@ -135,8 +135,20 @@ namespace RSDSystem.Controllers
 
             var attendance = await _db.AttendanceRecords.AsNoTracking()
                 .FirstOrDefaultAsync(r => r.AttendanceRecordId == request.AttendanceRecordId, HttpContext.RequestAborted);
-            if (attendance != null
-                && await PayrollAttendanceLock.IsLockedAsync(
+            if (attendance == null)
+            {
+                request.Status = CorrectionRequestStatuses.Returned;
+                request.ReturnReason = AttendanceCorrectionRules.ReplacedByImportReason;
+                request.ReviewedAt = DateTime.Now;
+                await _db.SaveChangesAsync();
+                return Json(new
+                {
+                    success = false,
+                    message = "This attendance row was replaced by a newer import. The correction was closed so payroll can be generated."
+                });
+            }
+
+            if (await PayrollAttendanceLock.IsLockedAsync(
                     _db, attendance.ProjectId, attendance.EmployeeId, attendance.WorkDate, HttpContext.RequestAborted))
             {
                 return Json(new

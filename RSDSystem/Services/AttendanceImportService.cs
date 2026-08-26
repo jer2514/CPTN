@@ -441,6 +441,8 @@ namespace RSDSystem.Services
                 return (0, "No attendance rows in this period.");
 
             var importIds = records.Select(r => r.AttendanceImportId).Distinct().ToList();
+            await CloseOpenCorrectionsForRecordsAsync(
+                records.Select(r => r.AttendanceRecordId), cancellationToken);
             _db.AttendanceRecords.RemoveRange(records);
             await _db.SaveChangesAsync(cancellationToken);
 
@@ -589,6 +591,8 @@ namespace RSDSystem.Services
 
                 if (unlocked.Count > 0)
                 {
+                    await CloseOpenCorrectionsForRecordsAsync(
+                        unlocked.Select(r => r.AttendanceRecordId), cancellationToken);
                     _db.AttendanceRecords.RemoveRange(unlocked);
                     removedUnlocked = true;
                 }
@@ -642,7 +646,38 @@ namespace RSDSystem.Services
                 .ToList();
 
             if (existing.Count > 0)
+            {
+                await CloseOpenCorrectionsForRecordsAsync(
+                    existing.Select(r => r.AttendanceRecordId), cancellationToken);
                 _db.AttendanceRecords.RemoveRange(existing);
+            }
+        }
+
+        /// <summary>
+        /// Re-import deletes attendance rows. Pending corrections still pointed at those
+        /// ids and blocked payroll even though admin could no longer approve them.
+        /// </summary>
+        private async Task CloseOpenCorrectionsForRecordsAsync(
+            IEnumerable<int> recordIds,
+            CancellationToken cancellationToken)
+        {
+            var ids = recordIds.Distinct().ToList();
+            if (ids.Count == 0)
+                return;
+
+            var open = await _db.AttendanceCorrectionRequests
+                .Where(c => ids.Contains(c.AttendanceRecordId)
+                    && AttendanceCorrectionRules.IsOpen(c.Status))
+                .ToListAsync(cancellationToken);
+            if (open.Count == 0)
+                return;
+
+            foreach (var request in open)
+            {
+                request.Status = CorrectionRequestStatuses.Returned;
+                request.ReturnReason = AttendanceCorrectionRules.ReplacedByImportReason;
+                request.ReviewedAt = PhilippinesTime.Now;
+            }
         }
 
         private static List<AttendancePreviewRow> DeduplicateRows(List<AttendancePreviewRow> rows)
