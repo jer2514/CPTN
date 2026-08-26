@@ -837,10 +837,10 @@ namespace RSDSystem.Controllers
 
         private async Task<HashSet<int>> PendingCorrectionEmployeeIdsAsync(int projectId)
         {
-            var ids = await _db.AttendanceCorrectionRequests.AsNoTracking()
-                .Where(c => c.ProjectId == projectId
-                    && c.Status == CorrectionRequestStatuses.Pending
-                    && c.EmployeeId != null)
+            var ids = await AttendanceCorrectionRules.PendingOnLiveRecords(
+                    _db.AttendanceCorrectionRequests.AsNoTracking(),
+                    _db.AttendanceRecords.AsNoTracking())
+                .Where(c => c.ProjectId == projectId && c.EmployeeId != null)
                 .Select(c => c.EmployeeId!.Value)
                 .Distinct()
                 .ToListAsync();
@@ -848,9 +848,9 @@ namespace RSDSystem.Controllers
         }
 
         private async Task<bool> HasPendingCorrectionAsync(int projectId, int employeeId) =>
-            await _db.AttendanceCorrectionRequests.AsNoTracking()
-                .AnyAsync(c => c.ProjectId == projectId
-                    && c.EmployeeId == employeeId
-                    && c.Status == CorrectionRequestStatuses.Pending);
+            await AttendanceCorrectionRules.PendingOnLiveRecords(
+                    _db.AttendanceCorrectionRequests.AsNoTracking(),
+                    _db.AttendanceRecords.AsNoTracking())
+                .AnyAsync(c => c.ProjectId == projectId && c.EmployeeId == employeeId);
     }
 }
