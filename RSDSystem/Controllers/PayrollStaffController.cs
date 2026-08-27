@@ -773,11 +773,11 @@ namespace RSDSystem.Controllers
              if (payroll == null)
              return Json(new { success = false, message = "Payroll record not found." });
 
-             if (payroll.Status == PayrollStatusOptions.Submitted ||
-                 payroll.Status == PayrollStatusOptions.Approved)
-             {
-                 return Json(new { success = false, message = "Submitted or approved payroll cannot be changed." });
-             }
+             var blocked = PayrollSubmitRules.BlockReason(
+                 payroll.Status,
+                 await HasPendingCorrectionAsync(payroll.ProjectId, payroll.EmployeeId));
+             if (blocked != null)
+                 return Json(new { success = false, message = blocked });
 
              var resubmitted = payroll.Status == PayrollStatusOptions.Correction;
              payroll.Status = PayrollStatusOptions.Submitted;
