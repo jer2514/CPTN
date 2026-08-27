@@ -136,13 +136,14 @@ namespace RSDSystem.Controllers
 
             _db.Users.Add(user);
             user.UserCode = await GenerateUserCodeAsync();
+            user.MustChangePassword = true;
             await _db.SaveChangesAsync();
             await _logs.LogAsync(
                 ActivityTypes.CreateUser,
                 ActivityModules.UserManagement,
                 $"Added payroll staff user {user.FullName} ({user.Username}).",
                 relatedId: user.UserId);
-            TempData["Success"] = "User added successfully.";
+            TempData["Success"] = "User added. They must change this temporary password on first login.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -238,7 +239,11 @@ namespace RSDSystem.Controllers
             existing.Address = user.Address?.Trim();
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
+            {
                 existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
+                if (string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+                    existing.MustChangePassword = true;
+            }
 
             if (photo != null && photo.Length > 0)
                 existing.PhotoPath = await SavePhotoAsync(photo);
@@ -264,7 +269,10 @@ namespace RSDSystem.Controllers
                     HttpContext.Session.Remove("PhotoPath");
             }
 
-            TempData["Success"] = "User updated successfully.";
+            TempData["Success"] = !string.IsNullOrWhiteSpace(NewPassword)
+                && string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
+                ? "User updated. They must change the new password on next login."
+                : "User updated successfully.";
             return RedirectToAction(nameof(Index));
         }
 
