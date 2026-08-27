@@ -10,7 +10,7 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-    <link href="~/css/site.css?v=61" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/site.css?v=63" rel="stylesheet" asp-append-version="true" />
 </head>
 
 <body data-role="@(Context.Session.GetString("Role") ?? "")">
@@ -99,45 +99,9 @@
                         <i class="bi bi-journal-text"></i> Activity Logs
                     </a>
                 </li>
-
-                <li>
-                    <a asp-controller="Account" asp-action="ChangePassword">
-                        <i class="bi bi-key-fill"></i> Change Password
-                    </a>
-                </li>
-
-                <li>
-                    <a asp-controller="Account" asp-action="Logout">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </a>
-                </li>
             </ul>
 
-            <div class="profile-card">
-                @{
-                    var fullName = Context.Session.GetString("FullName") ?? "Guest";
-                    var role = Context.Session.GetString("Role");
-                    var photo = Context.Session.GetString("PhotoPath");
-                    var displayRole = role == "PayrollStaff" ? "Payroll Staff" : (role ?? "Not logged in");
-                    var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .Take(2)
-                    .Select(w => char.ToUpper(w[0])));
-                }
-
-                @if (!string.IsNullOrEmpty(photo))
-                {
-                    <img src="@photo" alt="User">
-                }
-                else
-                {
-                    <span class="profile-avatar-initials">@initials</span>
-                }
-
-                <div>
-                    <div class="user-name">@fullName</div>
-                    <div class="user-role">@displayRole</div>
-                </div>
-            </div>
+            @await Html.PartialAsync("_ProfileCard")
 
         </aside>
 
@@ -267,8 +231,5 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
 
     @await RenderSectionAsync("Scripts", required: false)
-    @await Html.PartialAsync("_ProfileCard")
-
-
 </body>
 </html>
