@@ -143,7 +143,10 @@
                         <span class="field-error" data-error-for="NewPassword">@Err("NewPassword")</span>
                         @if (Model.Role == "PayrollStaff")
                         {
-                            <div style="color:#9ab0d8;font-size:12px;margin-top:4px">Must include 1 capital letter, 1 number, and 1 special character.</div>
+                            <div style="color:#9ab0d8;font-size:12px;margin-top:4px">
+                                Must include 1 capital letter, 1 number, and 1 special character.
+                                Setting a password here is temporary — they must change it on next login.
+                            </div>
                         }
                     </div>
                     <div>

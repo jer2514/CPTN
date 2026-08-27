@@ -46,6 +46,7 @@ namespace RSDSystem.Models
     {
         public const string Login = "Login";
         public const string Logout = "Logout";
+        public const string ChangePassword = "Change Password";
         public const string GeneratePayroll = "Generate Payroll";
         public const string SubmitPayroll = "Submit Payroll";
         public const string ApprovePayroll = "Approve Payroll";

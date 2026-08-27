@@ -7,9 +7,6 @@ namespace RSDSystem.Filters
 {
     public class AuthCheckFilter : IActionFilter
     {
-        // Controllers reachable without being logged in
-        private static readonly string[] PublicControllers = { "Account", "AttendanceApi" };
-
         private readonly PayrollDbContext _db;
 
         public AuthCheckFilter(PayrollDbContext db)
@@ -20,8 +17,9 @@ namespace RSDSystem.Filters
         public void OnActionExecuting(ActionExecutingContext context)
         {
             var controllerName = context.RouteData.Values["controller"]?.ToString();
+            var actionName = context.RouteData.Values["action"]?.ToString();
 
-            if (controllerName != null && PublicControllers.Contains(controllerName))
+            if (IsPublic(controllerName, actionName))
                 return;
 
             var userId = context.HttpContext.Session.GetString("UserId");
@@ -35,22 +33,62 @@ namespace RSDSystem.Filters
 
             if (int.TryParse(userId, out var id))
             {
-                var active = _db.Users.AsNoTracking()
-                    .Any(u => u.UserId == id && u.IsActive);
-                if (!active)
+                var account = _db.Users.AsNoTracking()
+                    .Where(u => u.UserId == id)
+                    .Select(u => new { u.IsActive, u.MustChangePassword, u.Role })
+                    .FirstOrDefault();
+
+                if (account == null || !account.IsActive)
                 {
                     context.HttpContext.Session.Clear();
                     Reject(context, "This account is inactive and cannot log in.", inactive: true);
                     return;
                 }
+
+                var mustChange = string.Equals(account.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
+                    && account.MustChangePassword;
+                var onChangePassword = string.Equals(controllerName, "Account", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(actionName, "ChangePassword", StringComparison.OrdinalIgnoreCase);
+                var onLogout = string.Equals(controllerName, "Account", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(actionName, "Logout", StringComparison.OrdinalIgnoreCase);
+
+                if (mustChange && !onChangePassword && !onLogout)
+                {
+                    if (WantsJson(context))
+                    {
+                        context.Result = new JsonResult(new
+                        {
+                            success = false,
+                            message = "Change your password before continuing."
+                        })
+                        {
+                            StatusCode = 401
+                        };
+                        return;
+                    }
+
+                    context.Result = new RedirectToActionResult("ChangePassword", "Account", null);
+                    return;
+                }
             }
 
-            // Keep PayrollStaff out of Admin-only areas
             var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll", "ActivityLog" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
                 context.Result = new RedirectToActionResult("Index", "PayrollStaff", null);
             }
+        }
+
+        private static bool IsPublic(string? controllerName, string? actionName)
+        {
+            if (string.Equals(controllerName, "AttendanceApi", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!string.Equals(controllerName, "Account", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return string.Equals(actionName, "Login", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actionName, "Logout", StringComparison.OrdinalIgnoreCase);
         }
 
         public void OnActionExecuted(ActionExecutedContext context) { }

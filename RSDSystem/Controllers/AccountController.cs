@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Authentication;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Services;
+using RSDSystem.Validation;
 
 namespace RSDSystem.Controllers
 {
@@ -23,13 +23,12 @@ namespace RSDSystem.Controllers
             _logs = logs;
         }
 
-        // GET: /Account/Login
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null, int? inactive = null)
+        public async Task<IActionResult> Login(string? returnUrl = null, int? inactive = null)
         {
-            var role = HttpContext.Session.GetString("Role");
-            if (role == "Admin") return RedirectToAction("Index", "Home");
-            if (role == "PayrollStaff") return RedirectToAction("Index", "PayrollStaff");
+            var signedIn = await SignedInDestinationAsync();
+            if (signedIn != null)
+                return signedIn;
 
             if (inactive == 1)
                 ViewBag.Error = "This account is inactive and cannot log in.";
@@ -39,7 +38,6 @@ namespace RSDSystem.Controllers
             return View();
         }
 
-        // POST: /Account/Login
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(string Username, string Password, string? returnUrl)
@@ -67,6 +65,70 @@ namespace RSDSystem.Controllers
                 ActivityTypes.Login,
                 ActivityModules.Authentication,
                 $"{user.FullName} signed in.");
+
+            if (MustChangeOwnPassword(user))
+                return RedirectToAction(nameof(ChangePassword));
+
+            return user.Role == "Admin"
+                ? RedirectToAction("Index", "Home")
+                : RedirectToAction("Index", "PayrollStaff");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ChangePassword()
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            BindChangePasswordView(user);
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangePassword(string CurrentPassword, string NewPassword, string ConfirmPassword)
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            BindChangePasswordView(user);
+
+            if (string.IsNullOrWhiteSpace(CurrentPassword) || !BCrypt.Net.BCrypt.Verify(CurrentPassword, user.PasswordHash))
+                ModelState.AddModelError("CurrentPassword", "Current password is incorrect.");
+
+            if (string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!InputRules.TryValidateStaffPassword(NewPassword, out var passwordError))
+                    ModelState.AddModelError("NewPassword", passwordError!);
+            }
+            else if (string.IsNullOrWhiteSpace(NewPassword) || NewPassword.Length < 8)
+            {
+                ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
+                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            if (!string.IsNullOrWhiteSpace(NewPassword)
+                && BCrypt.Net.BCrypt.Verify(NewPassword, user.PasswordHash))
+            {
+                ModelState.AddModelError("NewPassword", "Choose a password that is different from the current one.");
+            }
+
+            if (!ModelState.IsValid)
+                return View();
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
+            user.MustChangePassword = false;
+            await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.ChangePassword,
+                ActivityModules.Authentication,
+                $"{user.FullName} changed their password.");
+
+            TempData["Success"] = "Your password was changed. Use the new password the next time you sign in.";
             return user.Role == "Admin"
                 ? RedirectToAction("Index", "Home")
                 : RedirectToAction("Index", "PayrollStaff");
@@ -84,8 +146,6 @@ namespace RSDSystem.Controllers
                 HttpContext.Session.Remove("PhotoPath");
         }
 
-
-        // GET: /Account/Logout
         [HttpGet]
         public async Task<IActionResult> Logout()
         {
@@ -96,11 +156,41 @@ namespace RSDSystem.Controllers
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             HttpContext.Session.Clear();
 
-            // Optional: show a message after logout
             TempData["Success"] = "You have been logged out.";
-
-            // Redirect to the login page if you have one, otherwise to Home/Index.
             return RedirectToAction("Login", "Account");
+        }
+
+        private async Task<IActionResult?> SignedInDestinationAsync()
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return null;
+
+            if (MustChangeOwnPassword(user))
+                return RedirectToAction(nameof(ChangePassword));
+
+            return user.Role == "Admin"
+                ? RedirectToAction("Index", "Home")
+                : RedirectToAction("Index", "PayrollStaff");
+        }
+
+        private async Task<User?> CurrentUserAsync()
+        {
+            var userId = HttpContext.Session.GetString("UserId");
+            if (!int.TryParse(userId, out var id))
+                return null;
+
+            return await _db.Users.FirstOrDefaultAsync(u => u.UserId == id && u.IsActive);
+        }
+
+        private static bool MustChangeOwnPassword(User user) =>
+            string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
+            && user.MustChangePassword;
+
+        private void BindChangePasswordView(User user)
+        {
+            ViewBag.Forced = MustChangeOwnPassword(user);
+            ViewBag.IsStaff = string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

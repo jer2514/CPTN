@@ -202,6 +202,15 @@ END");
             Console.WriteLine("Activity log schema fix error: " + ex.Message);
         }
 
+        try
+        {
+            UserSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("User schema fix error: " + ex.Message);
+        }
+
         // Change these two values, then restart the app. The existing Admin
         // row is updated so login matches Program.cs (not only first-time seed).
         const string seedAdminUsername = "admin";

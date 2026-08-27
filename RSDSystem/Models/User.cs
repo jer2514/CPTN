@@ -78,6 +78,12 @@ namespace RSDSystem.Models
 
         public bool IsActive { get; set; } = true;
 
+        /// <summary>
+        /// True after Admin creates or resets a Payroll Staff password.
+        /// Staff must set their own password before using the rest of the app.
+        /// </summary>
+        public bool MustChangePassword { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
