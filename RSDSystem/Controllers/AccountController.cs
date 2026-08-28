@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using BCrypt.Net;
@@ -209,6 +210,55 @@ namespace RSDSystem.Controllers
                 return RedirectToAction(nameof(Login));
 
             return View(user);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Profile(string Username, string Email, string ContactNumber, string? Address)
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            var username = (Username ?? "").Trim();
+            var email = (Email ?? "").Trim();
+            var contact = (ContactNumber ?? "").Trim();
+            var address = string.IsNullOrWhiteSpace(Address) ? null : Address.Trim();
+
+            if (username.Length < 3)
+                ModelState.AddModelError("Username", "Username must be at least 3 characters.");
+            else if (await _db.Users.AnyAsync(u => u.Username == username && u.UserId != user.UserId))
+                ModelState.AddModelError("Username", "This username is already taken.");
+
+            if (string.IsNullOrEmpty(email))
+                ModelState.AddModelError("Email", "Email is required.");
+            else if (!new EmailAddressAttribute().IsValid(email))
+                ModelState.AddModelError("Email", "Enter a valid email address.");
+            else if (await _db.Users.AnyAsync(u => u.Email == email && u.UserId != user.UserId))
+                ModelState.AddModelError("Email", "This email is already registered.");
+
+            if (!InputRules.IsPhMobile(contact))
+                ModelState.AddModelError("ContactNumber", InputRules.PhMobileMessage);
+
+            if (address != null && !System.Text.RegularExpressions.Regex.IsMatch(address, InputRules.AddressPattern))
+                ModelState.AddModelError("Address", InputRules.AddressMessage);
+
+            user.Username = username;
+            user.Email = email;
+            user.ContactNumber = contact;
+            user.Address = address;
+
+            if (!ModelState.IsValid)
+                return View(user);
+
+            await _db.SaveChangesAsync();
+            await _logs.LogAsync(
+                ActivityTypes.EditUser,
+                ActivityModules.UserManagement,
+                $"{user.FullName} updated their profile.");
+
+            TempData["Success"] = "Your profile was saved. Admin User Management now shows these details.";
+            return RedirectToAction(nameof(Profile));
         }
 
         [HttpGet]
