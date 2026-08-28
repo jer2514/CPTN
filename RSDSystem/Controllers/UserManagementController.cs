@@ -13,12 +13,21 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly IWebHostEnvironment _env;
         private readonly ActivityLogService _logs;
+        private readonly EmailService _email;
+        private readonly PasswordLinkService _links;
 
-        public UserManagementController(PayrollDbContext db, IWebHostEnvironment env, ActivityLogService logs)
+        public UserManagementController(
+            PayrollDbContext db,
+            IWebHostEnvironment env,
+            ActivityLogService logs,
+            EmailService email,
+            PasswordLinkService links)
         {
             _db = db;
             _env = env;
             _logs = logs;
+            _email = email;
+            _links = links;
         }
 
         public static readonly string[] Roles = new[] { "Admin", "PayrollStaff" };
@@ -82,6 +91,8 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
+            ModelState.Remove("PasswordResetTokenHash");
+            ModelState.Remove("PasswordResetExpiry");
             user.Role = "PayrollStaff";
 
             if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
@@ -129,14 +140,25 @@ namespace RSDSystem.Controllers
 
             _db.Users.Add(user);
             user.UserCode = await GenerateUserCodeAsync();
-            user.MustChangePassword = false;
+            user.MustChangePassword = true;
             await _db.SaveChangesAsync();
+
+            var invite = await IssuePasswordLinkAsync(user, PasswordLinkService.InviteLifetime, isInvite: true);
             await _logs.LogAsync(
                 ActivityTypes.CreateUser,
                 ActivityModules.UserManagement,
                 $"Added payroll staff user {user.FullName} ({user.Username}).",
                 relatedId: user.UserId);
-            TempData["Success"] = "User added. They must use Forgot password on the login page with their username and email to create their password.";
+
+            if (invite.Sent)
+            {
+                TempData["Success"] = $"User added. A set-password link was emailed to {user.Email}.";
+            }
+            else
+            {
+                TempData["Success"] = "User added. Email was not sent — copy this link and give it to them.";
+                TempData["InviteLink"] = invite.Link;
+            }
             return RedirectToAction(nameof(Index));
         }
 
@@ -167,6 +189,8 @@ namespace RSDSystem.Controllers
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
+            ModelState.Remove("PasswordResetTokenHash");
+            ModelState.Remove("PasswordResetExpiry");
 
             var existing = await _db.Users.FindAsync(user.UserId);
             if (existing == null) return NotFound();
@@ -240,6 +264,57 @@ namespace RSDSystem.Controllers
 
             TempData["Success"] = "User updated successfully.";
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendInvite(int id)
+        {
+            var user = await _db.Users.FindAsync(id);
+            if (user == null)
+                return NotFound();
+
+            if (!user.IsActive)
+            {
+                TempData["Error"] = "Reactivate this account before sending a set-password email.";
+                return RedirectToAction(nameof(Edit), new { id });
+            }
+
+            if (string.IsNullOrWhiteSpace(user.Email))
+            {
+                TempData["Error"] = "This account has no email address.";
+                return RedirectToAction(nameof(Edit), new { id });
+            }
+
+            var invite = await IssuePasswordLinkAsync(user, PasswordLinkService.InviteLifetime, isInvite: true);
+            await _logs.LogAsync(
+                ActivityTypes.EditUser,
+                ActivityModules.UserManagement,
+                $"Sent a set-password email to {user.FullName} ({user.Username}).",
+                relatedId: user.UserId);
+
+            if (invite.Sent)
+            {
+                TempData["Success"] = $"A set-password link was emailed to {user.Email}.";
+            }
+            else
+            {
+                TempData["Success"] = "Email was not sent — copy this link and give it to them.";
+                TempData["InviteLink"] = invite.Link;
+            }
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+
+        private async Task<(bool Sent, string Link)> IssuePasswordLinkAsync(
+            User user, TimeSpan lifetime, bool isInvite)
+        {
+            var token = _links.Issue(user, lifetime);
+            await _db.SaveChangesAsync();
+            var link = Url.Action("SetPassword", "Account", new { token }, Request.Scheme, Request.Host.Value)
+                ?? throw new InvalidOperationException("Could not build the set-password URL.");
+            var sent = await _email.SendSetPasswordLinkAsync(
+                user.Email!, user.FullName, user.Username, link, isInvite);
+            return (sent.Sent, link);
         }
 
         // POST /UserManagement/Delete/{id}

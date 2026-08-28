@@ -1151,6 +1151,50 @@ select.form-ctrl {
     color: #266DF1;
 }
 
+.invite-link-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #EEF3FF;
+    border: 1px solid #C9DAFF;
+    color: #163F8B;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 16px;
+}
+
+.invite-link-box i {
+    margin-top: 2px;
+    color: #266DF1;
+    font-size: 18px;
+}
+
+.invite-link-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.invite-link-copy input {
+    width: 100%;
+    margin: 8px 0;
+    border: 1px solid #C9DAFF;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #163F8B;
+    background: #fff;
+}
+
+.invite-resend-form {
+    margin-top: 12px;
+}
+
+.invite-resend-form .btn-primary-blue-block {
+    background: #163F8B;
+}
+
 /* ── Edit page — photo circle preview ───────────────────── */
 /* ── Edit Employee layout (photo left + fields right) ────── */
 .edit-layout {

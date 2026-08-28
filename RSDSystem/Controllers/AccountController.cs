@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Authentication;
@@ -19,12 +17,18 @@ namespace RSDSystem.Controllers
         private readonly PayrollDbContext _db;
         private readonly ActivityLogService _logs;
         private readonly EmailService _email;
+        private readonly PasswordLinkService _links;
 
-        public AccountController(PayrollDbContext db, ActivityLogService logs, EmailService email)
+        public AccountController(
+            PayrollDbContext db,
+            ActivityLogService logs,
+            EmailService email,
+            PasswordLinkService links)
         {
             _db = db;
             _logs = logs;
             _email = email;
+            _links = links;
         }
 
         [HttpGet]
@@ -51,7 +55,9 @@ namespace RSDSystem.Controllers
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(Password, user.PasswordHash))
             {
-                ViewBag.Error = "Invalid username or password.";
+                ViewBag.Error = user != null && MustChangeOwnPassword(user)
+                    ? "This account does not have a password yet. Open the set-password link we emailed you, or use Forgot password."
+                    : "Invalid username or password.";
                 return View();
             }
 
@@ -115,92 +121,57 @@ namespace RSDSystem.Controllers
                 return View();
             }
 
-            var sent = await StartEmailVerificationAsync(user);
-            if (!sent.Sent)
-            {
-                ViewBag.Error = sent.Error ?? "Could not send the verification email.";
-                return View();
-            }
+            var issued = await IssuePasswordLinkAsync(user, PasswordLinkService.ResetLifetime, isInvite: false);
+            HttpContext.Session.SetString(ResetMaskedEmailKey, MaskEmail(user.Email));
+            if (!issued.Sent)
+                HttpContext.Session.SetString(ResetDisplayLinkKey, issued.Link);
+            else
+                HttpContext.Session.Remove(ResetDisplayLinkKey);
 
-            return RedirectToAction(nameof(VerifyResetCode));
+            return RedirectToAction(nameof(CheckEmail));
         }
 
         [HttpGet]
-        public async Task<IActionResult> VerifyResetCode()
+        public IActionResult CheckEmail()
         {
-            var user = await PasswordResetUserAsync();
-            if (user == null)
-            {
-                TempData["Error"] = "Your reset session expired. Enter your username and email again.";
-                return RedirectToAction(nameof(ForgotPassword));
-            }
-
-            BindVerifyView();
+            ViewBag.MaskedEmail = HttpContext.Session.GetString(ResetMaskedEmailKey) ?? "your email";
+            ViewBag.DisplayLink = HttpContext.Session.GetString(ResetDisplayLinkKey);
             return View();
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> VerifyResetCode(string Code, string? resend)
-        {
-            var user = await PasswordResetUserAsync();
-            if (user == null)
-            {
-                TempData["Error"] = "Your reset session expired. Enter your username and email again.";
-                return RedirectToAction(nameof(ForgotPassword));
-            }
-
-            if (string.Equals(resend, "1", StringComparison.Ordinal))
-            {
-                var sent = await StartEmailVerificationAsync(user);
-                BindVerifyView();
-                if (!sent.Sent)
-                    ViewBag.Error = sent.Error ?? "Could not send the verification email.";
-                else
-                    ViewBag.Info = "A new code was sent to your email.";
-                return View();
-            }
-
-            var entered = (Code ?? "").Trim();
-            var expected = HttpContext.Session.GetString(ResetCodeHashKey);
-            if (string.IsNullOrEmpty(entered) || string.IsNullOrEmpty(expected)
-                || !FixedEquals(HashResetCode(entered, user.UserId), expected))
-            {
-                BindVerifyView();
-                ViewBag.Error = "That code is incorrect. Check the email and try again.";
-                return View();
-            }
-
-            HttpContext.Session.SetString(ResetVerifiedKey, "1");
-            HttpContext.Session.Remove(ResetDisplayCodeKey);
-            return RedirectToAction(nameof(ResetPassword));
-        }
+        [HttpGet]
+        public IActionResult VerifyResetCode() => RedirectToAction(nameof(ForgotPassword));
 
         [HttpGet]
-        public async Task<IActionResult> ResetPassword()
+        public IActionResult ResetPassword() => RedirectToAction(nameof(ForgotPassword));
+
+        [HttpGet]
+        public async Task<IActionResult> SetPassword(string? token)
         {
-            var user = await PasswordResetUserAsync(requireVerified: true);
+            var user = await _links.FindValidAsync(token);
             if (user == null)
             {
-                TempData["Error"] = "Confirm the code from your email before creating a new password.";
-                return RedirectToAction(nameof(ForgotPassword));
+                ViewBag.Invalid = true;
+                return View();
             }
 
+            ViewBag.Token = token;
             BindResetPasswordView(user);
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ResetPassword(string NewPassword, string ConfirmPassword)
+        public async Task<IActionResult> SetPassword(string? token, string NewPassword, string ConfirmPassword)
         {
-            var user = await PasswordResetUserAsync(requireVerified: true);
+            var user = await _links.FindValidAsync(token);
             if (user == null)
             {
-                TempData["Error"] = "Confirm the code from your email before creating a new password.";
-                return RedirectToAction(nameof(ForgotPassword));
+                ViewBag.Invalid = true;
+                return View();
             }
 
+            ViewBag.Token = token;
             BindResetPasswordView(user);
             ValidateChosenPassword(user, NewPassword, ConfirmPassword);
 
@@ -209,22 +180,22 @@ namespace RSDSystem.Controllers
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
             user.MustChangePassword = false;
+            _links.Clear(user);
             await _db.SaveChangesAsync();
             var notifyEmail = user.Email;
             var notifyName = user.FullName;
-            ClearPasswordReset();
             await _logs.LogAsync(
                 user.UserId,
                 notifyName,
                 user.Role,
                 ActivityTypes.ResetPassword,
                 ActivityModules.Authentication,
-                $"{notifyName} reset their password.");
+                $"{notifyName} set their password from an email link.");
 
             if (!string.IsNullOrWhiteSpace(notifyEmail))
                 await _email.SendPasswordChangedAsync(notifyEmail, notifyName);
 
-            TempData["Success"] = "Your password was saved. Sign in with the new password. A confirmation was sent to your email.";
+            TempData["Success"] = "Your password was saved. Sign in with the new password.";
             return RedirectToAction(nameof(Login));
         }
 
@@ -346,45 +317,16 @@ namespace RSDSystem.Controllers
             ViewBag.IsStaff = string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
         }
 
-        private void BindVerifyView()
+        private async Task<(bool Sent, string Link)> IssuePasswordLinkAsync(
+            User user, TimeSpan lifetime, bool isInvite)
         {
-            ViewBag.MaskedEmail = HttpContext.Session.GetString(ResetMaskedEmailKey) ?? "your email";
-            ViewBag.DisplayCode = HttpContext.Session.GetString(ResetDisplayCodeKey);
-        }
-
-        private async Task<(bool Sent, string? Error)> StartEmailVerificationAsync(User user)
-        {
-            var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-            BeginPasswordReset(user.UserId);
-            HttpContext.Session.SetString(ResetCodeHashKey, HashResetCode(code, user.UserId));
-            HttpContext.Session.SetString(ResetMaskedEmailKey, MaskEmail(user.Email));
-            HttpContext.Session.Remove(ResetVerifiedKey);
-
-            var sent = await _email.SendVerificationCodeAsync(user.Email!, user.FullName, code);
-            if (!sent.Sent)
-            {
-                if (_email.IsConfigured)
-                    return sent;
-
-                HttpContext.Session.SetString(ResetDisplayCodeKey, code);
-                return (true, null);
-            }
-
-            HttpContext.Session.Remove(ResetDisplayCodeKey);
-            return (true, null);
-        }
-
-        private static string HashResetCode(string code, int userId)
-        {
-            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(code.Trim() + ":" + userId));
-            return Convert.ToHexString(bytes);
-        }
-
-        private static bool FixedEquals(string left, string right)
-        {
-            var a = Encoding.UTF8.GetBytes(left);
-            var b = Encoding.UTF8.GetBytes(right);
-            return a.Length == b.Length && CryptographicOperations.FixedTimeEquals(a, b);
+            var token = _links.Issue(user, lifetime);
+            await _db.SaveChangesAsync();
+            var link = Url.Action(nameof(SetPassword), "Account", new { token }, Request.Scheme, Request.Host.Value)
+                ?? throw new InvalidOperationException("Could not build the set-password URL.");
+            var sent = await _email.SendSetPasswordLinkAsync(
+                user.Email!, user.FullName, user.Username, link, isInvite);
+            return (sent.Sent, link);
         }
 
         private static string MaskEmail(string? email)
@@ -396,12 +338,8 @@ namespace RSDSystem.Controllers
             return value[0] + new string('*', Math.Max(1, at - 1)) + value[at..];
         }
 
-        private const string ResetUserIdKey = "PasswordResetUserId";
-        private const string ResetUntilKey = "PasswordResetUntil";
-        private const string ResetCodeHashKey = "PasswordResetCodeHash";
-        private const string ResetVerifiedKey = "PasswordResetVerified";
         private const string ResetMaskedEmailKey = "PasswordResetMaskedEmail";
-        private const string ResetDisplayCodeKey = "PasswordResetDisplayCode";
+        private const string ResetDisplayLinkKey = "PasswordResetDisplayLink";
 
         private void ValidateChosenPassword(User user, string? newPassword, string? confirmPassword)
         {
@@ -423,43 +361,6 @@ namespace RSDSystem.Controllers
             {
                 ModelState.AddModelError("NewPassword", "Choose a password that is different from the current one.");
             }
-        }
-
-        private void BeginPasswordReset(int userId)
-        {
-            HttpContext.Session.SetInt32(ResetUserIdKey, userId);
-            HttpContext.Session.SetString(
-                ResetUntilKey,
-                DateTime.UtcNow.AddMinutes(10).ToString("O"));
-        }
-
-        private async Task<User?> PasswordResetUserAsync(bool requireVerified = false)
-        {
-            var id = HttpContext.Session.GetInt32(ResetUserIdKey);
-            var untilRaw = HttpContext.Session.GetString(ResetUntilKey);
-            if (id == null
-                || string.IsNullOrEmpty(untilRaw)
-                || !DateTime.TryParse(untilRaw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var until)
-                || until < DateTime.UtcNow)
-            {
-                ClearPasswordReset();
-                return null;
-            }
-
-            if (requireVerified && HttpContext.Session.GetString(ResetVerifiedKey) != "1")
-                return null;
-
-            return await _db.Users.FirstOrDefaultAsync(u => u.UserId == id && u.IsActive);
-        }
-
-        private void ClearPasswordReset()
-        {
-            HttpContext.Session.Remove(ResetUserIdKey);
-            HttpContext.Session.Remove(ResetUntilKey);
-            HttpContext.Session.Remove(ResetCodeHashKey);
-            HttpContext.Session.Remove(ResetVerifiedKey);
-            HttpContext.Session.Remove(ResetMaskedEmailKey);
-            HttpContext.Session.Remove(ResetDisplayCodeKey);
         }
     }
 }

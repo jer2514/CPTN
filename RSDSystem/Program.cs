@@ -43,7 +43,12 @@ builder.Services.AddHttpClient("PayrollPrediction", client =>
 builder.Services.AddScoped<PayrollPredictionService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ActivityLogService>();
+builder.Services.AddHttpClient("EmailApi", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<PasswordLinkService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
