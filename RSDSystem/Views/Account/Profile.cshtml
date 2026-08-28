@@ -9,6 +9,8 @@
         .Take(2)
         .Select(w => char.ToUpper(w[0])));
     string Dash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
+    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
     var backHref = isStaff
         ? Url.Action("Index", "PayrollStaff")
         : Url.Action("Index", "Home");
@@ -44,47 +46,69 @@
         </div>
     </div>
 
-    <div class="profile-view-grid">
-        <div>
-            <div class="profile-view-label">Username</div>
-            <div class="profile-view-value">@Dash(Model.Username)</div>
-        </div>
-        <div>
-            <div class="profile-view-label">Email</div>
-            <div class="profile-view-value">@Dash(Model.Email)</div>
-        </div>
-        <div>
-            <div class="profile-view-label">Contact Number</div>
-            <div class="profile-view-value">@Dash(Model.ContactNumber)</div>
-        </div>
-        <div>
-            <div class="profile-view-label">Gender</div>
-            <div class="profile-view-value">@Dash(Model.Gender)</div>
-        </div>
-        <div>
-            <div class="profile-view-label">Date of Birth</div>
-            <div class="profile-view-value">
-                @(Model.DateOfBirth.HasValue
-                    ? Model.DateOfBirth.Value.ToString("MMMM d, yyyy")
-                    : "—")
+    <form asp-controller="Account" asp-action="Profile" method="post" class="js-validate" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div class="profile-view-grid">
+            <div>
+                <label class="profile-view-label" for="Username">Username <span class="req-star">*</span></label>
+                <input id="Username" type="text" name="Username" value="@Model.Username" maxlength="50"
+                       class="@Ctrl("Username")" data-validate="required" data-label="Username"
+                       autocomplete="username" />
+                <span class="field-error" data-error-for="Username">@Err("Username")</span>
+            </div>
+            <div>
+                <label class="profile-view-label" for="Email">Email <span class="req-star">*</span></label>
+                <input id="Email" type="email" name="Email" value="@Model.Email" maxlength="100"
+                       class="@Ctrl("Email")" data-validate="required|email" data-label="Email"
+                       autocomplete="email" />
+                <span class="field-error" data-error-for="Email">@Err("Email")</span>
+            </div>
+            <div>
+                <label class="profile-view-label" for="ContactNumber">Contact Number <span class="req-star">*</span></label>
+                <input id="ContactNumber" type="text" name="ContactNumber" value="@Model.ContactNumber" maxlength="11"
+                       inputmode="numeric" class="@Ctrl("ContactNumber")"
+                       data-validate="required|phone" data-label="Contact number"
+                       placeholder="09XXXXXXXXX" />
+                <span class="field-error" data-error-for="ContactNumber">@Err("ContactNumber")</span>
+            </div>
+            <div>
+                <div class="profile-view-label">Gender</div>
+                <div class="profile-view-value">@Dash(Model.Gender)</div>
+            </div>
+            <div>
+                <div class="profile-view-label">Date of Birth</div>
+                <div class="profile-view-value">
+                    @(Model.DateOfBirth.HasValue
+                        ? Model.DateOfBirth.Value.ToString("MMMM d, yyyy")
+                        : "—")
+                </div>
+            </div>
+            <div>
+                <div class="profile-view-label">Age</div>
+                <div class="profile-view-value">@(Model.Age?.ToString() ?? "—")</div>
+            </div>
+            <div class="profile-view-wide">
+                <label class="profile-view-label" for="Address">Address</label>
+                <input id="Address" type="text" name="Address" value="@Model.Address" maxlength="250"
+                       class="@Ctrl("Address")" data-validate="address" data-label="Address"
+                       placeholder="Barangay, Municipality/City, Province" />
+                <span class="field-error" data-error-for="Address">@Err("Address")</span>
             </div>
         </div>
-        <div>
-            <div class="profile-view-label">Age</div>
-            <div class="profile-view-value">@(Model.Age?.ToString() ?? "—")</div>
-        </div>
-        <div class="profile-view-wide">
-            <div class="profile-view-label">Address</div>
-            <div class="profile-view-value">@Dash(Model.Address)</div>
-        </div>
-    </div>
 
-    <div class="profile-view-actions">
-        <a asp-controller="Account" asp-action="ChangePassword" class="btn-primary-blue">
-            <i class="bi bi-key-fill"></i> Change Password
-        </a>
-        <a asp-controller="Account" asp-action="Logout" class="btn-signout">
-            <i class="bi bi-box-arrow-right"></i> Sign out
-        </a>
-    </div>
+        <div class="profile-view-actions">
+            <button type="submit" class="btn-primary-blue">Save changes</button>
+            <a asp-controller="Account" asp-action="ChangePassword" class="btn-outline-blue">
+                <i class="bi bi-key-fill"></i> Change Password
+            </a>
+            <a asp-controller="Account" asp-action="Logout" class="btn-signout">
+                <i class="bi bi-box-arrow-right"></i> Sign out
+            </a>
+        </div>
+    </form>
 </div>
+
+@section Scripts {
+    <partial name="_FormValidationScripts" />
+}
