@@ -158,6 +158,7 @@ namespace RSDSystem.Controllers
             {
                 TempData["Success"] = "User added. Email was not sent — copy this link and give it to them.";
                 TempData["InviteLink"] = invite.Link;
+                TempData["InviteError"] = invite.Error;
             }
             return RedirectToAction(nameof(Index));
         }
@@ -301,11 +302,12 @@ namespace RSDSystem.Controllers
             {
                 TempData["Success"] = "Email was not sent — copy this link and give it to them.";
                 TempData["InviteLink"] = invite.Link;
+                TempData["InviteError"] = invite.Error;
             }
             return RedirectToAction(nameof(Edit), new { id });
         }
 
-        private async Task<(bool Sent, string Link)> IssuePasswordLinkAsync(
+        private async Task<(bool Sent, string Link, string? Error)> IssuePasswordLinkAsync(
             User user, TimeSpan lifetime, bool isInvite)
         {
             var token = _links.Issue(user, lifetime);
@@ -314,7 +316,7 @@ namespace RSDSystem.Controllers
                 ?? throw new InvalidOperationException("Could not build the set-password URL.");
             var sent = await _email.SendSetPasswordLinkAsync(
                 user.Email!, user.FullName, user.Username, link, isInvite);
-            return (sent.Sent, link);
+            return (sent.Sent, link, sent.Error);
         }
 
         // POST /UserManagement/Delete/{id}

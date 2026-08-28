@@ -3,7 +3,11 @@
     <div class="invite-link-box" id="inviteLinkBox">
         <i class="bi bi-link-45deg"></i>
         <div class="invite-link-copy">
-            <div>Email was not sent. Copy this set-password link and give it to the staff member:</div>
+            <div>Email was not sent. Copy this set-password link and give it to the staff member.</div>
+            @if (TempData["InviteError"] is string inviteError && !string.IsNullOrWhiteSpace(inviteError))
+            {
+                <div class="invite-link-reason">@inviteError</div>
+            }
             <input id="inviteLinkInput" type="text" readonly value="@inviteLink" />
             <button type="button" class="btn-outline-blue" id="copyInviteLink">Copy link</button>
         </div>
