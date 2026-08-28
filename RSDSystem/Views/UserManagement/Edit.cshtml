@@ -125,16 +125,23 @@
                 <div class="form-row form-row-1">
                     <div>
                         <label class="form-lbl">Username <span class="req-star">*</span></label>
-                        <input type="text" name="Username" value="@Model.Username" maxlength="50"
-                               class="@Ctrl("Username")" data-validate="required" data-label="Username" />
-                        <span class="field-error" data-error-for="Username">@Err("Username")</span>
+                        @if (string.Equals(Model.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <input type="text" class="form-ctrl" value="@Model.Username" readonly />
+                            <input type="hidden" name="Username" value="@Model.Username" />
+                        }
+                        else
+                        {
+                            <input type="text" name="Username" value="@Model.Username" maxlength="50"
+                                   class="@Ctrl("Username")" data-validate="required" data-label="Username" />
+                            <span class="field-error" data-error-for="Username">@Err("Username")</span>
+                        }
                     </div>
                 </div>
 
                 <div class="form-hint-box">
                     <i class="bi bi-info-circle-fill"></i>
                     Passwords are private. Admin cannot view or change them.
-                    Send a set-password email, or they can use <strong>Forgot password</strong> on the login page.
                 </div>
 
                 <div class="form-row form-row-2">

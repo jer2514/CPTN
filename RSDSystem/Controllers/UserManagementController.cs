@@ -195,11 +195,20 @@ namespace RSDSystem.Controllers
             var existing = await _db.Users.FindAsync(user.UserId);
             if (existing == null) return NotFound();
 
+            var staffUsernameLocked = string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
+            if (staffUsernameLocked)
+            {
+                user.Username = existing.Username;
+                ModelState.Remove("Username");
+            }
+
             if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
                 ModelState.AddModelError("photo", photoError);
 
-            var username = user.Username?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(username))
+            var username = staffUsernameLocked
+                ? existing.Username
+                : (user.Username?.Trim() ?? string.Empty);
+            if (!staffUsernameLocked && !string.IsNullOrEmpty(username))
             {
                 var usernameTaken = await _db.Users
                     .AnyAsync(u => u.Username == username && u.UserId != user.UserId);
