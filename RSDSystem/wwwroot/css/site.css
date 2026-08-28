@@ -1067,7 +1067,7 @@ a.profile-card {
 
     .form-ctrl:disabled,
     .form-ctrl.is-disabled,
-    .form-ctrl:read-only {
+    input.form-ctrl:read-only {
         background: #e9edf3;
         color: #8b93a7;
         border-color: #d5dbe6;
