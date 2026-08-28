@@ -169,6 +169,11 @@ namespace RSDSystem.Models
             projects.Where(p => p.Status == OnGoing || p.Status == "Active"
                 || p.Status == null || p.Status == "");
 
+        public static IQueryable<Project> ForAttendanceView(this IQueryable<Project> projects) =>
+            projects.Where(p => p.Status == OnGoing || p.Status == "Active"
+                || p.Status == null || p.Status == ""
+                || p.Status == Finished || p.Status == "Completed");
+
         public static IQueryable<Project> WithStatus(this IQueryable<Project> projects, string? status)
         {
             var filter = Normalize(status);

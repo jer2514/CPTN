@@ -9,7 +9,7 @@ namespace RSDSystem.Controllers
     public class AttendanceController : Controller
     {
         private const string FinishedAttendanceMessage =
-            "Finished projects cannot be opened in Attendance Records.";
+            "Finished projects cannot import or change attendance records.";
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };
 
         private readonly PayrollDbContext _db;
@@ -35,14 +35,14 @@ namespace RSDSystem.Controllers
                 return RedirectToAction(nameof(Records));
 
             ViewBag.PageTitle = "Import Attendance";
-            return View(await LoadProjectsAsync());
+            return View(await LoadProjectsAsync(includeFinished: false));
         }
 
         public async Task<IActionResult> Records()
         {
             ViewBag.PageTitle = "Attendance Records";
             ViewBag.IsAdmin = IsAdmin;
-            return View(await LoadProjectsAsync());
+            return View(await LoadProjectsAsync(includeFinished: true));
         }
 
         public async Task<IActionResult> Summary()
@@ -52,7 +52,7 @@ namespace RSDSystem.Controllers
 
             ViewBag.PageTitle = "Attendance Summary";
             ViewBag.IsAdmin = true;
-            return View(await LoadProjectsAsync());
+            return View(await LoadProjectsAsync(includeFinished: true));
         }
 
         [HttpPost]
@@ -166,7 +166,7 @@ namespace RSDSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPeriods(int projectId)
         {
-            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            var (project, blocked) = await RequireProjectAsync(projectId);
             if (blocked != null)
                 return blocked;
 
@@ -175,6 +175,8 @@ namespace RSDSystem.Controllers
             {
                 success = true,
                 projectName = project!.ProjectName,
+                isFinished = ProjectStatusOptions.IsFinished(project.Status),
+                status = ProjectStatusOptions.Normalize(project.Status),
                 periods = periods.Select(p => new
                 {
                     key = p.Key,
@@ -191,7 +193,7 @@ namespace RSDSystem.Controllers
             int projectId, string? search, string? status, int page = 1,
             string? periodStart = null, string? periodEnd = null)
         {
-            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            var (project, blocked) = await RequireProjectAsync(projectId);
             if (blocked != null)
                 return blocked;
 
@@ -231,6 +233,8 @@ namespace RSDSystem.Controllers
             {
                 success = true,
                 projectName = project!.ProjectName,
+                isFinished = ProjectStatusOptions.IsFinished(project.Status),
+                status = ProjectStatusOptions.Normalize(project.Status),
                 periodLabel = start.HasValue && end.HasValue
                     ? AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end)
                     : null,
@@ -278,7 +282,7 @@ namespace RSDSystem.Controllers
             if (!IsAdmin)
                 return Json(new { success = false, message = "Attendance summary is available to admin only." });
 
-            var (project, blocked) = await RequireOngoingProjectAsync(projectId);
+            var (project, blocked) = await RequireProjectAsync(projectId);
             if (blocked != null)
                 return blocked;
 
@@ -295,6 +299,8 @@ namespace RSDSystem.Controllers
             {
                 success = true,
                 projectName = project!.ProjectName,
+                isFinished = ProjectStatusOptions.IsFinished(project.Status),
+                status = ProjectStatusOptions.Normalize(project.Status),
                 periodLabel = AttendanceDisplay.LongDate(start) + " - " + AttendanceDisplay.LongDate(end),
                 importedBy = summary.ImportedBy,
                 total = summary.Total,
@@ -497,9 +503,10 @@ namespace RSDSystem.Controllers
             });
         }
 
-        private async Task<List<Project>> LoadProjectsAsync()
+        private async Task<List<Project>> LoadProjectsAsync(bool includeFinished)
         {
-            var query = _db.Projects.AsNoTracking().Ongoing();
+            IQueryable<Project> query = _db.Projects.AsNoTracking();
+            query = includeFinished ? query.ForAttendanceView() : query.Ongoing();
             var role = HttpContext.Session.GetString("Role");
             if (role != "PayrollStaff")
                 return await query.OrderBy(p => p.ProjectName).ToListAsync();
@@ -515,13 +522,21 @@ namespace RSDSystem.Controllers
                 .ToListAsync();
         }
 
-        private async Task<(Project? Project, IActionResult? Error)> RequireOngoingProjectAsync(int projectId)
+        private async Task<(Project? Project, IActionResult? Error)> RequireProjectAsync(int projectId)
         {
             var project = await _db.Projects.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ProjectId == projectId);
             if (project == null)
                 return (null, Json(new { success = false, message = "Project not found." }));
-            if (ProjectStatusOptions.IsFinished(project.Status))
+            return (project, null);
+        }
+
+        private async Task<(Project? Project, IActionResult? Error)> RequireOngoingProjectAsync(int projectId)
+        {
+            var (project, missing) = await RequireProjectAsync(projectId);
+            if (missing != null)
+                return (null, missing);
+            if (ProjectStatusOptions.IsFinished(project!.Status))
                 return (null, Json(new { success = false, message = FinishedAttendanceMessage }));
             return (project, null);
         }

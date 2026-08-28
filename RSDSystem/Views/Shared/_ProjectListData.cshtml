@@ -2,7 +2,13 @@
 @{
     var items = Model ?? Enumerable.Empty<RSDSystem.Models.Project>();
     var json = System.Text.Json.JsonSerializer.Serialize(
-        items.Select(p => new { id = p.ProjectId, name = p.ProjectName ?? "" }))
+        items.Select(p => new
+        {
+            id = p.ProjectId,
+            name = p.ProjectName ?? "",
+            status = ProjectStatusOptions.Normalize(p.Status),
+            isFinished = ProjectStatusOptions.IsFinished(p.Status)
+        }))
         .Replace("<", "\\u003C");
 }
 <script type="application/json" id="project-list-data">@Html.Raw(json)</script>

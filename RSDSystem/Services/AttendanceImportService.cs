@@ -34,7 +34,7 @@ namespace RSDSystem.Services
             {
                 return new AttendancePreviewResult
                 {
-                    Error = "Finished projects cannot import or open attendance records."
+                    Error = "Finished projects cannot import attendance."
                 };
             }
 
