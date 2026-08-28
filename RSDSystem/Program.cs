@@ -43,6 +43,7 @@ builder.Services.AddHttpClient("PayrollPrediction", client =>
 builder.Services.AddScoped<PayrollPredictionService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ActivityLogService>();
+builder.Services.AddScoped<EmailService>();
 
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
