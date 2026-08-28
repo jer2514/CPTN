@@ -7,16 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="..\prediction-api\**\*"
-             Exclude="..\prediction-api\**\__pycache__\**;..\prediction-api\**\*.pyc;..\prediction-api\**\.venv\**"
-             CopyToOutputDirectory="PreserveNewest"
-             Link="prediction-api\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Content Include="..\prediction-api\**\*" Exclude="..\prediction-api\**\__pycache__\**;..\prediction-api\**\*.pyc;..\prediction-api\**\.venv\**" CopyToOutputDirectory="PreserveNewest" Link="prediction-api\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="ExcelDataReader" Version="3.7.0" />
     <PackageReference Include="ExcelDataReader.DataSet" Version="3.7.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
