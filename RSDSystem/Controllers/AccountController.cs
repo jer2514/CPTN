@@ -161,7 +161,7 @@ namespace RSDSystem.Controllers
                 return View();
             }
 
-            var entered = (Code ?? "").Trim();
+            var entered = new string((Code ?? "").Where(char.IsDigit).ToArray());
             var expected = HttpContext.Session.GetString(ResetCodeHashKey);
             if (string.IsNullOrEmpty(entered) || string.IsNullOrEmpty(expected)
                 || !FixedEquals(HashResetCode(entered, user.UserId), expected))
