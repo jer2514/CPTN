@@ -6,7 +6,7 @@
 }
 
 @section Styles {
-    <link rel="stylesheet" href="~/css/login.css?v=7" />
+    <link rel="stylesheet" href="~/css/login.css?v=8" />
 }
 
 <div class="login-page">
@@ -30,9 +30,10 @@
                 <div class="login-info" role="status">
                     <i class="bi bi-info-circle-fill"></i>
                     <span>
-                        SMTP email is not set yet, so the code is shown here:
-                        <strong class="login-code-fallback">@displayCode</strong>.
-                        After you add Gmail SMTP in appsettings, this code will only arrive in your inbox.
+                        SMTP is not set, so Gmail did not get this code yet.
+                        Type this 6-digit code: <strong class="login-code-fallback">@displayCode</strong>.
+                        To send it to your inbox, add your Gmail and App Password in
+                        <code>appsettings.json</code> under <code>Smtp:User</code> and <code>Smtp:Password</code>, then restart the app.
                     </span>
                 </div>
             }
