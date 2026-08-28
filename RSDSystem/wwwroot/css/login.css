@@ -257,6 +257,13 @@
     font-size: 16px;
 }
 
+.login-fallback-link {
+    display: inline;
+    font-weight: 700;
+    color: #163F8B;
+    word-break: break-all;
+}
+
 .login-form .btn-back {
     width: 100%;
     justify-content: center;

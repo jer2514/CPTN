@@ -1,0 +1,44 @@
+@{
+    Layout = "_AuthLayout";
+    ViewData["Title"] = "Check Email";
+    var masked = ViewBag.MaskedEmail as string ?? "your email";
+    var displayLink = ViewBag.DisplayLink as string;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/login.css?v=8" />
+}
+
+<div class="login-page">
+    <div class="login-shell">
+        <aside class="login-brand">
+            <img src="~/Uploads/Images/RSDLogoWhite.png" alt="RSD Construction Services" class="login-logo" />
+            <h1 class="login-brand-title">RSD Payroll System</h1>
+            <p class="login-brand-copy">
+                Open the email and click the button. You do not type a code.
+            </p>
+        </aside>
+
+        <section class="login-panel">
+            <div class="login-panel-head">
+                <h2>Check your email</h2>
+                <p>We sent a set-password link to <strong>@masked</strong>. Click that link to create your password.</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(displayLink))
+            {
+                <div class="login-info" role="status">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span>
+                        Email is not sending from this server yet, so use this link now:
+                        <a class="login-fallback-link" href="@displayLink">Create your password</a>
+                    </span>
+                </div>
+            }
+
+            <a asp-controller="Account" asp-action="Login" class="btn-back" style="margin-top:8px">
+                <i class="bi bi-arrow-left"></i> Back to sign in
+            </a>
+        </section>
+    </div>
+</div>

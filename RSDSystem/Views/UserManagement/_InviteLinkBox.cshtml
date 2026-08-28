@@ -1,0 +1,25 @@
+@if (TempData["InviteLink"] is string inviteLink && !string.IsNullOrWhiteSpace(inviteLink))
+{
+    <div class="invite-link-box" id="inviteLinkBox">
+        <i class="bi bi-link-45deg"></i>
+        <div class="invite-link-copy">
+            <div>Email was not sent. Copy this set-password link and give it to the staff member:</div>
+            <input id="inviteLinkInput" type="text" readonly value="@inviteLink" />
+            <button type="button" class="btn-outline-blue" id="copyInviteLink">Copy link</button>
+        </div>
+    </div>
+    <script>
+        document.getElementById('copyInviteLink')?.addEventListener('click', async function () {
+            const input = document.getElementById('inviteLinkInput');
+            if (!input) return;
+            try {
+                await navigator.clipboard.writeText(input.value);
+                this.textContent = 'Copied';
+            } catch {
+                input.select();
+                document.execCommand('copy');
+                this.textContent = 'Copied';
+            }
+        });
+    </script>
+}

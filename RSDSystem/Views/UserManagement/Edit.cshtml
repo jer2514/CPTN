@@ -22,6 +22,7 @@
 </div>
 
 <div class="form-card">
+    <partial name="_InviteLinkBox" />
     <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
         @Html.AntiForgeryToken()
         @if (generalErrors.Count > 0)
@@ -133,7 +134,7 @@
                 <div class="form-hint-box">
                     <i class="bi bi-info-circle-fill"></i>
                     Passwords are private. Admin cannot view or change them.
-                    The user can use <strong>Forgot password</strong> on the login page if they forget it.
+                    Send a set-password email, or they can use <strong>Forgot password</strong> on the login page.
                 </div>
 
                 <div class="form-row form-row-2">
@@ -185,9 +186,14 @@
                 </div>
 
                 <button type="submit" class="btn-primary-blue-block">Save Changes</button>
-
             </div>
         </div>
+    </form>
+
+    <form asp-action="SendInvite" method="post" class="invite-resend-form">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.UserId" />
+        <button type="submit" class="btn-primary-blue-block">Send set-password email</button>
     </form>
 
     <!-- Hidden form for toggle submission -->

@@ -79,10 +79,16 @@ namespace RSDSystem.Models
         public bool IsActive { get; set; } = true;
 
         /// <summary>
-        /// True after Admin used to create or reset a Payroll Staff password.
-        /// New staff now set their own password with Forgot password instead.
+        /// True until the user finishes the emailed set-password link
+        /// (or an older Admin-set password that still needs changing).
         /// </summary>
         public bool MustChangePassword { get; set; }
+
+        /// <summary>SHA-256 hex of a one-click set-password token. Null when unused.</summary>
+        [MaxLength(64)]
+        public string? PasswordResetTokenHash { get; set; }
+
+        public DateTime? PasswordResetExpiry { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 

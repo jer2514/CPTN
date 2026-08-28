@@ -1,4 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -9,14 +12,22 @@ namespace RSDSystem.Services
     {
         private readonly IConfiguration _config;
         private readonly ILogger<EmailService> _log;
+        private readonly IHttpClientFactory _httpFactory;
 
-        public EmailService(IConfiguration config, ILogger<EmailService> log)
+        public EmailService(
+            IConfiguration config,
+            ILogger<EmailService> log,
+            IHttpClientFactory httpFactory)
         {
             _config = config;
             _log = log;
+            _httpFactory = httpFactory;
         }
 
-        public bool IsConfigured
+        public bool IsApiConfigured =>
+            !string.IsNullOrWhiteSpace(_config["Email:ApiKey"]);
+
+        public bool IsSmtpConfigured
         {
             get
             {
@@ -29,21 +40,41 @@ namespace RSDSystem.Services
             }
         }
 
-        public async Task<(bool Sent, string? Error)> SendVerificationCodeAsync(
-            string toEmail, string fullName, string code, CancellationToken cancellationToken = default)
+        public bool IsConfigured => IsApiConfigured || IsSmtpConfigured;
+
+        public async Task<(bool Sent, string? Error)> SendSetPasswordLinkAsync(
+            string toEmail, string fullName, string username, string setPasswordUrl,
+            bool isInvite, CancellationToken cancellationToken = default)
         {
-            var subject = "RSD Payroll: confirm it's you";
+            var heading = isInvite ? "Create your password" : "Reset your password";
+            var subject = isInvite
+                ? "RSD Payroll: create your password"
+                : "RSD Payroll: reset your password";
+            var intro = isInvite
+                ? "Admin created your RSD Payroll account. Click the button below to choose your password. You do not need a code."
+                : "Use the button below to choose a new password. You do not need a code.";
+            var expiry = isInvite ? "48 hours" : "2 hours";
+            var encodedUrl = WebUtility.HtmlEncode(setPasswordUrl);
+            var encodedName = WebUtility.HtmlEncode(fullName);
+            var encodedUser = WebUtility.HtmlEncode(username);
+
             var text = $"Hi {fullName},\n\n"
-                + "Use this code to confirm your identity and create a new password:\n\n"
-                + $"    {code}\n\n"
-                + "This code expires in 10 minutes. If you did not ask to change your password, ignore this email.\n\n"
+                + $"{intro}\n\n"
+                + $"Username: {username}\n"
+                + $"Create password: {setPasswordUrl}\n\n"
+                + $"This link expires in {expiry}. If you did not expect this email, ignore it.\n\n"
                 + "RSD Payroll System";
             var html = WrapHtml(
-                "Confirm it's you",
-                $"<p>Hi {WebUtility.HtmlEncode(fullName)},</p>"
-                + "<p>Use this code to confirm your identity and create a new password:</p>"
-                + $"<p style=\"font-size:28px;letter-spacing:6px;font-weight:700;color:#163F8B;margin:24px 0\">{WebUtility.HtmlEncode(code)}</p>"
-                + "<p>This code expires in 10 minutes. If you did not ask to change your password, ignore this email.</p>");
+                heading,
+                $"<p>Hi {encodedName},</p>"
+                + $"<p>{WebUtility.HtmlEncode(intro)}</p>"
+                + $"<p>Username: <strong>{encodedUser}</strong></p>"
+                + "<p style=\"margin:28px 0\">"
+                + $"<a href=\"{encodedUrl}\" style=\"display:inline-block;background:#163F8B;color:#ffffff;padding:12px 22px;"
+                + "border-radius:8px;text-decoration:none;font-weight:700\">Create your password</a></p>"
+                + $"<p style=\"font-size:13px;color:#6b7a99\">This link expires in {expiry}. "
+                + "If the button does not work, paste this address into your browser:</p>"
+                + $"<p style=\"font-size:12px;word-break:break-all;color:#163F8B\">{encodedUrl}</p>");
             return await SendAsync(toEmail, subject, text, html, cancellationToken);
         }
 
@@ -53,7 +84,7 @@ namespace RSDSystem.Services
             var subject = "RSD Payroll: your password was changed";
             var text = $"Hi {fullName},\n\n"
                 + "Your RSD Payroll password was changed. If this was you, no action is needed.\n"
-                + "If you did not change it, sign in with Forgot password and set a new one, then tell Admin.\n\n"
+                + "If you did not change it, use Forgot password on the login page and tell Admin.\n\n"
                 + "RSD Payroll System";
             var html = WrapHtml(
                 "Your password was changed",
@@ -72,9 +103,96 @@ namespace RSDSystem.Services
             if (string.IsNullOrWhiteSpace(toEmail))
                 return (false, "This account has no email address.");
 
-            if (!IsConfigured)
-                return (false, "Email is not configured. Ask Admin to set SMTP in appsettings.json.");
+            string? apiError = null;
+            if (IsApiConfigured)
+            {
+                var api = await SendViaApiAsync(toEmail, subject, textBody, htmlBody, cancellationToken);
+                if (api.Sent)
+                    return api;
 
+                apiError = api.Error;
+                _log.LogWarning("Email API send failed for {To}: {Error}", toEmail, api.Error);
+            }
+
+            if (IsSmtpConfigured)
+            {
+                var smtp = await SendViaSmtpAsync(toEmail, subject, textBody, htmlBody, cancellationToken);
+                if (smtp.Sent)
+                    return smtp;
+
+                return smtp;
+            }
+
+            if (apiError != null)
+                return (false, apiError);
+
+            return (false, "Email is not configured. Ask Admin to set Email:ApiKey in appsettings.json.");
+        }
+
+        private async Task<(bool Sent, string? Error)> SendViaApiAsync(
+            string toEmail, string subject, string textBody, string htmlBody,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var provider = (_config["Email:Provider"] ?? "Resend").Trim();
+                var client = _httpFactory.CreateClient("EmailApi");
+                using var request = BuildApiRequest(provider, toEmail, subject, textBody, htmlBody);
+                using var response = await client.SendAsync(request, cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (response.IsSuccessStatusCode)
+                    return (true, null);
+
+                _log.LogError("Email API {Provider} returned {Status}: {Body}",
+                    provider, (int)response.StatusCode, body);
+                return (false, DescribeApiFailure(response.StatusCode, body));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Email API failed for {To}", toEmail);
+                return (false, "Could not send the email. Try again in a few minutes.");
+            }
+        }
+
+        private HttpRequestMessage BuildApiRequest(
+            string provider, string toEmail, string subject, string textBody, string htmlBody)
+        {
+            var apiKey = _config["Email:ApiKey"]!.Trim();
+            var fromEmail = FromEmail();
+            var fromName = FromName();
+
+            if (string.Equals(provider, "Brevo", StringComparison.OrdinalIgnoreCase))
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+                request.Headers.TryAddWithoutValidation("api-key", apiKey);
+                request.Content = JsonContent(new
+                {
+                    sender = new { name = fromName, email = fromEmail },
+                    to = new[] { new { email = toEmail } },
+                    subject,
+                    htmlContent = htmlBody,
+                    textContent = textBody
+                });
+                return request;
+            }
+
+            var resend = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+            resend.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            resend.Content = JsonContent(new
+            {
+                from = $"{fromName} <{fromEmail}>",
+                to = new[] { toEmail },
+                subject,
+                html = htmlBody,
+                text = textBody
+            });
+            return resend;
+        }
+
+        private async Task<(bool Sent, string? Error)> SendViaSmtpAsync(
+            string toEmail, string subject, string textBody, string htmlBody,
+            CancellationToken cancellationToken)
+        {
             try
             {
                 var host = _config["Smtp:Host"]!;
@@ -104,9 +222,55 @@ namespace RSDSystem.Services
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Failed to send email to {To}", toEmail);
+                _log.LogError(ex, "Failed to send SMTP email to {To}", toEmail);
                 return (false, "Could not send the email. Try again in a few minutes.");
             }
+        }
+
+        private string FromEmail()
+        {
+            var email = _config["Email:FromEmail"];
+            if (!string.IsNullOrWhiteSpace(email))
+                return email.Trim();
+
+            var smtpFrom = _config["Smtp:FromEmail"];
+            if (!string.IsNullOrWhiteSpace(smtpFrom))
+                return smtpFrom.Trim();
+
+            return "beth.t@example.com";
+        }
+
+        private string FromName()
+        {
+            var name = _config["Email:FromName"];
+            if (!string.IsNullOrWhiteSpace(name))
+                return name.Trim();
+
+            var smtpName = _config["Smtp:FromName"];
+            return string.IsNullOrWhiteSpace(smtpName) ? "RSD Payroll System" : smtpName.Trim();
+        }
+
+        private static StringContent JsonContent(object payload)
+        {
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            return new StringContent(json, Encoding.UTF8, "application/json");
+        }
+
+        private static string DescribeApiFailure(HttpStatusCode status, string body)
+        {
+            if (status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden)
+                return "The email API key was rejected. Ask Admin to check Email:ApiKey.";
+
+            if (status == HttpStatusCode.UnprocessableEntity || (int)status == 422)
+                return "The email API could not send to that address. Verify the FromEmail and domain.";
+
+            if (!string.IsNullOrWhiteSpace(body) && body.Contains("only send testing emails", StringComparison.OrdinalIgnoreCase))
+                return "Resend test mode can only mail the account that owns the API key. Verify a domain, or switch to Brevo.";
+
+            return "Could not send the email. Try again in a few minutes.";
         }
 
         private static string WrapHtml(string heading, string inner) =>
