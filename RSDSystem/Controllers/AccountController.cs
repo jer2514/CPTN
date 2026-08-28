@@ -163,6 +163,16 @@ namespace RSDSystem.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> Profile()
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            return View(user);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> ChangePassword()
         {
             var user = await CurrentUserAsync();
@@ -200,9 +210,7 @@ namespace RSDSystem.Controllers
                 $"{user.FullName} changed their password.");
 
             TempData["Success"] = "Your password was changed. Use the new password the next time you sign in.";
-            return user.Role == "Admin"
-                ? RedirectToAction("Index", "Home")
-                : RedirectToAction("Index", "PayrollStaff");
+            return RedirectToAction(nameof(Profile));
         }
 
         private void SignIn(int userId, string fullName, string role, string? photoPath)

@@ -6,11 +6,14 @@
     var initials = string.Join("", fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                                              .Take(2)
                                              .Select(w => char.ToUpper(w[0])));
+    var onProfile = string.Equals(ViewContext.RouteData.Values["controller"]?.ToString(), "Account", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(ViewContext.RouteData.Values["action"]?.ToString(), "Profile", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="profile-wrap">
-    <button type="button" class="profile-card" id="profileToggle"
-            aria-expanded="false" aria-controls="profileMenu" title="Account">
+    <a asp-controller="Account" asp-action="Profile"
+       class="profile-card @(onProfile ? "active" : "")"
+       title="View profile">
         @if (!string.IsNullOrEmpty(photo))
         {
             <img src="@photo" alt="" />
@@ -23,14 +26,6 @@
             <div class="user-name">@fullName</div>
             <div class="user-role">@displayRole</div>
         </div>
-        <i class="bi bi-chevron-up profile-card-chevron"></i>
-    </button>
-    <div class="profile-menu" id="profileMenu" hidden>
-        <a asp-controller="Account" asp-action="ChangePassword" class="profile-menu-item">
-            <i class="bi bi-key-fill"></i> Change Password
-        </a>
-        <a asp-controller="Account" asp-action="Logout" class="profile-menu-item profile-menu-item-danger">
-            <i class="bi bi-box-arrow-right"></i> Sign out
-        </a>
-    </div>
+        <i class="bi bi-chevron-right profile-card-chevron"></i>
+    </a>
 </div>
