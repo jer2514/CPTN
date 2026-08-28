@@ -1090,6 +1090,25 @@ select.form-ctrl {
     color: #9ab0d8;
 }
 
+.form-hint-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: #EEF3FF;
+    border: 1px solid #C9DAFF;
+    color: #163F8B;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 14px;
+}
+
+.form-hint-box i {
+    margin-top: 2px;
+    color: #266DF1;
+}
+
 /* ── Edit page — photo circle preview ───────────────────── */
 /* ── Edit Employee layout (photo left + fields right) ────── */
 .edit-layout {

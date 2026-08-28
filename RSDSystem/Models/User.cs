@@ -79,8 +79,8 @@ namespace RSDSystem.Models
         public bool IsActive { get; set; } = true;
 
         /// <summary>
-        /// True after Admin creates or resets a Payroll Staff password.
-        /// Staff must set their own password before using the rest of the app.
+        /// True after Admin used to create or reset a Payroll Staff password.
+        /// New staff now set their own password with Forgot password instead.
         /// </summary>
         public bool MustChangePassword { get; set; }
 

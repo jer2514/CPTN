@@ -88,7 +88,9 @@ namespace RSDSystem.Filters
                 return false;
 
             return string.Equals(actionName, "Login", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(actionName, "Logout", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(actionName, "Logout", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actionName, "ForgotPassword", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(actionName, "ResetPassword", StringComparison.OrdinalIgnoreCase);
         }
 
         public void OnActionExecuted(ActionExecutedContext context) { }

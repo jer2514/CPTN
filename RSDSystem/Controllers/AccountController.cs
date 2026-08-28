@@ -75,6 +75,94 @@ namespace RSDSystem.Controllers
         }
 
         [HttpGet]
+        public IActionResult ForgotPassword()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ForgotPassword(string Username, string Email)
+        {
+            ViewBag.Username = Username;
+            ViewBag.Email = Email;
+
+            var username = (Username ?? "").Trim();
+            var email = (Email ?? "").Trim();
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(email))
+            {
+                ViewBag.Error = "Enter the username and email on this account.";
+                return View();
+            }
+
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+            var emailMatches = user?.Email != null
+                && string.Equals(user.Email.Trim(), email, StringComparison.OrdinalIgnoreCase);
+
+            if (user == null || !emailMatches)
+            {
+                ViewBag.Error = "Username and email do not match an account.";
+                return View();
+            }
+
+            if (!user.IsActive)
+            {
+                ViewBag.Error = "This account is inactive and cannot reset a password.";
+                return View();
+            }
+
+            BeginPasswordReset(user.UserId);
+            return RedirectToAction(nameof(ResetPassword));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ResetPassword()
+        {
+            var user = await PasswordResetUserAsync();
+            if (user == null)
+            {
+                TempData["Error"] = "Your reset session expired. Enter your username and email again.";
+                return RedirectToAction(nameof(ForgotPassword));
+            }
+
+            BindResetPasswordView(user);
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(string NewPassword, string ConfirmPassword)
+        {
+            var user = await PasswordResetUserAsync();
+            if (user == null)
+            {
+                TempData["Error"] = "Your reset session expired. Enter your username and email again.";
+                return RedirectToAction(nameof(ForgotPassword));
+            }
+
+            BindResetPasswordView(user);
+            ValidateChosenPassword(user, NewPassword, ConfirmPassword);
+
+            if (!ModelState.IsValid)
+                return View();
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
+            user.MustChangePassword = false;
+            await _db.SaveChangesAsync();
+            ClearPasswordReset();
+            await _logs.LogAsync(
+                user.UserId,
+                user.FullName,
+                user.Role,
+                ActivityTypes.ResetPassword,
+                ActivityModules.Authentication,
+                $"{user.FullName} reset their password.");
+
+            TempData["Success"] = "Your password was saved. Sign in with the new password.";
+            return RedirectToAction(nameof(Login));
+        }
+
+        [HttpGet]
         public async Task<IActionResult> ChangePassword()
         {
             var user = await CurrentUserAsync();
@@ -98,24 +186,7 @@ namespace RSDSystem.Controllers
             if (string.IsNullOrWhiteSpace(CurrentPassword) || !BCrypt.Net.BCrypt.Verify(CurrentPassword, user.PasswordHash))
                 ModelState.AddModelError("CurrentPassword", "Current password is incorrect.");
 
-            if (string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
-            {
-                if (!InputRules.TryValidateStaffPassword(NewPassword, out var passwordError))
-                    ModelState.AddModelError("NewPassword", passwordError!);
-            }
-            else if (string.IsNullOrWhiteSpace(NewPassword) || NewPassword.Length < 8)
-            {
-                ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
-            }
-
-            if (!string.IsNullOrWhiteSpace(NewPassword) && NewPassword != ConfirmPassword)
-                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
-
-            if (!string.IsNullOrWhiteSpace(NewPassword)
-                && BCrypt.Net.BCrypt.Verify(NewPassword, user.PasswordHash))
-            {
-                ModelState.AddModelError("NewPassword", "Choose a password that is different from the current one.");
-            }
+            ValidateChosenPassword(user, NewPassword, ConfirmPassword);
 
             if (!ModelState.IsValid)
                 return View();
@@ -191,6 +262,66 @@ namespace RSDSystem.Controllers
         {
             ViewBag.Forced = MustChangeOwnPassword(user);
             ViewBag.IsStaff = string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void BindResetPasswordView(User user)
+        {
+            ViewBag.IsStaff = string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ValidateChosenPassword(User user, string? newPassword, string? confirmPassword)
+        {
+            if (string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!InputRules.TryValidateStaffPassword(newPassword, out var passwordError))
+                    ModelState.AddModelError("NewPassword", passwordError!);
+            }
+            else if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 8)
+            {
+                ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(newPassword) && newPassword != confirmPassword)
+                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
+
+            if (!string.IsNullOrWhiteSpace(newPassword)
+                && BCrypt.Net.BCrypt.Verify(newPassword, user.PasswordHash))
+            {
+                ModelState.AddModelError("NewPassword", "Choose a password that is different from the current one.");
+            }
+        }
+
+        private const string ResetUserIdKey = "PasswordResetUserId";
+        private const string ResetUntilKey = "PasswordResetUntil";
+
+        private void BeginPasswordReset(int userId)
+        {
+            HttpContext.Session.SetInt32(ResetUserIdKey, userId);
+            HttpContext.Session.SetString(
+                ResetUntilKey,
+                DateTime.UtcNow.AddMinutes(10).ToString("O"));
+        }
+
+        private async Task<User?> PasswordResetUserAsync()
+        {
+            var id = HttpContext.Session.GetInt32(ResetUserIdKey);
+            var untilRaw = HttpContext.Session.GetString(ResetUntilKey);
+            if (id == null
+                || string.IsNullOrEmpty(untilRaw)
+                || !DateTime.TryParse(untilRaw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var until)
+                || until < DateTime.UtcNow)
+            {
+                ClearPasswordReset();
+                return null;
+            }
+
+            return await _db.Users.FirstOrDefaultAsync(u => u.UserId == id && u.IsActive);
+        }
+
+        private void ClearPasswordReset()
+        {
+            HttpContext.Session.Remove(ResetUserIdKey);
+            HttpContext.Session.Remove(ResetUntilKey);
         }
     }
 }

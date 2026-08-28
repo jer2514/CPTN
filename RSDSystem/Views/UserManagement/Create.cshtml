@@ -87,33 +87,10 @@
             </div>
         </div>
 
-        <div class="form-row form-row-2">
-            <div>
-                <label class="form-lbl">Password <span class="req-star">*</span></label>
-                <div class="pwd-wrap">
-                    <input type="password" name="Password" id="pwd" class="@Ctrl("Password")"
-                           data-validate="required|staffPassword" data-label="Password" />
-                    <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
-                        <i class="bi bi-eye-slash" id="eye1"></i>
-                    </span>
-                </div>
-                <span class="field-error" data-error-for="Password">@Err("Password")</span>
-                <div style="color:#9ab0d8;font-size:12px;margin-top:4px">
-                    Temporary password. Staff must change it on first login.
-                    Must include 1 capital letter, 1 number, and 1 special character.
-                </div>
-            </div>
-            <div>
-                <label class="form-lbl">Confirm Password <span class="req-star">*</span></label>
-                <div class="pwd-wrap">
-                    <input type="password" name="ConfirmPassword" id="cpwd" class="@Ctrl("ConfirmPassword")"
-                           data-validate="required|match" data-match="pwd" data-label="Confirm password" />
-                    <span class="pwd-eye" onclick="togglePwd('cpwd','eye2')">
-                        <i class="bi bi-eye-slash" id="eye2"></i>
-                    </span>
-                </div>
-                <span class="field-error" data-error-for="ConfirmPassword">@Err("ConfirmPassword")</span>
-            </div>
+        <div class="form-hint-box">
+            <i class="bi bi-info-circle-fill"></i>
+            Admin does not set this password. Tell the staff member to open
+            <strong>Forgot password</strong> on the login page and create one with this username and email.
         </div>
 
         <div class="form-row form-row-2">
@@ -169,13 +146,4 @@
 
 @section Scripts {
     <partial name="_FormValidationScripts" />
-    <script>
-        function togglePwd(inputId, iconId) {
-            const input = document.getElementById(inputId);
-            const icon  = document.getElementById(iconId);
-            if (!input || !icon) return;
-            input.type = input.type === 'password' ? 'text' : 'password';
-            icon.className = input.type === 'text' ? 'bi bi-eye' : 'bi bi-eye-slash';
-        }
-    </script>
 }

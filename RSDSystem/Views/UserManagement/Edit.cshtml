@@ -130,36 +130,10 @@
                     </div>
                 </div>
 
-                <div class="form-row form-row-2">
-                    <div>
-                        <label class="form-lbl">New Password <span style="color:#9ab0d8;font-weight:400">(leave blank to keep)</span></label>
-                        <div class="pwd-wrap">
-                            <input type="password" name="NewPassword" id="pwd" class="@Ctrl("NewPassword")"
-                                   data-validate="@(Model.Role == "PayrollStaff" ? "staffPassword" : "minlen8")" data-label="Password" />
-                            <span class="pwd-eye" onclick="togglePwd('pwd','eye1')">
-                                <i class="bi bi-eye-slash" id="eye1"></i>
-                            </span>
-                        </div>
-                        <span class="field-error" data-error-for="NewPassword">@Err("NewPassword")</span>
-                        @if (Model.Role == "PayrollStaff")
-                        {
-                            <div style="color:#9ab0d8;font-size:12px;margin-top:4px">
-                                Must include 1 capital letter, 1 number, and 1 special character.
-                                Setting a password here is temporary — they must change it on next login.
-                            </div>
-                        }
-                    </div>
-                    <div>
-                        <label class="form-lbl">Confirm Password</label>
-                        <div class="pwd-wrap">
-                            <input type="password" name="ConfirmPassword" id="cpwd" class="@Ctrl("ConfirmPassword")"
-                                   data-validate="match" data-match="pwd" data-label="Confirm password" />
-                            <span class="pwd-eye" onclick="togglePwd('cpwd','eye2')">
-                                <i class="bi bi-eye-slash" id="eye2"></i>
-                            </span>
-                        </div>
-                        <span class="field-error" data-error-for="ConfirmPassword">@Err("ConfirmPassword")</span>
-                    </div>
+                <div class="form-hint-box">
+                    <i class="bi bi-info-circle-fill"></i>
+                    Passwords are private. Admin cannot view or change them.
+                    The user can use <strong>Forgot password</strong> on the login page if they forget it.
                 </div>
 
                 <div class="form-row form-row-2">
@@ -256,13 +230,6 @@
 @section Scripts {
     <partial name="_FormValidationScripts" />
     <script>
-        function togglePwd(inputId, iconId) {
-            const input = document.getElementById(inputId);
-            const icon  = document.getElementById(iconId);
-            if (!input || !icon) return;
-            input.type = input.type === 'password' ? 'text' : 'password';
-            icon.className = input.type === 'text' ? 'bi bi-eye' : 'bi bi-eye-slash';
-        }
         function previewPhoto(input) {
             document.getElementById('fileLabel').textContent =
                 input.files.length ? input.files[0].name : 'No File Chosen';
