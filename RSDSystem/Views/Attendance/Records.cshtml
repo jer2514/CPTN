@@ -45,6 +45,9 @@
     </div>
 
     <div id="recordsSection" style="display:none">
+        <div id="finishedNote" class="genpay-fallback-note" style="display:none">
+            This project is marked Finished. Attendance can be viewed but not imported or changed.
+        </div>
         <div id="recordsMeta" class="att-preview-meta"></div>
         <div class="list-controls-row att-list-toolbar">
             <div class="list-controls-left">
@@ -174,6 +177,10 @@
         let loadedPeriod = null;
         let lastRows = [];
 
+        function projectLabel(p) {
+            return p.isFinished ? `${p.name} (Finished)` : p.name;
+        }
+
         function renderSuggestions(matches) {
             if (matches.length === 0) {
                 suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
@@ -181,7 +188,7 @@
                 return;
             }
             suggestList.innerHTML = matches.map(p =>
-                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${projectLabel(p)}</li>`
             ).join('');
             suggestList.style.display = 'block';
         }
@@ -329,13 +336,17 @@
                 lastRows = data.rows || [];
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
                 const filterNote = statusFilter !== 'all' ? ` · ${statusFilter}` : '';
+                const finished = data.isFinished === true;
+                const finishedNote = document.getElementById('finishedNote');
+                if (finishedNote)
+                    finishedNote.style.display = finished ? 'block' : 'none';
                 document.getElementById('recordsMeta').textContent =
-                    `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${filterNote}${byline}`;
+                    `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${filterNote}${byline}${finished ? ' · View only' : ''}`;
                 document.getElementById('recordsBody').innerHTML = data.rows.length
                     ? data.rows.map(r => {
                         const action = isAdmin ? '' : (() => {
-                            const actionLabel = r.actionLabel || 'Request Edit';
-                            const locked = r.locked;
+                            const actionLabel = finished ? 'View only' : (r.actionLabel || 'Request Edit');
+                            const locked = finished || r.locked;
                             const cls = 'att-action-link' + (locked ? ' is-locked' : '');
                             return `<td><button type="button" class="${cls}" data-record-id="${r.recordId}"${locked ? ' disabled' : ''}>${actionLabel}</button></td>`;
                         })();
@@ -531,7 +542,7 @@
         if (!isAdmin) {
         document.getElementById('recordsBody').addEventListener('click', function (e) {
             const btn = e.target.closest('[data-record-id]');
-            if (!btn) return;
+            if (!btn || btn.disabled) return;
             const row = lastRows.find(r => String(r.recordId) === String(btn.dataset.recordId));
             openRecordEdit(row);
         });

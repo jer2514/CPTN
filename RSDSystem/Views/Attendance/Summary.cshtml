@@ -36,6 +36,9 @@
     </div>
 
     <div id="summarySection" style="display:none">
+        <div id="finishedNote" class="genpay-fallback-note" style="display:none">
+            This project is marked Finished. Attendance can be viewed but not imported or changed.
+        </div>
         <div id="summaryChips" class="att-summary att-summary-wide"></div>
         <div id="summaryMeta" class="att-preview-meta" style="margin-bottom:12px"></div>
 
@@ -103,6 +106,10 @@
         let statusFilter = 'all';
         let currentPage = 1;
 
+        function projectLabel(p) {
+            return p.isFinished ? `${p.name} (Finished)` : p.name;
+        }
+
         function renderSuggestions(matches) {
             if (matches.length === 0) {
                 suggestList.innerHTML = '<li class="genpay-suggest-empty">No matching project</li>';
@@ -110,7 +117,7 @@
                 return;
             }
             suggestList.innerHTML = matches.map(p =>
-                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${p.name}</li>`
+                `<li data-id="${p.id}" data-name="${p.name.replace(/"/g, '&quot;')}">${projectLabel(p)}</li>`
             ).join('');
             suggestList.style.display = 'block';
         }
@@ -239,8 +246,12 @@
                     chip('Unmatched', t.unmatched || 0);
 
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
+                const finished = data.isFinished === true;
+                const finishedNote = document.getElementById('finishedNote');
+                if (finishedNote)
+                    finishedNote.style.display = finished ? 'block' : 'none';
                 document.getElementById('summaryMeta').textContent =
-                    `${data.projectName} · ${data.periodLabel}${byline}`;
+                    `${data.projectName} · ${data.periodLabel}${byline}${finished ? ' · View only' : ''}`;
 
                 const rows = data.rows || [];
                 document.getElementById('summaryBody').innerHTML = rows.length
