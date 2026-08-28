@@ -124,9 +124,15 @@ namespace RSDSystem.Controllers
             var issued = await IssuePasswordLinkAsync(user, PasswordLinkService.ResetLifetime, isInvite: false);
             HttpContext.Session.SetString(ResetMaskedEmailKey, MaskEmail(user.Email));
             if (!issued.Sent)
+            {
                 HttpContext.Session.SetString(ResetDisplayLinkKey, issued.Link);
+                HttpContext.Session.SetString(ResetDisplayErrorKey, issued.Error ?? "");
+            }
             else
+            {
                 HttpContext.Session.Remove(ResetDisplayLinkKey);
+                HttpContext.Session.Remove(ResetDisplayErrorKey);
+            }
 
             return RedirectToAction(nameof(CheckEmail));
         }
@@ -136,6 +142,7 @@ namespace RSDSystem.Controllers
         {
             ViewBag.MaskedEmail = HttpContext.Session.GetString(ResetMaskedEmailKey) ?? "your email";
             ViewBag.DisplayLink = HttpContext.Session.GetString(ResetDisplayLinkKey);
+            ViewBag.DisplayError = HttpContext.Session.GetString(ResetDisplayErrorKey);
             return View();
         }
 
@@ -319,7 +326,7 @@ namespace RSDSystem.Controllers
             ViewBag.IsStaff = string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
         }
 
-        private async Task<(bool Sent, string Link)> IssuePasswordLinkAsync(
+        private async Task<(bool Sent, string Link, string? Error)> IssuePasswordLinkAsync(
             User user, TimeSpan lifetime, bool isInvite)
         {
             var token = _links.Issue(user, lifetime);
@@ -328,7 +335,7 @@ namespace RSDSystem.Controllers
                 ?? throw new InvalidOperationException("Could not build the set-password URL.");
             var sent = await _email.SendSetPasswordLinkAsync(
                 user.Email!, user.FullName, user.Username, link, isInvite);
-            return (sent.Sent, link);
+            return (sent.Sent, link, sent.Error);
         }
 
         private static string MaskEmail(string? email)
@@ -342,6 +349,7 @@ namespace RSDSystem.Controllers
 
         private const string ResetMaskedEmailKey = "PasswordResetMaskedEmail";
         private const string ResetDisplayLinkKey = "PasswordResetDisplayLink";
+        private const string ResetDisplayErrorKey = "PasswordResetDisplayError";
 
         private void ValidateChosenPassword(User user, string? newPassword, string? confirmPassword)
         {

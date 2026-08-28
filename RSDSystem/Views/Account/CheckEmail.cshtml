@@ -27,10 +27,16 @@
 
             @if (!string.IsNullOrEmpty(displayLink))
             {
+                var displayError = ViewBag.DisplayError as string;
                 <div class="login-info" role="status">
                     <i class="bi bi-info-circle-fill"></i>
                     <span>
-                        Email is not sending from this server yet, so use this link now:
+                        Email is not sending from this server yet
+                        @if (!string.IsNullOrWhiteSpace(displayError))
+                        {
+                            <text>(@displayError)</text>
+                        }
+                        , so use this link now:
                         <a class="login-fallback-link" href="@displayLink">Create your password</a>
                     </span>
                 </div>

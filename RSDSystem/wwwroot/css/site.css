@@ -1176,6 +1176,12 @@ select.form-ctrl {
     min-width: 0;
 }
 
+.invite-link-reason {
+    margin-top: 6px;
+    color: #9b1c1c;
+    font-weight: 600;
+}
+
 .invite-link-copy input {
     width: 100%;
     margin: 8px 0;

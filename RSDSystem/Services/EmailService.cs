@@ -126,7 +126,8 @@ namespace RSDSystem.Services
             if (apiError != null)
                 return (false, apiError);
 
-            return (false, "Email is not configured. Ask Admin to set Email:ApiKey in appsettings.json.");
+            return (false, "Mail is not set up yet. Put a Resend API key in Email:ApiKey, "
+                + "or a Gmail App Password in Smtp:User and Smtp:Password, then restart the app.");
         }
 
         private async Task<(bool Sent, string? Error)> SendViaApiAsync(
@@ -136,6 +137,14 @@ namespace RSDSystem.Services
             try
             {
                 var provider = (_config["Email:Provider"] ?? "Resend").Trim();
+                var fromEmail = FromEmail();
+                if (string.Equals(provider, "Resend", StringComparison.OrdinalIgnoreCase)
+                    && LooksLikePublicMailbox(fromEmail))
+                {
+                    return (false, "Resend cannot send From a Gmail address. Keep Email:FromEmail as "
+                        + "beth.t@example.com, or send with a Gmail App Password in Smtp instead.");
+                }
+
                 var client = _httpFactory.CreateClient("EmailApi");
                 using var request = BuildApiRequest(provider, toEmail, subject, textBody, htmlBody);
                 using var response = await client.SendAsync(request, cancellationToken);
@@ -223,6 +232,12 @@ namespace RSDSystem.Services
             catch (Exception ex)
             {
                 _log.LogError(ex, "Failed to send SMTP email to {To}", toEmail);
+                var detail = ex.Message;
+                if (detail.Contains("Authentication", StringComparison.OrdinalIgnoreCase)
+                    || detail.Contains("5.7.", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (false, "Gmail rejected the login. Use an App Password in Smtp:Password, not your normal Gmail password.");
+                }
                 return (false, "Could not send the email. Try again in a few minutes.");
             }
         }
@@ -259,18 +274,58 @@ namespace RSDSystem.Services
             return new StringContent(json, Encoding.UTF8, "application/json");
         }
 
+        private static bool LooksLikePublicMailbox(string email)
+        {
+            var at = email.LastIndexOf('@');
+            if (at < 0 || at == email.Length - 1)
+                return false;
+            var domain = email[(at + 1)..];
+            return domain.Equals("gmail.com", StringComparison.OrdinalIgnoreCase)
+                || domain.Equals("googlemail.com", StringComparison.OrdinalIgnoreCase)
+                || domain.Equals("yahoo.com", StringComparison.OrdinalIgnoreCase)
+                || domain.Equals("outlook.com", StringComparison.OrdinalIgnoreCase)
+                || domain.Equals("hotmail.com", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string DescribeApiFailure(HttpStatusCode status, string body)
         {
+            var apiMessage = TryReadApiMessage(body);
+
+            if (!string.IsNullOrWhiteSpace(apiMessage)
+                && apiMessage.Contains("only send testing emails", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Resend test mode can only mail the Gmail used to create the Resend account. "
+                    + "Add the staff user with that same Gmail, or put a Gmail App Password in Smtp.";
+            }
+
             if (status == HttpStatusCode.Unauthorized || status == HttpStatusCode.Forbidden)
-                return "The email API key was rejected. Ask Admin to check Email:ApiKey.";
+                return string.IsNullOrWhiteSpace(apiMessage)
+                    ? "The email API key was rejected. Check Email:ApiKey in appsettings.json."
+                    : apiMessage;
 
             if (status == HttpStatusCode.UnprocessableEntity || (int)status == 422)
-                return "The email API could not send to that address. Verify the FromEmail and domain.";
+                return "The email API rejected the From address. For Resend keep FromEmail as beth.t@example.com.";
 
-            if (!string.IsNullOrWhiteSpace(body) && body.Contains("only send testing emails", StringComparison.OrdinalIgnoreCase))
-                return "Resend test mode can only mail the account that owns the API key. Verify a domain, or switch to Brevo.";
+            return string.IsNullOrWhiteSpace(apiMessage)
+                ? "Could not send the email. Try again in a few minutes."
+                : apiMessage;
+        }
 
-            return "Could not send the email. Try again in a few minutes.";
+        private static string? TryReadApiMessage(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+                return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("message", out var message)
+                    && message.ValueKind == JsonValueKind.String)
+                    return message.GetString();
+            }
+            catch (JsonException)
+            {
+            }
+            return null;
         }
 
         private static string WrapHtml(string heading, string inner) =>
