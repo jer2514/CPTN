@@ -4,6 +4,7 @@ using RSDSystem.Models;
 using RSDSystem.Validation;
 using RSDSystem.Services;
 using BCrypt.Net;
+using System.Security.Cryptography;
 
 namespace RSDSystem.Controllers
 {
@@ -75,22 +76,13 @@ namespace RSDSystem.Controllers
         // POST /UserManagement/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(User user, string Password,
-            string ConfirmPassword, IFormFile? photo)
+        public async Task<IActionResult> Create(User user, IFormFile? photo)
         {
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
             ModelState.Remove("Age");
             ModelState.Remove("UserCode");
             user.Role = "PayrollStaff";
-
-            if (string.IsNullOrWhiteSpace(Password))
-                ModelState.AddModelError("Password", "Password is required.");
-            else if (!InputRules.TryValidateStaffPassword(Password, out var passwordError))
-                ModelState.AddModelError("Password", passwordError!);
-
-            if (Password != ConfirmPassword)
-                ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
 
             if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
                 ModelState.AddModelError("photo", photoError);
@@ -126,7 +118,8 @@ namespace RSDSystem.Controllers
             user.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
                 ? null
                 : user.MiddleInitial.Trim().ToUpperInvariant();
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password ?? string.Empty);
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
             user.UserId = 0;
             user.UserCode = GenerateUserCode();
             user.CreatedAt = DateTime.Now;
@@ -136,14 +129,14 @@ namespace RSDSystem.Controllers
 
             _db.Users.Add(user);
             user.UserCode = await GenerateUserCodeAsync();
-            user.MustChangePassword = true;
+            user.MustChangePassword = false;
             await _db.SaveChangesAsync();
             await _logs.LogAsync(
                 ActivityTypes.CreateUser,
                 ActivityModules.UserManagement,
                 $"Added payroll staff user {user.FullName} ({user.Username}).",
                 relatedId: user.UserId);
-            TempData["Success"] = "User added. They must change this temporary password on first login.";
+            TempData["Success"] = "User added. They must use Forgot password on the login page with their username and email to create their password.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -168,8 +161,7 @@ namespace RSDSystem.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(User user, string? NewPassword,
-    string? ConfirmPassword, IFormFile? photo)
+        public async Task<IActionResult> Edit(User user, IFormFile? photo)
         {
             ModelState.Remove("PasswordHash");
             ModelState.Remove("FullName");
@@ -178,22 +170,6 @@ namespace RSDSystem.Controllers
 
             var existing = await _db.Users.FindAsync(user.UserId);
             if (existing == null) return NotFound();
-
-            if (!string.IsNullOrWhiteSpace(NewPassword))
-            {
-                if (string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!InputRules.TryValidateStaffPassword(NewPassword, out var passwordError))
-                        ModelState.AddModelError("NewPassword", passwordError!);
-                }
-                else if (NewPassword.Length < 8)
-                {
-                    ModelState.AddModelError("NewPassword", "Password must be at least 8 characters.");
-                }
-
-                if (NewPassword != ConfirmPassword)
-                    ModelState.AddModelError("ConfirmPassword", "Passwords do not match.");
-            }
 
             if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
                 ModelState.AddModelError("photo", photoError);
@@ -238,13 +214,6 @@ namespace RSDSystem.Controllers
             existing.ContactNumber = user.ContactNumber?.Trim();
             existing.Address = user.Address?.Trim();
 
-            if (!string.IsNullOrWhiteSpace(NewPassword))
-            {
-                existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(NewPassword);
-                if (string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
-                    existing.MustChangePassword = true;
-            }
-
             if (photo != null && photo.Length > 0)
                 existing.PhotoPath = await SavePhotoAsync(photo);
 
@@ -269,10 +238,7 @@ namespace RSDSystem.Controllers
                     HttpContext.Session.Remove("PhotoPath");
             }
 
-            TempData["Success"] = !string.IsNullOrWhiteSpace(NewPassword)
-                && string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase)
-                ? "User updated. They must change the new password on next login."
-                : "User updated successfully.";
+            TempData["Success"] = "User updated successfully.";
             return RedirectToAction(nameof(Index));
         }
 

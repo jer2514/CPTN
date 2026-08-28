@@ -121,6 +121,7 @@
 
 .login-panel .form-ctrl,
 .login-panel input[type="text"],
+.login-panel input[type="email"],
 .login-panel input[type="password"] {
     width: 100%;
     height: 44px;
@@ -203,6 +204,41 @@
 .login-form .btn-primary-blue-block:hover {
     background: #1B3FBF;
     color: #fff;
+}
+
+.login-forgot {
+    display: block;
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #266DF1;
+    text-decoration: none;
+}
+
+.login-forgot:hover {
+    text-decoration: underline;
+    color: #1B3FBF;
+}
+
+.login-hint {
+    color: #9ab0d8;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.login-form .btn-back {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.login-panel .field-error {
+    display: block;
+    min-height: 0;
+    margin-top: 4px;
+    font-size: 12px;
+    color: #d04545;
 }
 
 .validation-summary .text-danger,

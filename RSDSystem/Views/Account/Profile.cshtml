@@ -1,0 +1,90 @@
+@model RSDSystem.Models.User
+@{
+    var isStaff = string.Equals(Model.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
+    Layout = isStaff ? "_PayrollStaffLayout" : "_Layout";
+    ViewData["Title"] = "Profile";
+    var displayRole = isStaff ? "Payroll Staff" : (Model.Role ?? "—");
+    var initials = string.Join("", (Model.FullName ?? "")
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2)
+        .Select(w => char.ToUpper(w[0])));
+    string Dash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    var backHref = isStaff
+        ? Url.Action("Index", "PayrollStaff")
+        : Url.Action("Index", "Home");
+}
+
+<div class="content-topbar page-sticky-bar">
+    <a href="@backHref" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="form-card profile-view-card">
+    <div class="profile-view-head">
+        @if (!string.IsNullOrEmpty(Model.PhotoPath))
+        {
+            <img src="@Model.PhotoPath" alt="" class="edit-photo-circle" />
+        }
+        else
+        {
+            <div class="edit-photo-initials">@initials</div>
+        }
+        <div>
+            <h1 class="profile-view-name">@Model.FullName</h1>
+            <div class="profile-view-meta">
+                @displayRole
+                <span class="profile-view-dot">·</span>
+                Staff ID @Dash(Model.UserCode)
+            </div>
+            <span class="@(Model.IsActive ? "badge-active" : "badge-inactive")">
+                @(Model.IsActive ? "Active" : "Inactive")
+            </span>
+        </div>
+    </div>
+
+    <div class="profile-view-grid">
+        <div>
+            <div class="profile-view-label">Username</div>
+            <div class="profile-view-value">@Dash(Model.Username)</div>
+        </div>
+        <div>
+            <div class="profile-view-label">Email</div>
+            <div class="profile-view-value">@Dash(Model.Email)</div>
+        </div>
+        <div>
+            <div class="profile-view-label">Contact Number</div>
+            <div class="profile-view-value">@Dash(Model.ContactNumber)</div>
+        </div>
+        <div>
+            <div class="profile-view-label">Gender</div>
+            <div class="profile-view-value">@Dash(Model.Gender)</div>
+        </div>
+        <div>
+            <div class="profile-view-label">Date of Birth</div>
+            <div class="profile-view-value">
+                @(Model.DateOfBirth.HasValue
+                    ? Model.DateOfBirth.Value.ToString("MMMM d, yyyy")
+                    : "—")
+            </div>
+        </div>
+        <div>
+            <div class="profile-view-label">Age</div>
+            <div class="profile-view-value">@(Model.Age?.ToString() ?? "—")</div>
+        </div>
+        <div class="profile-view-wide">
+            <div class="profile-view-label">Address</div>
+            <div class="profile-view-value">@Dash(Model.Address)</div>
+        </div>
+    </div>
+
+    <div class="profile-view-actions">
+        <a asp-controller="Account" asp-action="ChangePassword" class="btn-primary-blue">
+            <i class="bi bi-key-fill"></i> Change Password
+        </a>
+        <a asp-controller="Account" asp-action="Logout" class="btn-signout">
+            <i class="bi bi-box-arrow-right"></i> Sign out
+        </a>
+    </div>
+</div>
