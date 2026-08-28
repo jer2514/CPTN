@@ -27,42 +27,4 @@
         if (btn)
             btn.textContent = label;
     });
-
-    document.addEventListener('click', function (e) {
-        var wrap = document.querySelector('.profile-wrap');
-        if (!wrap)
-            return;
-        var toggle = document.getElementById('profileToggle');
-        var menu = document.getElementById('profileMenu');
-        if (!toggle || !menu)
-            return;
-
-        if (toggle.contains(e.target)) {
-            var open = wrap.classList.toggle('open');
-            menu.hidden = !open;
-            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-            return;
-        }
-
-        if (!wrap.contains(e.target) && wrap.classList.contains('open')) {
-            wrap.classList.remove('open');
-            menu.hidden = true;
-            toggle.setAttribute('aria-expanded', 'false');
-        }
-    });
-
-    document.addEventListener('keydown', function (e) {
-        if (e.key !== 'Escape')
-            return;
-        var wrap = document.querySelector('.profile-wrap');
-        var toggle = document.getElementById('profileToggle');
-        var menu = document.getElementById('profileMenu');
-        if (!wrap || !wrap.classList.contains('open'))
-            return;
-        wrap.classList.remove('open');
-        if (menu)
-            menu.hidden = true;
-        if (toggle)
-            toggle.setAttribute('aria-expanded', 'false');
-    });
 })();
