@@ -195,6 +195,8 @@ namespace RSDSystem.Controllers
             if (!string.IsNullOrWhiteSpace(notifyEmail))
                 await _email.SendPasswordChangedAsync(notifyEmail, notifyName);
 
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            HttpContext.Session.Clear();
             TempData["Success"] = "Your password was saved. Sign in with the new password.";
             return RedirectToAction(nameof(Login));
         }
