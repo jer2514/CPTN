@@ -11,6 +11,7 @@
     string Dash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
     string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
     string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
+    var startEditing = !ViewData.ModelState.IsValid;
     var backHref = isStaff
         ? Url.Action("Index", "PayrollStaff")
         : Url.Action("Index", "Home");
@@ -46,30 +47,31 @@
         </div>
     </div>
 
-    <form asp-controller="Account" asp-action="Profile" method="post" class="js-validate" novalidate>
+    <form asp-controller="Account" asp-action="Profile" method="post"
+          class="js-validate profile-form@(startEditing ? "" : " is-locked")" novalidate>
         @Html.AntiForgeryToken()
 
         <div class="profile-view-grid">
             <div>
                 <label class="profile-view-label" for="Username">Username <span class="req-star">*</span></label>
                 <input id="Username" type="text" name="Username" value="@Model.Username" maxlength="50"
-                       class="@Ctrl("Username")" data-validate="required" data-label="Username"
-                       autocomplete="username" />
+                       class="@Ctrl("Username") profile-edit-field" data-validate="required" data-label="Username"
+                       autocomplete="username" @(startEditing ? null : "readonly") />
                 <span class="field-error" data-error-for="Username">@Err("Username")</span>
             </div>
             <div>
                 <label class="profile-view-label" for="Email">Email <span class="req-star">*</span></label>
                 <input id="Email" type="email" name="Email" value="@Model.Email" maxlength="100"
-                       class="@Ctrl("Email")" data-validate="required|email" data-label="Email"
-                       autocomplete="email" />
+                       class="@Ctrl("Email") profile-edit-field" data-validate="required|email" data-label="Email"
+                       autocomplete="email" @(startEditing ? null : "readonly") />
                 <span class="field-error" data-error-for="Email">@Err("Email")</span>
             </div>
             <div>
                 <label class="profile-view-label" for="ContactNumber">Contact Number <span class="req-star">*</span></label>
                 <input id="ContactNumber" type="text" name="ContactNumber" value="@Model.ContactNumber" maxlength="11"
-                       inputmode="numeric" class="@Ctrl("ContactNumber")"
+                       inputmode="numeric" class="@Ctrl("ContactNumber") profile-edit-field"
                        data-validate="required|phone" data-label="Contact number"
-                       placeholder="09XXXXXXXXX" />
+                       placeholder="09XXXXXXXXX" @(startEditing ? null : "readonly") />
                 <span class="field-error" data-error-for="ContactNumber">@Err("ContactNumber")</span>
             </div>
             <div>
@@ -91,14 +93,19 @@
             <div class="profile-view-wide">
                 <label class="profile-view-label" for="Address">Address</label>
                 <input id="Address" type="text" name="Address" value="@Model.Address" maxlength="250"
-                       class="@Ctrl("Address")" data-validate="address" data-label="Address"
-                       placeholder="Barangay, Municipality/City, Province" />
+                       class="@Ctrl("Address") profile-edit-field" data-validate="address" data-label="Address"
+                       placeholder="Barangay, Municipality/City, Province" @(startEditing ? null : "readonly") />
                 <span class="field-error" data-error-for="Address">@Err("Address")</span>
             </div>
         </div>
 
         <div class="profile-view-actions">
-            <button type="submit" class="btn-primary-blue">Save changes</button>
+            <button type="button" id="profileEditBtn" class="btn-primary-blue"
+                    @(startEditing ? "hidden" : null)>Edit</button>
+            <button type="submit" id="profileSaveBtn" class="btn-primary-blue"
+                    @(startEditing ? null : "hidden")>Save changes</button>
+            <button type="button" id="profileCancelBtn" class="profile-cancel-btn"
+                    @(startEditing ? null : "hidden")>Cancel</button>
             <a asp-controller="Account" asp-action="ChangePassword" class="btn-outline-blue">
                 <i class="bi bi-key-fill"></i> Change Password
             </a>
@@ -108,4 +115,35 @@
 
 @section Scripts {
     <partial name="_FormValidationScripts" />
+    <script>
+        (function () {
+            const form = document.querySelector('.profile-form');
+            if (!form) return;
+            const editBtn = document.getElementById('profileEditBtn');
+            const saveBtn = document.getElementById('profileSaveBtn');
+            const cancelBtn = document.getElementById('profileCancelBtn');
+            const fields = form.querySelectorAll('.profile-edit-field');
+
+            function setEditing(on) {
+                form.classList.toggle('is-locked', !on);
+                fields.forEach(function (field) {
+                    if (on) field.removeAttribute('readonly');
+                    else field.setAttribute('readonly', 'readonly');
+                });
+                if (editBtn) editBtn.hidden = on;
+                if (saveBtn) saveBtn.hidden = !on;
+                if (cancelBtn) cancelBtn.hidden = !on;
+                if (on) {
+                    const first = form.querySelector('.profile-edit-field');
+                    if (first) first.focus();
+                }
+            }
+
+            if (editBtn) editBtn.addEventListener('click', function () { setEditing(true); });
+            if (cancelBtn) cancelBtn.addEventListener('click', function () { window.location.reload(); });
+            form.addEventListener('submit', function (e) {
+                if (form.classList.contains('is-locked')) e.preventDefault();
+            });
+        })();
+    </script>
 }
