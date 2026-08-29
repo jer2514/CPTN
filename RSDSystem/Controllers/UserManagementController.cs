@@ -177,102 +177,7 @@ namespace RSDSystem.Controllers
             if (user == null) return NotFound();
 
             ViewBag.PageTitle = "Edit User";
-            ViewBag.IsLastActiveAdmin = await IsLastAdminAsync(user);
             return View(user);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(User user, IFormFile? photo)
-        {
-            ModelState.Remove("PasswordHash");
-            ModelState.Remove("FullName");
-            ModelState.Remove("Age");
-            ModelState.Remove("UserCode");
-            ModelState.Remove("PasswordResetTokenHash");
-            ModelState.Remove("PasswordResetExpiry");
-
-            var existing = await _db.Users.FindAsync(user.UserId);
-            if (existing == null) return NotFound();
-
-            var staffUsernameLocked = string.Equals(existing.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
-            if (staffUsernameLocked)
-            {
-                user.Username = existing.Username;
-                ModelState.Remove("Username");
-            }
-
-            if (!InputRules.TryValidatePhoto(photo, out var photoError) && photoError != null)
-                ModelState.AddModelError("photo", photoError);
-
-            var username = staffUsernameLocked
-                ? existing.Username
-                : (user.Username?.Trim() ?? string.Empty);
-            if (!staffUsernameLocked && !string.IsNullOrEmpty(username))
-            {
-                var usernameTaken = await _db.Users
-                    .AnyAsync(u => u.Username == username && u.UserId != user.UserId);
-                if (usernameTaken)
-                    ModelState.AddModelError("Username", "This username is already taken.");
-            }
-
-            var email = user.Email?.Trim();
-            if (!string.IsNullOrEmpty(email))
-            {
-                var emailTaken = await _db.Users
-                    .AnyAsync(u => u.Email == email && u.UserId != user.UserId);
-                if (emailTaken)
-                    ModelState.AddModelError("Email", "This email is already registered.");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                ViewBag.PageTitle = "Edit User";
-                user.Role = existing.Role;
-                user.PhotoPath = existing.PhotoPath;
-                user.UserCode = existing.UserCode;
-                return View(user);
-            }
-
-            var ti = System.Globalization.CultureInfo.CurrentCulture.TextInfo;
-            existing.FirstName = ti.ToTitleCase((user.FirstName ?? string.Empty).Trim().ToLower());
-            existing.LastName = ti.ToTitleCase((user.LastName ?? string.Empty).Trim().ToLower());
-            existing.MiddleInitial = string.IsNullOrWhiteSpace(user.MiddleInitial)
-                ? null
-                : user.MiddleInitial.Trim().ToUpperInvariant();
-            existing.DateOfBirth = user.DateOfBirth;
-            existing.Gender = user.Gender;
-            existing.Username = username;
-            existing.Email = email;
-            existing.ContactNumber = user.ContactNumber?.Trim();
-            existing.Address = user.Address?.Trim();
-
-            if (photo != null && photo.Length > 0)
-                existing.PhotoPath = await SavePhotoAsync(photo);
-
-            await _db.SaveChangesAsync();
-            await _logs.LogAsync(
-                ActivityTypes.EditUser,
-                ActivityModules.UserManagement,
-                $"Updated user {existing.FullName} ({existing.Username}).",
-                relatedId: existing.UserId);
-
-            // If the account being edited is the one currently logged in,
-            // refresh Session so the sidebar reflects the change immediately.
-            var sessionUserId = HttpContext.Session.GetString("UserId");
-            if (sessionUserId == existing.UserId.ToString())
-            {
-                HttpContext.Session.SetString("FullName", existing.FullName);
-                HttpContext.Session.SetString("Role", existing.Role);
-
-                if (!string.IsNullOrEmpty(existing.PhotoPath))
-                    HttpContext.Session.SetString("PhotoPath", existing.PhotoPath);
-                else
-                    HttpContext.Session.Remove("PhotoPath");
-            }
-
-            TempData["Success"] = "User updated successfully.";
-            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
@@ -361,6 +266,12 @@ namespace RSDSystem.Controllers
             var user = await _db.Users.FindAsync(id);
             if (user != null)
             {
+                if (!string.Equals(user.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
+                {
+                    TempData["Error"] = "Admin can only activate or inactivate payroll staff.";
+                    return RedirectToAction(nameof(Edit), new { id });
+                }
+
                 if (user.IsActive && await IsLastAdminAsync(user))
                 {
                     TempData["Error"] = "The system must keep one active admin account.";

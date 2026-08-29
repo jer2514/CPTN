@@ -242,6 +242,26 @@ a.profile-card {
     border-top: 1px solid #eef1f6;
 }
 
+.profile-cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 6px;
+    border: 1.5px solid #d5dbe6;
+    background: #fff;
+    color: #4a5568;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+    .profile-cancel-btn:hover {
+        background: #f4f6fa;
+        color: #1a202c;
+    }
+
 .btn-signout {
     display: inline-flex;
     align-items: center;
@@ -1195,10 +1215,6 @@ select.form-ctrl {
 
 .invite-resend-form {
     margin-top: 12px;
-}
-
-.invite-resend-form .btn-primary-blue-block {
-    background: #163F8B;
 }
 
 /* ── Edit page — photo circle preview ───────────────────── */

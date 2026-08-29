@@ -1,18 +1,10 @@
 ﻿@model RSDSystem.Models.User
 @{
     ViewData["Title"] = "Edit User";
-    var roles = ViewBag.Roles as string[] ?? Array.Empty<string>();
-    string Ctrl(string name) => ViewData.ModelState[name]?.Errors.Count > 0 ? "form-ctrl is-invalid" : "form-ctrl";
-    string Err(string name) => ViewData.ModelState[name]?.Errors.FirstOrDefault()?.ErrorMessage ?? "";
-    var generalErrors = ViewData.ModelState
-        .Where(kv => string.IsNullOrEmpty(kv.Key))
-        .SelectMany(kv => kv.Value?.Errors ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.ModelBinding.ModelError>())
-        .ToList();
-    var maxDob = DateTime.Today.AddYears(-18).ToString("yyyy-MM-dd");
-    var minDob = DateTime.Today.AddYears(-80).ToString("yyyy-MM-dd");
+    var isPayrollStaff = string.Equals(Model.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase);
     var initials = $"{(string.IsNullOrEmpty(Model.FirstName) ? "" : Model.FirstName[..1])}{(string.IsNullOrEmpty(Model.LastName) ? "" : Model.LastName[..1])}";
+    string Dash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
 }
-
 
 <div class="content-topbar page-sticky-bar">
     <a asp-action="Index" class="btn-back">
@@ -23,40 +15,23 @@
 
 <div class="form-card">
     <partial name="_InviteLinkBox" />
-    <form asp-action="Edit" method="post" enctype="multipart/form-data" class="js-validate" novalidate>
-        @Html.AntiForgeryToken()
-        @if (generalErrors.Count > 0)
-        {
-            <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:13px">
-                <ul class="mb-0 ps-3">
-                    @foreach (var err in generalErrors)
-                    {
-                        <li>@err.ErrorMessage</li>
-                    }
-                </ul>
-            </div>
-        }
-        <input type="hidden" name="UserId" value="@Model.UserId" />
 
+    <div class="edit-layout">
 
-        <div class="edit-layout">
+        <div class="edit-photo-col">
+            @if (!string.IsNullOrEmpty(Model.PhotoPath))
+            {
+                <img src="@Model.PhotoPath" class="edit-photo-circle" />
+            }
+            else
+            {
+                <div class="edit-photo-initials">
+                    @initials
+                </div>
+            }
 
-            <!-- LEFT: Photo -->
-            <div class="edit-photo-col">
-                @if (!string.IsNullOrEmpty(Model.PhotoPath))
-                {
-                    <img src="@Model.PhotoPath" class="edit-photo-circle" id="photoPreview" />
-                }
-                else
-                {
-                    <div class="edit-photo-initials" id="photoPreviewPlaceholder">
-                        @initials
-                    </div>
-                }
-                <input type="file" id="photoInput" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                       class="d-none" data-validate="fileImage" onchange="previewPhoto(this)" />
-
-                <!-- Status toggle: Active asks for confirmation; last admin cannot be turned off. -->
+            @if (isPayrollStaff)
+            {
                 @if (Model.IsActive)
                 {
                     <button type="button" class="status-toggle-btn status-toggle-inactive"
@@ -71,139 +46,95 @@
                         <i class="bi bi-toggle-off"></i> Inactive
                     </button>
                 }
-            </div>
-
-
-            <!-- RIGHT: Fields -->
-            <div class="edit-fields-col">
-
-                <div class="form-row form-row-3">
-                    <div>
-                        <label class="form-lbl">First Name <span class="req-star">*</span></label>
-                        <input type="text" name="FirstName" value="@Model.FirstName" maxlength="80"
-                               class="@Ctrl("FirstName")" data-validate="required|name" data-label="First name" />
-                        <span class="field-error" data-error-for="FirstName">@Err("FirstName")</span>
-                    </div>
-                    <div>
-                        <label class="form-lbl">Last Name <span class="req-star">*</span></label>
-                        <input type="text" name="LastName" value="@Model.LastName" maxlength="80"
-                               class="@Ctrl("LastName")" data-validate="required|name" data-label="Last name" />
-                        <span class="field-error" data-error-for="LastName">@Err("LastName")</span>
-                    </div>
-                    <div>
-                        <label class="form-lbl">M.I</label>
-                        <input type="text" name="MiddleInitial" value="@Model.MiddleInitial" maxlength="2"
-                               class="@Ctrl("MiddleInitial")" data-validate="mi" data-label="Middle initial" />
-                        <span class="field-error" data-error-for="MiddleInitial">@Err("MiddleInitial")</span>
-                    </div>
-                </div>
-
-                <div class="form-row form-row-3b">
-                    <div>
-                        <label class="form-lbl">Date of Birth</label>
-                        <input type="date" name="DateOfBirth" id="dobInput"
-                               value="@Model.DateOfBirth?.ToString("yyyy-MM-dd")"
-                               min="@minDob" max="@maxDob"
-                               class="@Ctrl("DateOfBirth")" data-validate="dob" data-label="Date of birth" />
-                        <span class="field-error" data-error-for="DateOfBirth">@Err("DateOfBirth")</span>
-                    </div>
-                    <div>
-                        <label class="form-lbl">Age</label>
-                        <input type="text" id="ageInput" class="form-ctrl"
-                               readonly value="@Model.Age" placeholder="—" />
-                    </div>
-                    <div>
-                        <label class="form-lbl">Gender</label>
-                        <select name="Gender" class="form-ctrl">
-                            <option value="">Select</option>
-                            <option value="Male" selected="@(Model.Gender == "Male")">Male</option>
-                            <option value="Female" selected="@(Model.Gender == "Female")">Female</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row form-row-1">
-                    <div>
-                        <label class="form-lbl">Username <span class="req-star">*</span></label>
-                        @if (string.Equals(Model.Role, "PayrollStaff", StringComparison.OrdinalIgnoreCase))
-                        {
-                            <input type="text" class="form-ctrl" value="@Model.Username" readonly />
-                            <input type="hidden" name="Username" value="@Model.Username" />
-                        }
-                        else
-                        {
-                            <input type="text" name="Username" value="@Model.Username" maxlength="50"
-                                   class="@Ctrl("Username")" data-validate="required" data-label="Username" />
-                            <span class="field-error" data-error-for="Username">@Err("Username")</span>
-                        }
-                    </div>
-                </div>
-
-                <div class="form-hint-box">
-                    <i class="bi bi-info-circle-fill"></i>
-                    Passwords are private. Admin cannot view or change them.
-                </div>
-
-                <div class="form-row form-row-2">
-                    <div>
-                        <label class="form-lbl">Email <span class="req-star">*</span></label>
-                        <input type="email" name="Email" value="@Model.Email" maxlength="100"
-                               class="@Ctrl("Email")" data-validate="required|email" data-label="Email" />
-                        <span class="field-error" data-error-for="Email">@Err("Email")</span>
-                    </div>
-                    <div>
-                        <label class="form-lbl">Contact Number <span class="req-star">*</span></label>
-                        <input type="text" name="ContactNumber" value="@Model.ContactNumber" maxlength="11"
-                               inputmode="numeric" class="@Ctrl("ContactNumber")"
-                               data-validate="required|phone" data-label="Contact number"
-                               placeholder="09XXXXXXXXX" />
-                        <span class="field-error" data-error-for="ContactNumber">@Err("ContactNumber")</span>
-                    </div>
-                </div>
-
-                <div class="form-row form-row-1">
-                    <div>
-                        <label class="form-lbl">Address</label>
-                        <input type="text" name="Address" value="@Model.Address" maxlength="250"
-                               class="@Ctrl("Address")" data-validate="address" data-label="Address"
-                               placeholder="Barangay, Municipality/City, Province" />
-                        <span class="field-error" data-error-for="Address">@Err("Address")</span>
-                    </div>
-                </div>
-
-                <div class="form-row form-row-2">
-                    <div>
-                        <label class="form-lbl">Photo</label>
-                        <div class="file-row">
-                            <label class="file-choose-btn" for="photoInput">Choose File</label>
-                            <span class="file-name-lbl" id="fileLabel">
-                                @(string.IsNullOrEmpty(Model.PhotoPath)
-                                    ? "No File Chosen"
-                                    : System.IO.Path.GetFileName(Model.PhotoPath))
-                            </span>
-                        </div>
-                        <span class="field-error" data-error-for="photo">@Err("photo")</span>
-                    </div>
-                    <div>
-                        <label class="form-lbl">Role</label>
-                        <input type="text" class="form-ctrl"
-                               value="@(Model.Role == "PayrollStaff" ? "Payroll Staff" : Model.Role)" readonly />
-                        <input type="hidden" name="Role" value="@Model.Role" />
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-primary-blue-block">Save Changes</button>
-            </div>
+            }
         </div>
-    </form>
 
-    <form asp-action="SendInvite" method="post" class="invite-resend-form">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="id" value="@Model.UserId" />
-        <button type="submit" class="btn-primary-blue-block">Send set-password email</button>
-    </form>
+        <div class="edit-fields-col">
 
-    <!-- Hidden form for toggle submission -->
+            <div class="form-row form-row-3">
+                <div>
+                    <label class="form-lbl">First Name</label>
+                    <input type="text" class="form-ctrl" value="@Model.FirstName" readonly />
+                </div>
+                <div>
+                    <label class="form-lbl">Last Name</label>
+                    <input type="text" class="form-ctrl" value="@Model.LastName" readonly />
+                </div>
+                <div>
+                    <label class="form-lbl">M.I</label>
+                    <input type="text" class="form-ctrl" value="@Dash(Model.MiddleInitial)" readonly />
+                </div>
+            </div>
+
+            <div class="form-row form-row-3b">
+                <div>
+                    <label class="form-lbl">Date of Birth</label>
+                    <input type="text" class="form-ctrl"
+                           value="@(Model.DateOfBirth.HasValue ? Model.DateOfBirth.Value.ToString("MMMM d, yyyy") : "—")"
+                           readonly />
+                </div>
+                <div>
+                    <label class="form-lbl">Age</label>
+                    <input type="text" class="form-ctrl" readonly value="@(Model.Age?.ToString() ?? "—")" />
+                </div>
+                <div>
+                    <label class="form-lbl">Gender</label>
+                    <input type="text" class="form-ctrl" value="@Dash(Model.Gender)" readonly />
+                </div>
+            </div>
+
+            <div class="form-row form-row-1">
+                <div>
+                    <label class="form-lbl">Username</label>
+                    <input type="text" class="form-ctrl" value="@Model.Username" readonly />
+                </div>
+            </div>
+
+            <div class="form-hint-box">
+                <i class="bi bi-info-circle-fill"></i>
+                Passwords are private. Admin cannot view or change them.
+            </div>
+
+            <div class="form-row form-row-2">
+                <div>
+                    <label class="form-lbl">Email</label>
+                    <input type="email" class="form-ctrl" value="@Model.Email" readonly />
+                </div>
+                <div>
+                    <label class="form-lbl">Contact Number</label>
+                    <input type="text" class="form-ctrl" value="@Model.ContactNumber" readonly />
+                </div>
+            </div>
+
+            <div class="form-row form-row-1">
+                <div>
+                    <label class="form-lbl">Address</label>
+                    <input type="text" class="form-ctrl" value="@Dash(Model.Address)" readonly />
+                </div>
+            </div>
+
+            <div class="form-row form-row-2">
+                <div>
+                    <label class="form-lbl">Photo</label>
+                    <input type="text" class="form-ctrl"
+                           value="@(string.IsNullOrEmpty(Model.PhotoPath) ? "No file chosen" : System.IO.Path.GetFileName(Model.PhotoPath))"
+                           readonly />
+                </div>
+                <div>
+                    <label class="form-lbl">Role</label>
+                    <input type="text" class="form-ctrl"
+                           value="@(Model.Role == "PayrollStaff" ? "Payroll Staff" : Model.Role)" readonly />
+                </div>
+            </div>
+
+            <form asp-action="SendInvite" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.UserId" />
+                <button type="submit" class="btn-primary-blue-block">Send set-password email</button>
+            </form>
+        </div>
+    </div>
+
     <form id="toggleStatusForm" method="post" style="display: none;">
         @Html.AntiForgeryToken()
     </form>
@@ -225,62 +156,15 @@
     </div>
 </div>
 
-<div class="del-overlay" id="lastAdminOverlay" onclick="closeLastAdminModal(arguments[0])">
-    <div class="del-modal">
-        <div class="del-icon-wrap">
-            <i class="bi bi-exclamation-triangle-fill del-icon"></i>
-        </div>
-        <div class="del-title">Cannot set inactive</div>
-        <div class="del-msg">
-            The system must keep one active admin account.
-        </div>
-        <div class="del-actions">
-            <button type="button" class="del-btn-cancel" onclick="closeLastAdminModal()">OK</button>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
-    <partial name="_FormValidationScripts" />
     <script>
-        function previewPhoto(input) {
-            document.getElementById('fileLabel').textContent =
-                input.files.length ? input.files[0].name : 'No File Chosen';
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    let img = document.getElementById('photoPreview');
-                    if (!img) {
-                        const ph = document.getElementById('photoPreviewPlaceholder');
-                        img = document.createElement('img');
-                        img.id = 'photoPreview';
-                        img.className = 'edit-photo-circle';
-                        if (ph) ph.replaceWith(img);
-                    }
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        const isLastActiveAdmin = @(ViewBag.IsLastActiveAdmin is true ? "true" : "false");
-
         function confirmToggleUserStatus(userId) {
-            if (isLastActiveAdmin) {
-                document.getElementById('lastAdminOverlay').classList.add('open');
-                return;
-            }
             document.getElementById('deactivateUserOverlay').classList.add('open');
         }
 
         function closeDeactivateUserModal(e) {
             if (!e || e.target === document.getElementById('deactivateUserOverlay'))
                 document.getElementById('deactivateUserOverlay').classList.remove('open');
-        }
-
-        function closeLastAdminModal(e) {
-            if (!e || e.target === document.getElementById('lastAdminOverlay'))
-                document.getElementById('lastAdminOverlay').classList.remove('open');
         }
 
         function toggleUserStatus(userId) {
@@ -290,10 +174,8 @@
         }
 
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
+            if (e.key === 'Escape')
                 closeDeactivateUserModal();
-                closeLastAdminModal();
-            }
         });
     </script>
 }
