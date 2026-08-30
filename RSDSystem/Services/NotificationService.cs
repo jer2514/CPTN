@@ -555,6 +555,7 @@ namespace RSDSystem.Services
             if (kind == NotificationKinds.PayrollResubmitted
                 || kind == NotificationKinds.AttendanceCorrectionResubmitted
                 || kind == NotificationKinds.TaskCompletionRequested
+                || kind == NotificationKinds.CashAdvanceAdded
                 || kind == NotificationKinds.CashAdvanceDeduction)
                 return false;
 

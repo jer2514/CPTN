@@ -360,11 +360,11 @@ namespace RSDSystem.Controllers
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Monthly Payroll Report", monthLabel));
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Job</th><th>Period</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
+            html.Append("<th>Employee</th><th>Job</th><th>Period</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Cash Advance</th><th>Net Pay</th><th>Status</th>");
             html.Append("</tr></thead><tbody>");
             if (slips.Count == 0)
             {
-                html.Append("<tr><td colspan=\"9\">No payroll records for this month.</td></tr>");
+                html.Append("<tr><td colspan=\"10\">No payroll records for this month.</td></tr>");
             }
             else
             {
@@ -380,6 +380,7 @@ namespace RSDSystem.Controllers
                     html.Append($"<td>{PayrollComputation.PaidRegularHours(slip):0.##}</td>");
                     html.Append($"<td>{slip.OvertimeHours:0.##}</td>");
                     html.Append($"<td>₱{slip.GrossPay:N2}</td>");
+                    html.Append($"<td>₱{slip.CashAdvance:N2}</td>");
                     html.Append($"<td>₱{slip.NetPay:N2}</td>");
                     html.Append($"<td>{Esc(slip.Status)}</td>");
                     html.Append("</tr>");
