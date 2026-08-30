@@ -4408,3 +4408,147 @@ button.badge-btn {
     background: #1B3FBF;
     color: #ffffff;
 }
+
+.ca-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    gap: 14px;
+    margin: 22px 0 18px;
+}
+
+.ca-kpi {
+    background: #f3f7ff;
+    border: 1px solid #d7e4ff;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.ca-kpi span {
+    display: block;
+    font-size: 12px;
+    color: #5b6f94;
+    font-weight: 600;
+}
+
+.ca-kpi strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 20px;
+    color: #163F8B;
+}
+
+.ca-emp-head {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.ca-emp-head-tight {
+    grid-template-columns: repeat(3, minmax(120px, 1fr));
+    margin-bottom: 16px;
+}
+
+.ca-emp-link {
+    font-size: 14px;
+    font-weight: 700;
+    color: #266DF1;
+}
+
+.ca-amount-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ca-amount-wrap span {
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.ca-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 32, 72, .45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    padding: 20px;
+}
+
+.ca-overlay[hidden] {
+    display: none;
+}
+
+.ca-panel {
+    width: min(560px, 100%);
+    background: #fff;
+    border-radius: 12px;
+    padding: 22px 24px 20px;
+}
+
+.ca-panel-sm {
+    width: min(440px, 100%);
+}
+
+.ca-panel-center {
+    text-align: center;
+}
+
+.ca-panel-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #163F8B;
+    margin-bottom: 16px;
+}
+
+.ca-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.ca-panel-actions-center {
+    justify-content: center;
+}
+
+.ca-btn-cancel {
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 6px;
+    border: 1.5px solid #1a1a1a;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.ca-success-icon {
+    width: 64px;
+    height: 64px;
+    margin: 4px auto 12px;
+    border-radius: 50%;
+    background: #d4f7e0;
+    color: #0d7a3e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.ca-success-msg {
+    font-size: 14px;
+    color: #4a5568;
+    line-height: 1.45;
+}
+
+@media (max-width: 760px) {
+    .ca-kpi-row,
+    .ca-emp-head,
+    .ca-emp-head-tight {
+        grid-template-columns: 1fr;
+    }
+}

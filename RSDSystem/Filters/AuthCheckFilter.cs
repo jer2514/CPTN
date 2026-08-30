@@ -72,7 +72,7 @@ namespace RSDSystem.Filters
                 }
             }
 
-            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll", "ActivityLog" };
+            var adminOnly = new[] { "Home", "UserManagement", "Employee", "Project", "Report", "Payroll", "CashAdvance", "ActivityLog" };
             if (role == "PayrollStaff" && controllerName != null && adminOnly.Contains(controllerName))
             {
                 context.Result = new RedirectToActionResult("Index", "PayrollStaff", null);
@@ -152,7 +152,11 @@ namespace RSDSystem.Filters
                         || string.Equals(action, "ReturnTask", StringComparison.OrdinalIgnoreCase)))
                 || (string.Equals(controller, "Report", StringComparison.OrdinalIgnoreCase)
                     && (string.Equals(action, "Periods", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(action, "Generate", StringComparison.OrdinalIgnoreCase)));
+                        || string.Equals(action, "Generate", StringComparison.OrdinalIgnoreCase)))
+                || (string.Equals(controller, "CashAdvance", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(action, "Add", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "Deduct", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(action, "DeductTotal", StringComparison.OrdinalIgnoreCase)));
         }
     }
 }

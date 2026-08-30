@@ -60,5 +60,7 @@ namespace RSDSystem.Models
         public const string CreateUser = "Create User";
         public const string EditUser = "Edit User";
         public const string GeneratePrediction = "Load Prediction";
+        public const string AddCashAdvance = "Add Cash Advance";
+        public const string DeductCashAdvance = "Deduct Cash Advance";
     }
 }

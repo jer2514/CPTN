@@ -19,17 +19,20 @@ namespace RSDSystem.Controllers
         private readonly AttendanceImportService _attendance;
         private readonly NotificationService _notifications;
         private readonly ActivityLogService _logs;
+        private readonly CashAdvanceService _advances;
 
         public PayrollStaffController(
             PayrollDbContext db,
             AttendanceImportService attendance,
             NotificationService notifications,
-            ActivityLogService logs)
+            ActivityLogService logs,
+            CashAdvanceService advances)
         {
             _db = db;
             _attendance = attendance;
             _notifications = notifications;
             _logs = logs;
+            _advances = advances;
         }
 
         // GET /PayrollStaff  → "To do task" dashboard
@@ -384,7 +387,9 @@ namespace RSDSystem.Controllers
             ViewBag.AbsentDays = attendance.DaysAbsent;
             ViewBag.OvertimeHours = attendance.OvertimeHours;
             ViewBag.RegularHours = attendance.RegularHours;
-            ViewBag.CashAdvance = existing?.CashAdvance ?? 0;
+            var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
+            ViewBag.CashAdvance = existing?.CashAdvance ?? pendingAdvance;
+            ViewBag.CashAdvanceLocked = true;
             ViewBag.MinDate = activeSchedule != null
                 ? activeSchedule.StartingDate.ToString("yyyy-MM-dd")
                 : "";
@@ -535,12 +540,19 @@ namespace RSDSystem.Controllers
             var overtimeHours = attendance.OvertimeHours;
             var regularHours = attendance.RegularHours;
 
+            var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
+            var hourly = EmployeeRates.HourlyFromDaily(emp.DailyRate);
+            var previewGross = PayrollComputation.Compute(hourly, regularHours, overtimeHours, 0).GrossPay;
+            cashAdvance = pendingAdvance;
+            if (cashAdvance > previewGross)
+                cashAdvance = previewGross;
+
             var errors = new Dictionary<string, string>();
             if (cashAdvance < 0)
                 errors["cashAdvance"] = "Cash advance cannot be negative.";
 
             var (regularPay, overtimePay, gross, net) = PayrollComputation.Compute(
-                EmployeeRates.HourlyFromDaily(emp.DailyRate), regularHours, overtimeHours, cashAdvance);
+                hourly, regularHours, overtimeHours, cashAdvance);
 
             if (cashAdvance > gross)
                 errors["cashAdvance"] = "Cash advance cannot be greater than gross pay.";

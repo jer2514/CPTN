@@ -62,6 +62,8 @@ namespace RSDSystem.Models
         public const string AttendanceCorrectionRejected = "AttendanceCorrectionRejected";
         public const string PayslipsSent = "PayslipsSent";
         public const string StaffAssigned = "StaffAssigned";
+        public const string CashAdvanceAdded = "CashAdvanceAdded";
+        public const string CashAdvanceDeduction = "CashAdvanceDeduction";
 
         public static string Icon(string? kind) => (kind ?? "").Trim() switch
         {
@@ -83,6 +85,8 @@ namespace RSDSystem.Models
             AttendanceCorrectionRejected => "bi-file-earmark-excel-fill",
             PayslipsSent => "bi-file-earmark-pdf-fill",
             StaffAssigned => "bi-person-check-fill",
+            CashAdvanceAdded => "bi-cash-coin",
+            CashAdvanceDeduction => "bi-cash-coin",
             _ => "bi-bell-fill"
         };
 
@@ -106,6 +110,8 @@ namespace RSDSystem.Models
             AttendanceCorrectionRejected => "notif-icon-reject",
             PayslipsSent => "notif-icon-send",
             StaffAssigned => "notif-icon-task",
+            CashAdvanceAdded => "notif-icon-send",
+            CashAdvanceDeduction => "notif-icon-send",
             _ => "notif-icon-task"
         };
     }
