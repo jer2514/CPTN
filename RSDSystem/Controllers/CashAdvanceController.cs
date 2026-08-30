@@ -36,7 +36,6 @@ namespace RSDSystem.Controllers
                 .ToListAsync();
             ViewBag.SelectedProjectId = projectId;
             ViewBag.Search = search ?? "";
-            ViewBag.Status = string.IsNullOrWhiteSpace(status) ? "all" : status;
 
             if (projectId is null or <= 0)
             {
@@ -57,8 +56,8 @@ namespace RSDSystem.Controllers
             ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
             ViewBag.Totals = await _advances.ProjectTotalsAsync(project.ProjectId);
 
-            var rows = await _advances.EmployeeRowsAsync(project.ProjectId, search, status);
-            const int pageSize = 10;
+            var rows = await _advances.EmployeeRowsAsync(project.ProjectId, search, "all");
+            const int pageSize = 5;
             var totalPages = Math.Max(1, (int)Math.Ceiling(rows.Count / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
             ViewBag.CurrentPage = page;
@@ -131,11 +130,6 @@ namespace RSDSystem.Controllers
                 .FirstOrDefaultAsync(p => p.ProjectId == projectId);
             var employee = await _db.Employees.AsNoTracking()
                 .FirstOrDefaultAsync(e => e.EmployeeId == employeeId);
-            if (project != null)
-            {
-                await _notifications.NotifyCashAdvanceAddedAsync(
-                    project, employee?.FullName ?? "an employee", entry!.Amount, HttpContext.RequestAborted);
-            }
 
             await _logs.LogAsync(
                 ActivityTypes.AddCashAdvance,
@@ -161,11 +155,7 @@ namespace RSDSystem.Controllers
             if (entry?.Project != null)
             {
                 await _notifications.NotifyCashAdvanceDeductionAsync(
-                    entry.Project,
-                    entry.Employee?.FullName ?? "an employee",
-                    entry.Amount,
-                    wholeBalance: false,
-                    HttpContext.RequestAborted);
+                    entry.Project, HttpContext.RequestAborted);
             }
 
             await _logs.LogAsync(
@@ -200,8 +190,7 @@ namespace RSDSystem.Controllers
                 .FirstOrDefaultAsync(p => p.ProjectId == projectId);
             if (project != null)
             {
-                await _notifications.NotifyCashAdvanceDeductionAsync(
-                    project, name, amount, wholeBalance: true, HttpContext.RequestAborted);
+                await _notifications.NotifyCashAdvanceDeductionAsync(project, HttpContext.RequestAborted);
             }
 
             await _logs.LogAsync(

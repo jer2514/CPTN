@@ -14,17 +14,20 @@ namespace RSDSystem.Controllers
         private readonly NotificationService _notifications;
         private readonly AttendanceImportService _imports;
         private readonly ActivityLogService _logs;
+        private readonly CashAdvanceService _advances;
 
         public NotificationController(
             PayrollDbContext db,
             NotificationService notifications,
             AttendanceImportService imports,
-            ActivityLogService logs)
+            ActivityLogService logs,
+            CashAdvanceService advances)
         {
             _db = db;
             _notifications = notifications;
             _imports = imports;
             _logs = logs;
+            _advances = advances;
         }
 
         public async Task<IActionResult> Index(int page = 1, string? filter = null)
@@ -83,6 +86,36 @@ namespace RSDSystem.Controllers
         {
             await _notifications.MarkAllReadAsync(CurrentRole(), CurrentName(), HttpContext.RequestAborted);
             return Json(new { success = true });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetCashAdvanceSummary(int projectId)
+        {
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == projectId, HttpContext.RequestAborted);
+            if (project == null)
+                return Json(new { success = false, message = "Project not found." });
+
+            if (IsStaff && !StaffNames.IsAssigned(project.AssignedPayrollStaff, CurrentName()))
+                return Json(new { success = false, message = "This project is not assigned to you." });
+
+            var rows = await _advances.PendingByEmployeeAsync(project.ProjectId, HttpContext.RequestAborted);
+            return Json(new
+            {
+                success = true,
+                projectName = project.ProjectName,
+                message = $"The following cash advances on project '{project.ProjectName}' have been marked for deduction for the next payroll.",
+                generateUrl = IsStaff
+                    ? "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId
+                    : "/CashAdvance/Index?projectId=" + project.ProjectId,
+                employees = rows.Select(r => new
+                {
+                    name = r.EmployeeName,
+                    job = r.Job,
+                    amount = r.Amount,
+                    count = r.Count
+                })
+            });
         }
 
         [HttpGet]

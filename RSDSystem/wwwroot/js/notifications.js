@@ -82,7 +82,8 @@
                     ' data-id="' + item.id + '"' +
                     ' data-url="' + (item.url || '') + '"' +
                     ' data-kind="' + (item.kind || '') + '"' +
-                    ' data-related="' + (item.relatedId || '') + '">' +
+                    ' data-related="' + (item.relatedId || '') + '"' +
+                    ' data-project="' + (item.projectId || '') + '">' +
                     '<span class="notif-icon ' + item.iconClass + '"><i class="bi ' + item.icon + '"></i></span>' +
                     '<span class="notif-item-copy">' +
                         '<span class="notif-item-top"><span class="notif-item-title">' + escapeHtml(item.title) + '</span>' +
@@ -147,6 +148,11 @@
             openTaskModal(related);
             return;
         }
+        if ((kind === 'CashAdvanceDeduction' || kind === 'CashAdvanceAdded') && el.dataset.project) {
+            closeAll();
+            openCashAdvanceSummary(el.dataset.project);
+            return;
+        }
         if (el.dataset.url) window.location.href = el.dataset.url;
     }
 
@@ -192,6 +198,58 @@
     }
 
     window.rsdOpenCorrection = openCorrectionModal;
+
+    async function openCashAdvanceSummary(projectId) {
+        const overlay = document.getElementById('cashAdvanceNotifOverlay');
+        if (!overlay) {
+            window.location.href = '/PayrollStaff/GeneratePayroll?projectId=' + encodeURIComponent(projectId);
+            return;
+        }
+        overlay.hidden = false;
+        const msg = document.getElementById('caNotifMessage');
+        const rows = document.getElementById('caNotifRows');
+        const openBtn = document.getElementById('caNotifOpenBtn');
+        if (msg) msg.textContent = 'Loading...';
+        if (rows) rows.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">Loading...</td></tr>';
+        try {
+            const res = await fetch('/Notification/GetCashAdvanceSummary?projectId=' + encodeURIComponent(projectId), {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.success) {
+                showToast(data.message || 'Could not load cash advances.');
+                overlay.hidden = true;
+                return;
+            }
+            if (msg) msg.textContent = data.message || '';
+            if (openBtn) {
+                openBtn.href = data.generateUrl || ('/PayrollStaff/GeneratePayroll?projectId=' + projectId);
+                openBtn.textContent = isAdmin ? 'Open Cash Advance' : 'Open Payroll';
+            }
+            if (rows) {
+                if (!data.employees || !data.employees.length) {
+                    rows.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No cash advances are waiting for the next payroll.</td></tr>';
+                } else {
+                    rows.innerHTML = data.employees.map(function (row) {
+                        return '<tr><td>' + escapeHtml(row.name) + '</td><td>' + escapeHtml(row.job) +
+                            '</td><td>₱ ' + Number(row.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 }) + '</td></tr>';
+                    }).join('');
+                }
+            }
+        } catch (err) {
+            showToast('Could not load cash advances.');
+            overlay.hidden = true;
+        }
+    }
+
+    const caNotifOverlay = document.getElementById('cashAdvanceNotifOverlay');
+    if (caNotifOverlay) {
+        caNotifOverlay.addEventListener('click', function (e) {
+            if (e.target === caNotifOverlay) caNotifOverlay.hidden = true;
+        });
+        const closeBtn = document.getElementById('caNotifCloseBtn');
+        if (closeBtn) closeBtn.addEventListener('click', function () { caNotifOverlay.hidden = true; });
+    }
 
     async function openTaskModal(id) {
         const overlay = document.getElementById('taskApprovalOverlay');

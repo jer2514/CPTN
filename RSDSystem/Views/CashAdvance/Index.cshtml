@@ -7,11 +7,7 @@
     var selectedId = ViewBag.SelectedProjectId as int?;
     var totals = ViewBag.Totals as CashAdvanceTotals ?? new CashAdvanceTotals();
     var search = ViewBag.Search as string ?? "";
-    var status = ViewBag.Status as string ?? "all";
-    var filterLabel = status == "unpaid" ? "Unpaid"
-        : status == "paid" ? "Paid"
-        : status == "all" ? "All"
-        : "Filter";
+    var isFinished = ViewBag.IsFinished is true;
     int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
 }
@@ -72,32 +68,8 @@
                 <form method="get" asp-action="Index" class="search-wrap search-wrap-wide">
                     <i class="bi bi-search"></i>
                     <input type="hidden" name="projectId" value="@selectedId" />
-                    <input type="hidden" name="status" value="@status" />
                     <input type="text" name="search" value="@search" placeholder="Search Employee" />
                 </form>
-                <div class="dropdown">
-                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        @filterLabel
-                    </button>
-                    <ul class="dropdown-menu filter-menu">
-                        <li>
-                            <a class="dropdown-item @(status == "all" ? "active" : "")"
-                               asp-action="Index" asp-route-projectId="@selectedId"
-                               asp-route-search="@search" asp-route-status="all">All</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item @(status == "unpaid" ? "active" : "")"
-                               asp-action="Index" asp-route-projectId="@selectedId"
-                               asp-route-search="@search" asp-route-status="unpaid">Unpaid</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item @(status == "paid" ? "active" : "")"
-                               asp-action="Index" asp-route-projectId="@selectedId"
-                               asp-route-search="@search" asp-route-status="paid">Paid</a>
-                        </li>
-                    </ul>
-                </div>
             </div>
         </div>
 
@@ -116,7 +88,7 @@
                     @if (Model.Count == 0)
                     {
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">No employees match this filter.</td>
+                            <td colspan="5" class="text-center text-muted py-4">No employees found.</td>
                         </tr>
                     }
                     @foreach (var row in Model)
@@ -127,12 +99,23 @@
                             <td>@row.Job</td>
                             <td>₱ @row.Total.ToString("N2")</td>
                             <td>
-                                <a class="pill-btn pill-view"
-                                   asp-action="Employee"
-                                   asp-route-projectId="@selectedId"
-                                   asp-route-employeeId="@row.EmployeeId">
-                                    <i class="bi bi-eye-fill"></i> View
-                                </a>
+                                <div class="ca-row-actions">
+                                    @if (!isFinished && row.Outstanding > 0)
+                                    {
+                                        <button type="button" class="pill-btn pill-view ca-list-deduct"
+                                                data-employee-id="@row.EmployeeId"
+                                                data-name="@row.EmployeeName"
+                                                data-amount="@row.Outstanding.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                                            Deduct
+                                        </button>
+                                    }
+                                    <a class="ca-view-btn"
+                                       asp-action="Employee"
+                                       asp-route-projectId="@selectedId"
+                                       asp-route-employeeId="@row.EmployeeId">
+                                        <i class="bi bi-eye-fill"></i> View
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     }
@@ -149,10 +132,98 @@
                        asp-action="Index"
                        asp-route-projectId="@selectedId"
                        asp-route-search="@search"
-                       asp-route-status="@status"
                        asp-route-page="@i">@i</a>
                 }
             </div>
         }
     }
 </div>
+
+<div class="ca-overlay" id="confirmOverlay" hidden>
+    <div class="ca-panel ca-panel-sm">
+        <div class="ca-panel-title" id="confirmTitle">Deduct cash advance</div>
+        <div class="ca-confirm-body">
+            <div class="ca-confirm-icon"><i class="bi bi-exclamation-lg"></i></div>
+            <div>
+                <p class="ca-confirm-copy" id="confirmMsg"></p>
+                <p class="ca-confirm-warn">This action cannot be undone.</p>
+            </div>
+        </div>
+        <div class="ca-panel-actions">
+            <button type="button" class="ca-btn-cancel" id="confirmCancelBtn">Cancel</button>
+            <button type="button" class="btn-primary-blue" id="confirmOkBtn">Confirm Deduction</button>
+        </div>
+    </div>
+</div>
+
+<div class="ca-overlay" id="successOverlay" hidden>
+    <div class="ca-panel ca-panel-sm ca-panel-center">
+        <div class="ca-success-icon"><i class="bi bi-check-lg"></i></div>
+        <div class="ca-panel-title ca-panel-title-dark">Cash Advance Deducted</div>
+        <div class="ca-success-msg" id="successMsg"></div>
+        <div class="ca-panel-actions ca-panel-actions-center">
+            <button type="button" class="btn-primary-blue" id="successOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
+    <script>
+        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]')?.value || '';
+        const projectId = @(selectedId ?? 0);
+        let deductRow = null;
+
+        function show(el) { el.hidden = false; }
+        function hide(el) { el.hidden = true; }
+
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        const successOverlay = document.getElementById('successOverlay');
+
+        document.querySelectorAll('.ca-list-deduct').forEach(btn => {
+            btn.addEventListener('click', () => {
+                deductRow = {
+                    employeeId: btn.dataset.employeeId,
+                    name: btn.dataset.name,
+                    amount: btn.dataset.amount
+                };
+                document.getElementById('confirmTitle').textContent = 'Deduct total cash advance';
+                document.getElementById('confirmMsg').textContent =
+                    `This will deduct the whole outstanding balance of ₱ ${Number(deductRow.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} for ${deductRow.name} in the next payroll.`;
+                show(confirmOverlay);
+            });
+        });
+        document.getElementById('confirmCancelBtn')?.addEventListener('click', () => hide(confirmOverlay));
+        confirmOverlay?.addEventListener('click', e => { if (e.target === confirmOverlay) hide(confirmOverlay); });
+
+        document.getElementById('confirmOkBtn')?.addEventListener('click', async function () {
+            if (!deductRow) return;
+            this.disabled = true;
+            const body = new URLSearchParams();
+            body.set('__RequestVerificationToken', token);
+            body.set('projectId', projectId);
+            body.set('employeeId', deductRow.employeeId);
+            try {
+                const res = await fetch('/CashAdvance/DeductTotal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                    body
+                });
+                const data = await res.json();
+                hide(confirmOverlay);
+                if (!data.success) { showToast(data.message || 'Could not mark the cash advance.'); return; }
+                const amount = Number(data.amount || deductRow.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+                document.getElementById('successMsg').textContent =
+                    `The total cash advance of ₱ ${amount} for ${data.employeeName || deductRow.name} has been marked for deduction in the next payroll.`;
+                show(successOverlay);
+            } catch (err) {
+                showToast('Could not mark the cash advance.');
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        document.getElementById('successOkBtn')?.addEventListener('click', () => window.location.reload());
+        successOverlay?.addEventListener('click', e => { if (e.target === successOverlay) window.location.reload(); });
+    </script>
+}
