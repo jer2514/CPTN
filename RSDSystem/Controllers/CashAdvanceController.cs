@@ -66,7 +66,7 @@ namespace RSDSystem.Controllers
             return View(rows.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
-        public async Task<IActionResult> Employee(int projectId, int employeeId, int page = 1)
+        public async Task<IActionResult> Employee(int projectId, int employeeId, string? status, int page = 1)
         {
             var blocked = RequireAdmin();
             if (blocked != null) return blocked;
@@ -84,21 +84,31 @@ namespace RSDSystem.Controllers
                 .ThenByDescending(c => c.CashAdvanceId)
                 .ToListAsync();
 
+            var filter = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
+            var visible = filter switch
+            {
+                "unpaid" => rows.Where(r => CashAdvanceStatuses.IsUnpaid(r.Status)).ToList(),
+                "paid" => rows.Where(r => CashAdvanceStatuses.IsPaid(r.Status)).ToList(),
+                _ => rows
+            };
+
             const int pageSize = 10;
-            var totalPages = Math.Max(1, (int)Math.Ceiling(rows.Count / (double)pageSize));
+            var totalPages = Math.Max(1, (int)Math.Ceiling(visible.Count / (double)pageSize));
             page = Math.Clamp(page, 1, totalPages);
 
-            ViewBag.PageTitle = "Cash Advance";
+            ViewBag.PageTitle = "Employee Cash Advance";
             ViewBag.Project = project;
             ViewBag.Employee = employee;
             ViewBag.DisplayId = EmployeeIds.Format(employee.EmployeeCode);
             ViewBag.IsFinished = ProjectStatusOptions.IsFinished(project.Status);
+            ViewBag.Status = filter;
+            ViewBag.Total = rows.Sum(r => r.Amount);
             ViewBag.Outstanding = rows.Where(r => r.Status == CashAdvanceStatuses.Outstanding).Sum(r => r.Amount);
-            ViewBag.Pending = rows.Where(r => r.Status == CashAdvanceStatuses.Pending).Sum(r => r.Amount);
+            ViewBag.Unpaid = rows.Where(r => CashAdvanceStatuses.IsUnpaid(r.Status)).Sum(r => r.Amount);
             ViewBag.Paid = rows.Where(r => r.Status == CashAdvanceStatuses.Deducted).Sum(r => r.Amount);
             ViewBag.CurrentPage = page;
             ViewBag.TotalPages = totalPages;
-            return View(rows.Skip((page - 1) * pageSize).Take(pageSize).ToList());
+            return View(visible.Skip((page - 1) * pageSize).Take(pageSize).ToList());
         }
 
         [HttpPost]

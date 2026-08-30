@@ -394,14 +394,11 @@ namespace RSDSystem.Services
             var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
-            var detail = wholeBalance
-                ? $"The total cash advance of ₱{amount:N2} for {employeeName} has been marked for deduction from the next payroll."
-                : $"A cash advance of ₱{amount:N2} for {employeeName} has been marked for deduction from the next payroll.";
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.CashAdvanceDeduction,
                 "Cash Advance",
-                "The following cash advances have been marked for deduction from the employees' next payroll. " + detail,
+                "The following cash advances have been marked for deduction from the employees' next payroll.",
                 project.ProjectId,
                 null,
                 "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId,

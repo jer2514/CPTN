@@ -4545,10 +4545,231 @@ button.badge-btn {
     line-height: 1.45;
 }
 
+.ca-panel-title-dark {
+    color: #111;
+}
+
+.ca-success-icon {
+    background: #22c55e;
+    color: #fff;
+}
+
+.ca-summary-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 14px;
+    padding: 16px 18px;
+    border: 1px solid #d7e4ff;
+    border-radius: 10px;
+}
+
+.ca-summary-person {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.ca-emp-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #266DF1;
+    flex-shrink: 0;
+}
+
+.ca-emp-avatar-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #C9DAFF;
+    color: #163F8B;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.ca-emp-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #163F8B;
+}
+
+.ca-emp-meta {
+    font-size: 13px;
+    color: #5b6f94;
+    margin-top: 2px;
+}
+
+.ca-summary-metrics {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+}
+
+.ca-summary-metrics > div {
+    padding: 0 22px;
+    border-left: 1px solid #d7e4ff;
+}
+
+.ca-summary-metrics span {
+    display: block;
+    font-size: 12px;
+    color: #5b6f94;
+    font-weight: 600;
+}
+
+.ca-summary-metrics strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 20px;
+    color: #163F8B;
+}
+
+.ca-status-unpaid {
+    background: #ffd8a8;
+    color: #c05621;
+}
+
+.ca-status-paid {
+    background: #b6f0c9;
+    color: #0d7a3e;
+}
+
+.ca-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ca-view-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 20px;
+    border: 1px solid #c5d0e6;
+    background: #fff;
+    color: #4a5568;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ca-view-btn:hover {
+    background: #f4f7ff;
+    color: #163F8B;
+}
+
+.ca-footer-deduct {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 22px;
+    flex-wrap: wrap;
+}
+
+.ca-footer-deduct .form-hint-box {
+    margin: 0;
+    flex: 1;
+    min-width: 240px;
+}
+
+.ca-confirm-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.ca-confirm-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #266DF1;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+}
+
+.ca-confirm-copy,
+.ca-confirm-warn {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+    line-height: 1.45;
+}
+
+.ca-confirm-warn {
+    margin-top: 8px;
+}
+
+.ca-view-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 18px;
+}
+
+.ca-view-wide {
+    grid-column: 1 / -1;
+}
+
+.notif-icon-bell {
+    background: #f3f4f6;
+    color: #111;
+}
+
+.notif-item[data-kind="CashAdvanceDeduction"] .notif-item-title,
+.notif-item[data-kind="CashAdvanceAdded"] .notif-item-title,
+.notif-page-item[data-kind="CashAdvanceDeduction"] .notif-item-title,
+.notif-page-item[data-kind="CashAdvanceAdded"] .notif-item-title {
+    color: #266DF1;
+}
+
+.profile-photo-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.profile-photo-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #266DF1;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.profile-photo-btn:hover {
+    color: #1B52BD;
+}
+
 @media (max-width: 760px) {
     .ca-kpi-row,
     .ca-emp-head,
-    .ca-emp-head-tight {
+    .ca-emp-head-tight,
+    .ca-summary-card,
+    .ca-summary-metrics,
+    .ca-view-grid {
         grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .ca-summary-metrics > div {
+        padding: 10px 0 0;
+        border-left: none;
+        border-top: 1px solid #d7e4ff;
+        width: 100%;
     }
 }
