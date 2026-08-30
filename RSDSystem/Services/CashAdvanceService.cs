@@ -197,18 +197,35 @@ namespace RSDSystem.Services
             if (pending.Count == 0)
                 return;
 
-            var remaining = payroll.CashAdvance;
             var now = PhilippinesTime.Now;
-            foreach (var row in pending)
+            var plan = CashAdvanceDeduction.Plan(
+                pending.Select(row => (row.CashAdvanceId, row.Amount)),
+                payroll.CashAdvance);
+            var byId = pending.ToDictionary(row => row.CashAdvanceId);
+            foreach (var step in plan)
             {
-                if (remaining <= 0)
-                    break;
-                if (row.Amount > remaining)
-                    continue;
+                var row = byId[step.CashAdvanceId];
+                if (step.LeftoverAmount > 0)
+                {
+                    _db.CashAdvances.Add(new CashAdvance
+                    {
+                        ProjectId = row.ProjectId,
+                        EmployeeId = row.EmployeeId,
+                        AdvanceDate = row.AdvanceDate,
+                        Amount = step.LeftoverAmount,
+                        Reason = row.Reason,
+                        Status = CashAdvanceStatuses.Pending,
+                        CreatedAt = row.CreatedAt,
+                        CreatedBy = row.CreatedBy,
+                        MarkedAt = row.MarkedAt,
+                        MarkedBy = row.MarkedBy
+                    });
+                    row.Amount = step.DeductedAmount;
+                }
+
                 row.Status = CashAdvanceStatuses.Deducted;
                 row.PayrollId = payroll.PayrollId;
                 row.DeductedAt = now;
-                remaining -= row.Amount;
             }
             await _db.SaveChangesAsync(cancellationToken);
         }
