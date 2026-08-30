@@ -12,12 +12,6 @@
     int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
     var displayId = ViewBag.DisplayId as string ?? "—";
-    var status = ViewBag.Status as string ?? "all";
-    var statusClicked = !string.IsNullOrWhiteSpace(Context.Request.Query["status"]);
-    var filterLabel = !statusClicked ? "Filter"
-        : status == "unpaid" ? "Unpaid"
-        : status == "paid" ? "Paid"
-        : "All";
     var initials = string.Join("", new[] { employee?.FirstName, employee?.LastName }
         .Where(v => !string.IsNullOrWhiteSpace(v))
         .Select(v => char.ToUpper(v![0])));
@@ -64,31 +58,7 @@
     @if (!isFinished)
     {
         <div class="list-controls-row att-list-toolbar">
-            <div class="list-controls-left">
-                <div class="dropdown">
-                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                        @filterLabel
-                    </button>
-                    <ul class="dropdown-menu filter-menu">
-                        <li>
-                            <a class="dropdown-item @(status == "all" ? "active" : "")"
-                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
-                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="all">All</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item @(status == "unpaid" ? "active" : "")"
-                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
-                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="unpaid">Unpaid</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item @(status == "paid" ? "active" : "")"
-                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
-                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="paid">Paid</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+            <div class="list-controls-left"></div>
             <div class="list-controls-actions">
                 <button type="button" class="btn-primary-blue" id="addAdvanceBtn">Add Cash Advance</button>
             </div>
@@ -162,7 +132,6 @@
                    asp-action="Employee"
                    asp-route-projectId="@project?.ProjectId"
                    asp-route-employeeId="@employee?.EmployeeId"
-                   asp-route-status="@status"
                    asp-route-page="@i">@i</a>
             }
         </div>

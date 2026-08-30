@@ -58,6 +58,7 @@ namespace RSDSystem.Services
 
                 var empRows = advances.Where(a => a.EmployeeId == emp.EmployeeId).ToList();
                 var unpaid = empRows.Where(a => CashAdvanceStatuses.IsUnpaid(a.Status)).Sum(a => a.Amount);
+                var outstanding = empRows.Where(a => a.Status == CashAdvanceStatuses.Outstanding).Sum(a => a.Amount);
                 var paid = empRows.Where(a => CashAdvanceStatuses.IsPaid(a.Status)).Sum(a => a.Amount);
                 if (filter == "unpaid" && unpaid <= 0)
                     continue;
@@ -72,11 +73,38 @@ namespace RSDSystem.Services
                     Job = emp.JobClassification ?? "—",
                     Total = empRows.Sum(a => a.Amount),
                     Unpaid = unpaid,
+                    Outstanding = outstanding,
                     Paid = paid
                 });
             }
 
             return rows;
+        }
+
+        public async Task<List<CashAdvancePendingRow>> PendingByEmployeeAsync(
+            int projectId, CancellationToken cancellationToken = default)
+        {
+            var rows = await _db.CashAdvances.AsNoTracking()
+                .Include(c => c.Employee)
+                .Where(c => c.ProjectId == projectId && c.Status == CashAdvanceStatuses.Pending)
+                .ToListAsync(cancellationToken);
+
+            return rows
+                .GroupBy(c => c.EmployeeId)
+                .Select(g =>
+                {
+                    var emp = g.First().Employee;
+                    return new CashAdvancePendingRow
+                    {
+                        EmployeeId = g.Key,
+                        EmployeeName = emp?.FullName ?? "Employee",
+                        Job = emp?.JobClassification ?? "—",
+                        Amount = g.Sum(x => x.Amount),
+                        Count = g.Count()
+                    };
+                })
+                .OrderBy(r => r.EmployeeName)
+                .ToList();
         }
 
         public async Task<decimal> PendingAmountAsync(int projectId, int employeeId, CancellationToken cancellationToken = default)

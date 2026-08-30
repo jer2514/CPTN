@@ -388,20 +388,43 @@ namespace RSDSystem.Services
         }
 
         public async Task NotifyCashAdvanceDeductionAsync(
-            Project project, string employeeName, decimal amount, bool wholeBalance,
-            CancellationToken cancellationToken = default)
+            Project project, CancellationToken cancellationToken = default)
         {
             var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
             if (string.IsNullOrWhiteSpace(staff))
                 return;
+
+            var name = ProjectName(project);
+            var message = $"The following cash advances on project '{name}' have been marked for deduction for the next payroll.";
+            var url = "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId;
+
+            var existing = await _db.AppNotifications
+                .Where(n => n.RecipientRole == NotificationRoles.PayrollStaff
+                    && n.RecipientName == staff
+                    && n.Kind == NotificationKinds.CashAdvanceDeduction
+                    && n.ProjectId == project.ProjectId
+                    && !n.IsRead)
+                .OrderByDescending(n => n.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existing != null)
+            {
+                existing.Title = "Cash Advance";
+                existing.Message = ClipMessage(message);
+                existing.Url = url;
+                existing.CreatedAt = PhilippinesTime.Now;
+                await _db.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
             await NotifyStaffAsync(
                 staff,
                 NotificationKinds.CashAdvanceDeduction,
                 "Cash Advance",
-                "The following cash advances have been marked for deduction from the employees' next payroll.",
+                message,
                 project.ProjectId,
                 null,
-                "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId,
+                url,
                 cancellationToken);
         }
 

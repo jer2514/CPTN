@@ -71,6 +71,7 @@ namespace RSDSystem.Models
         public string Job { get; set; } = "";
         public decimal Total { get; set; }
         public decimal Unpaid { get; set; }
+        public decimal Outstanding { get; set; }
         public decimal Paid { get; set; }
     }
 
@@ -79,5 +80,14 @@ namespace RSDSystem.Models
         public decimal Total { get; set; }
         public decimal Unpaid { get; set; }
         public decimal Paid { get; set; }
+    }
+
+    public class CashAdvancePendingRow
+    {
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = "";
+        public string Job { get; set; } = "";
+        public decimal Amount { get; set; }
+        public int Count { get; set; }
     }
 }
