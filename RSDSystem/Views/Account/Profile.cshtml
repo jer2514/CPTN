@@ -26,14 +26,23 @@
 
 <div class="form-card profile-view-card">
     <div class="profile-view-head">
-        @if (!string.IsNullOrEmpty(Model.PhotoPath))
-        {
-            <img src="@Model.PhotoPath" alt="" class="edit-photo-circle" />
-        }
-        else
-        {
-            <div class="edit-photo-initials">@initials</div>
-        }
+        <div class="profile-photo-block">
+            @if (!string.IsNullOrEmpty(Model.PhotoPath))
+            {
+                <img src="@Model.PhotoPath" alt="" class="edit-photo-circle" id="profilePhotoPreview" />
+            }
+            else
+            {
+                <div class="edit-photo-initials" id="profilePhotoPlaceholder">@initials</div>
+            }
+            <form asp-controller="Account" asp-action="UpdatePhoto" method="post" enctype="multipart/form-data" id="profilePhotoForm">
+                @Html.AntiForgeryToken()
+                <input type="file" id="profilePhotoInput" name="photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden />
+                <button type="button" class="profile-photo-btn" id="profilePhotoBtn">
+                    @(string.IsNullOrEmpty(Model.PhotoPath) ? "Add photo" : "Change photo")
+                </button>
+            </form>
+        </div>
         <div>
             <h1 class="profile-view-name">@Model.FullName</h1>
             <div class="profile-view-meta">
@@ -144,6 +153,17 @@
             form.addEventListener('submit', function (e) {
                 if (form.classList.contains('is-locked')) e.preventDefault();
             });
+
+            const photoForm = document.getElementById('profilePhotoForm');
+            const photoInput = document.getElementById('profilePhotoInput');
+            const photoBtn = document.getElementById('profilePhotoBtn');
+            if (photoBtn && photoInput && photoForm) {
+                photoBtn.addEventListener('click', function () { photoInput.click(); });
+                photoInput.addEventListener('change', function () {
+                    if (photoInput.files && photoInput.files.length > 0)
+                        photoForm.submit();
+                });
+            }
         })();
     </script>
 }

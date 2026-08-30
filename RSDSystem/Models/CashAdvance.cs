@@ -57,7 +57,7 @@ namespace RSDSystem.Models
         public static string Display(string? status) => (status ?? "").Trim() switch
         {
             Outstanding => "Unpaid",
-            Pending => "For next payroll",
+            Pending => "Unpaid",
             Deducted => "Paid",
             _ => status ?? "—"
         };

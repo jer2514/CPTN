@@ -2,16 +2,25 @@
 @using RSDSystem.Models
 @model List<CashAdvance>
 @{
-    ViewData["Title"] = "Cash Advance";
+    ViewData["Title"] = "Employee Cash Advance";
     var project = ViewBag.Project as Project;
     var employee = ViewBag.Employee as Employee;
     var isFinished = ViewBag.IsFinished is true;
     var outstanding = ViewBag.Outstanding is decimal os ? os : 0m;
-    var pending = ViewBag.Pending is decimal pd ? pd : 0m;
-    var paid = ViewBag.Paid is decimal pa ? pa : 0m;
+    var unpaid = ViewBag.Unpaid is decimal ub ? ub : 0m;
+    var total = ViewBag.Total is decimal tot ? tot : 0m;
     int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
     var displayId = ViewBag.DisplayId as string ?? "—";
+    var status = ViewBag.Status as string ?? "all";
+    var statusClicked = !string.IsNullOrWhiteSpace(Context.Request.Query["status"]);
+    var filterLabel = !statusClicked ? "Filter"
+        : status == "unpaid" ? "Unpaid"
+        : status == "paid" ? "Paid"
+        : "All";
+    var initials = string.Join("", new[] { employee?.FirstName, employee?.LastName }
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .Select(v => char.ToUpper(v![0])));
 }
 
 <div class="content-topbar page-sticky-bar">
@@ -22,51 +31,65 @@
 </div>
 
 <div class="page-card search-stretch-card">
-    <div class="att-page-title">Cash Advance</div>
+    <div class="att-page-title">Employee Cash Advance</div>
 
-    <div class="ca-emp-head">
-        <div>
-            <div class="form-lbl">Employee Name</div>
-            <div class="ca-emp-link">@employee?.FullName</div>
+    <div class="ca-summary-card">
+        <div class="ca-summary-person">
+            @if (!string.IsNullOrEmpty(employee?.PhotoPath))
+            {
+                <img src="@employee.PhotoPath" alt="" class="ca-emp-avatar" />
+            }
+            else
+            {
+                <div class="ca-emp-avatar ca-emp-avatar-initials">@initials</div>
+            }
+            <div>
+                <div class="ca-emp-name">@(employee?.FullName ?? "—")</div>
+                <div class="ca-emp-meta">Employee ID: @displayId</div>
+                <div class="ca-emp-meta">Job: @(employee?.JobClassification ?? "—")</div>
+            </div>
         </div>
-        <div>
-            <div class="form-lbl">Job</div>
-            <div class="slip-value">@(employee?.JobClassification ?? "—")</div>
-        </div>
-        <div>
-            <div class="form-lbl">Assigned to</div>
-            <div class="ca-emp-link">@(project?.ProjectName ?? "—")</div>
-        </div>
-        <div>
-            <div class="form-lbl">Employee ID</div>
-            <div class="slip-value">@displayId</div>
-        </div>
-    </div>
-
-    <div class="ca-kpi-row">
-        <div class="ca-kpi">
-            <span>Unpaid</span>
-            <strong>₱ @outstanding.ToString("N2")</strong>
-        </div>
-        <div class="ca-kpi">
-            <span>For next payroll</span>
-            <strong>₱ @pending.ToString("N2")</strong>
-        </div>
-        <div class="ca-kpi">
-            <span>Paid</span>
-            <strong>₱ @paid.ToString("N2")</strong>
+        <div class="ca-summary-metrics">
+            <div>
+                <span>Total Cash Advance</span>
+                <strong>₱ @total.ToString("N2")</strong>
+            </div>
+            <div>
+                <span>Outstanding Balance</span>
+                <strong>₱ @unpaid.ToString("N2")</strong>
+            </div>
         </div>
     </div>
 
     @if (!isFinished)
     {
         <div class="list-controls-row att-list-toolbar">
-            <div class="list-controls-left"></div>
+            <div class="list-controls-left">
+                <div class="dropdown">
+                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        @filterLabel
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li>
+                            <a class="dropdown-item @(status == "all" ? "active" : "")"
+                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
+                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="all">All</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item @(status == "unpaid" ? "active" : "")"
+                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
+                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="unpaid">Unpaid</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item @(status == "paid" ? "active" : "")"
+                               asp-action="Employee" asp-route-projectId="@project?.ProjectId"
+                               asp-route-employeeId="@employee?.EmployeeId" asp-route-status="paid">Paid</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
             <div class="list-controls-actions">
-                @if (outstanding > 0)
-                {
-                    <button type="button" class="btn-outline-blue" id="deductTotalBtn">Deduct total</button>
-                }
                 <button type="button" class="btn-primary-blue" id="addAdvanceBtn">Add Cash Advance</button>
             </div>
         </div>
@@ -82,36 +105,32 @@
                 <tr>
                     <th>Date</th>
                     <th>Amount</th>
-                    <th>Reason</th>
                     <th>Status</th>
-                    @if (!isFinished)
-                    {
-                        <th>Action</th>
-                    }
+                    <th>Deduct to next payroll</th>
                 </tr>
             </thead>
             <tbody>
                 @if (Model.Count == 0)
                 {
                     <tr>
-                        <td colspan="@(isFinished ? 4 : 5)" class="text-center text-muted py-4">No cash advances yet.</td>
+                        <td colspan="4" class="text-center text-muted py-4">No cash advances yet.</td>
                     </tr>
                 }
                 @foreach (var row in Model)
                 {
+                    var unpaidRow = row.Status == CashAdvanceStatuses.Outstanding;
+                    var paidRow = CashAdvanceStatuses.IsPaid(row.Status);
                     <tr>
-                        <td>@row.AdvanceDate.ToString("MMMM d, yyyy")</td>
+                        <td>@row.AdvanceDate.ToString("MM-dd-yy")</td>
                         <td>₱ @row.Amount.ToString("N2")</td>
-                        <td>@(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)</td>
                         <td>
-                            <span class="status-pill @(row.Status == CashAdvanceStatuses.Deducted ? "att-status-complete" : row.Status == CashAdvanceStatuses.Pending ? "att-status-late" : "att-status-halfday")">
+                            <span class="status-pill @(paidRow ? "ca-status-paid" : "ca-status-unpaid")">
                                 @CashAdvanceStatuses.Display(row.Status)
                             </span>
                         </td>
-                        @if (!isFinished)
-                        {
-                            <td>
-                                @if (row.Status == CashAdvanceStatuses.Outstanding)
+                        <td>
+                            <div class="ca-row-actions">
+                                @if (!isFinished && unpaidRow)
                                 {
                                     <button type="button" class="pill-btn pill-view ca-deduct-one"
                                             data-id="@row.CashAdvanceId"
@@ -119,12 +138,15 @@
                                         Deduct
                                     </button>
                                 }
-                                else
-                                {
-                                    <span class="text-muted">—</span>
-                                }
-                            </td>
-                        }
+                                <button type="button" class="ca-view-btn ca-view-one"
+                                        data-date="@row.AdvanceDate.ToString("MMMM d, yyyy")"
+                                        data-amount="@row.Amount.ToString("N2")"
+                                        data-reason="@(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)"
+                                        data-status="@CashAdvanceStatuses.Display(row.Status)">
+                                    <i class="bi bi-eye-fill"></i> View
+                                </button>
+                            </div>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -140,8 +162,22 @@
                    asp-action="Employee"
                    asp-route-projectId="@project?.ProjectId"
                    asp-route-employeeId="@employee?.EmployeeId"
+                   asp-route-status="@status"
                    asp-route-page="@i">@i</a>
             }
+        </div>
+    }
+
+    @if (!isFinished)
+    {
+        <div class="ca-footer-deduct">
+            <button type="button" class="btn-primary-blue" id="deductTotalBtn" @(outstanding > 0 ? null : "disabled")>
+                Deduct Outstanding Balance
+            </button>
+            <div class="form-hint-box">
+                <i class="bi bi-info-circle-fill"></i>
+                This will deduct the employee's whole outstanding balance in the next payroll.
+            </div>
         </div>
     }
 </div>
@@ -204,10 +240,43 @@
     </div>
 </div>
 
+<div class="ca-overlay" id="viewOverlay" hidden>
+    <div class="ca-panel ca-panel-sm">
+        <div class="ca-panel-title">Cash Advance</div>
+        <div class="ca-view-grid">
+            <div>
+                <div class="form-lbl">Date</div>
+                <div class="slip-value" id="viewDate"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Amount</div>
+                <div class="slip-value" id="viewAmount"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Status</div>
+                <div class="slip-value" id="viewStatus"></div>
+            </div>
+            <div class="ca-view-wide">
+                <div class="form-lbl">Reason/Purpose</div>
+                <div class="slip-value" id="viewReason"></div>
+            </div>
+        </div>
+        <div class="ca-panel-actions">
+            <button type="button" class="btn-primary-blue" id="viewCloseBtn">OK</button>
+        </div>
+    </div>
+</div>
+
 <div class="ca-overlay" id="confirmOverlay" hidden>
     <div class="ca-panel ca-panel-sm">
         <div class="ca-panel-title" id="confirmTitle">Deduct cash advance</div>
-        <div class="form-hint-box" id="confirmMsg"></div>
+        <div class="ca-confirm-body">
+            <div class="ca-confirm-icon"><i class="bi bi-exclamation-lg"></i></div>
+            <div>
+                <p class="ca-confirm-copy" id="confirmMsg"></p>
+                <p class="ca-confirm-warn">This action cannot be undone.</p>
+            </div>
+        </div>
         <div class="ca-panel-actions">
             <button type="button" class="ca-btn-cancel" id="confirmCancelBtn">Cancel</button>
             <button type="button" class="btn-primary-blue" id="confirmOkBtn">Confirm Deduction</button>
@@ -218,7 +287,7 @@
 <div class="ca-overlay" id="successOverlay" hidden>
     <div class="ca-panel ca-panel-sm ca-panel-center">
         <div class="ca-success-icon"><i class="bi bi-check-lg"></i></div>
-        <div class="ca-panel-title">Cash Advance Deducted</div>
+        <div class="ca-panel-title ca-panel-title-dark">Cash Advance Deducted</div>
         <div class="ca-success-msg" id="successMsg"></div>
         <div class="ca-panel-actions ca-panel-actions-center">
             <button type="button" class="btn-primary-blue" id="successOkBtn">OK</button>
@@ -239,6 +308,7 @@
         function hide(el) { el.hidden = true; }
 
         const addOverlay = document.getElementById('addOverlay');
+        const viewOverlay = document.getElementById('viewOverlay');
         const confirmOverlay = document.getElementById('confirmOverlay');
         const successOverlay = document.getElementById('successOverlay');
         let deductMode = null;
@@ -263,19 +333,34 @@
             }
         });
 
+        document.querySelectorAll('.ca-view-one').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('viewDate').textContent = btn.dataset.date || '—';
+                document.getElementById('viewAmount').textContent = '₱ ' + (btn.dataset.amount || '0.00');
+                document.getElementById('viewStatus').textContent = btn.dataset.status || '—';
+                document.getElementById('viewReason').textContent = btn.dataset.reason || '—';
+                show(viewOverlay);
+            });
+        });
+        document.getElementById('viewCloseBtn')?.addEventListener('click', () => hide(viewOverlay));
+        viewOverlay?.addEventListener('click', e => { if (e.target === viewOverlay) hide(viewOverlay); });
+
         function openConfirm(mode, amount, id) {
             deductMode = { mode, amount, id };
             const whole = mode === 'total';
             document.getElementById('confirmTitle').textContent = whole
                 ? 'Deduct total cash advance'
                 : 'Deduct cash advance';
-            document.getElementById('confirmMsg').innerHTML = whole
-                ? `<i class="bi bi-info-circle-fill"></i> This will deduct the whole outstanding balance of ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} for ${employeeName} in the next payroll. This action cannot be undone.`
-                : `<i class="bi bi-info-circle-fill"></i> This will deduct ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} from ${employeeName}'s next payroll. This action cannot be undone.`;
+            document.getElementById('confirmMsg').textContent = whole
+                ? `This will deduct the whole outstanding balance of ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} for ${employeeName} in the next payroll.`
+                : `This will deduct ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} from ${employeeName}'s next payroll.`;
             show(confirmOverlay);
         }
 
-        document.getElementById('deductTotalBtn')?.addEventListener('click', () => openConfirm('total', outstanding));
+        document.getElementById('deductTotalBtn')?.addEventListener('click', () => {
+            if (outstanding <= 0) return;
+            openConfirm('total', outstanding);
+        });
         document.querySelectorAll('.ca-deduct-one').forEach(btn => {
             btn.addEventListener('click', () => openConfirm('one', btn.dataset.amount, btn.dataset.id));
         });

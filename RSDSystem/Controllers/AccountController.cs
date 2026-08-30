@@ -19,17 +19,20 @@ namespace RSDSystem.Controllers
         private readonly ActivityLogService _logs;
         private readonly EmailService _email;
         private readonly PasswordLinkService _links;
+        private readonly IWebHostEnvironment _env;
 
         public AccountController(
             PayrollDbContext db,
             ActivityLogService logs,
             EmailService email,
-            PasswordLinkService links)
+            PasswordLinkService links,
+            IWebHostEnvironment env)
         {
             _db = db;
             _logs = logs;
             _email = email;
             _links = links;
+            _env = env;
         }
 
         [HttpGet]
@@ -259,6 +262,48 @@ namespace RSDSystem.Controllers
 
             TempData["Success"] = "Your profile was saved. Admin User Management now shows these details.";
             return RedirectToAction(nameof(Profile));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePhoto(IFormFile? photo)
+        {
+            var user = await CurrentUserAsync();
+            if (user == null)
+                return RedirectToAction(nameof(Login));
+
+            if (photo == null || photo.Length == 0)
+            {
+                TempData["Error"] = "Choose a photo to upload.";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            if (!InputRules.TryValidatePhoto(photo, out var error) && error != null)
+            {
+                TempData["Error"] = error;
+                return RedirectToAction(nameof(Profile));
+            }
+
+            user.PhotoPath = await SavePhotoAsync(photo);
+            await _db.SaveChangesAsync();
+            SignIn(user.UserId, user.FullName, user.Role, user.PhotoPath);
+            await _logs.LogAsync(
+                ActivityTypes.EditUser,
+                ActivityModules.UserManagement,
+                $"{user.FullName} updated their profile photo.");
+            TempData["Success"] = "Profile photo updated.";
+            return RedirectToAction(nameof(Profile));
+        }
+
+        private async Task<string> SavePhotoAsync(IFormFile photo)
+        {
+            var folder = Path.Combine(_env.WebRootPath, "uploads", "users");
+            Directory.CreateDirectory(folder);
+            var fileName = $"{Guid.NewGuid()}{Path.GetExtension(photo.FileName)}";
+            var filePath = Path.Combine(folder, fileName);
+            using var stream = new FileStream(filePath, FileMode.Create);
+            await photo.CopyToAsync(stream);
+            return $"/uploads/users/{fileName}";
         }
 
         [HttpGet]
