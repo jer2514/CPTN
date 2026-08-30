@@ -43,6 +43,7 @@ builder.Services.AddHttpClient("PayrollPrediction", client =>
 builder.Services.AddScoped<PayrollPredictionService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ActivityLogService>();
+builder.Services.AddScoped<CashAdvanceService>();
 builder.Services.AddHttpClient("EmailApi", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(20);
@@ -215,6 +216,15 @@ END");
         catch (Exception ex)
         {
             Console.WriteLine("User schema fix error: " + ex.Message);
+        }
+
+        try
+        {
+            CashAdvanceSchema.Ensure(db);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Cash advance schema fix error: " + ex.Message);
         }
 
         // Change these two values, then restart the app. The existing Admin

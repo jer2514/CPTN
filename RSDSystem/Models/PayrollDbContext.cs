@@ -23,6 +23,7 @@ namespace RSDSystem.Models
         public DbSet<ProjectEmployeeHistory> ProjectEmployeeHistories { get; set; }
         public DbSet<PayrollPredictionHistory> PayrollPredictionHistories { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<CashAdvance> CashAdvances { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -182,6 +183,21 @@ namespace RSDSystem.Models
 
             modelBuilder.Entity<ActivityLog>()
                 .HasIndex(a => a.CreatedAt);
+
+            modelBuilder.Entity<CashAdvance>()
+                .HasOne(c => c.Project)
+                .WithMany()
+                .HasForeignKey(c => c.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CashAdvance>()
+                .HasOne(c => c.Employee)
+                .WithMany()
+                .HasForeignKey(c => c.EmployeeId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<CashAdvance>()
+                .HasIndex(c => new { c.ProjectId, c.EmployeeId, c.Status });
         }
     }
 }

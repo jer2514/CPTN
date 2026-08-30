@@ -370,6 +370,44 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
+        public async Task NotifyCashAdvanceAddedAsync(
+            Project project, string employeeName, decimal amount, CancellationToken cancellationToken = default)
+        {
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.CashAdvanceAdded,
+                "Cash Advance",
+                $"Admin added a ₱{amount:N2} cash advance for {employeeName} on {ProjectName(project)}.",
+                project.ProjectId,
+                null,
+                "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId,
+                cancellationToken);
+        }
+
+        public async Task NotifyCashAdvanceDeductionAsync(
+            Project project, string employeeName, decimal amount, bool wholeBalance,
+            CancellationToken cancellationToken = default)
+        {
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+            var detail = wholeBalance
+                ? $"The total cash advance of ₱{amount:N2} for {employeeName} has been marked for deduction from the next payroll."
+                : $"A cash advance of ₱{amount:N2} for {employeeName} has been marked for deduction from the next payroll.";
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.CashAdvanceDeduction,
+                "Cash Advance",
+                "The following cash advances have been marked for deduction from the employees' next payroll. " + detail,
+                project.ProjectId,
+                null,
+                "/PayrollStaff/GeneratePayroll?projectId=" + project.ProjectId,
+                cancellationToken);
+        }
+
         public async Task NotifyAttendanceCorrectionRequestedAsync(
             string? staffName, string? employeeName, string? projectName, DateTime? workDate,
             int projectId, int requestId, bool resubmitted = false,
@@ -516,7 +554,9 @@ namespace RSDSystem.Services
         {
             if (kind == NotificationKinds.PayrollResubmitted
                 || kind == NotificationKinds.AttendanceCorrectionResubmitted
-                || kind == NotificationKinds.TaskCompletionRequested)
+                || kind == NotificationKinds.TaskCompletionRequested
+                || kind == NotificationKinds.CashAdvanceAdded
+                || kind == NotificationKinds.CashAdvanceDeduction)
                 return false;
 
             var since = PhilippinesTime.Now.AddMinutes(-10);

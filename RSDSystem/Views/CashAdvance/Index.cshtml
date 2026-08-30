@@ -1,0 +1,158 @@
+@using RSDSystem.Helpers
+@using RSDSystem.Models
+@model List<CashAdvanceEmployeeRow>
+@{
+    ViewData["Title"] = "Cash Advance";
+    var projects = ViewBag.Projects as List<Project> ?? new List<Project>();
+    var selectedId = ViewBag.SelectedProjectId as int?;
+    var totals = ViewBag.Totals as CashAdvanceTotals ?? new CashAdvanceTotals();
+    var search = ViewBag.Search as string ?? "";
+    var status = ViewBag.Status as string ?? "all";
+    var filterLabel = status == "unpaid" ? "Unpaid"
+        : status == "paid" ? "Paid"
+        : status == "all" ? "All"
+        : "Filter";
+    int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+}
+
+<div class="content-topbar">
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card search-stretch-card">
+    <div class="att-page-title">Cash Advance</div>
+
+    <form method="get" asp-action="Index" class="att-filter-grid">
+        <div class="att-field">
+            <label class="form-lbl">Project Name</label>
+            <div class="att-field-controls">
+                <select name="projectId" class="form-ctrl att-grow">
+                    <option value="">Select Project</option>
+                    @foreach (var p in projects)
+                    {
+                        if (selectedId == p.ProjectId)
+                        {
+                            <option value="@p.ProjectId" selected>@p.ProjectName</option>
+                        }
+                        else
+                        {
+                            <option value="@p.ProjectId">@p.ProjectName</option>
+                        }
+                    }
+                </select>
+                <button type="submit" class="btn-primary-blue-solid">Load</button>
+            </div>
+        </div>
+    </form>
+
+    @if (ViewBag.NeedsProject is true)
+    {
+        <div class="text-center text-muted py-5">Select a project and click Load.</div>
+    }
+    else
+    {
+        <div class="ca-kpi-row">
+            <div class="ca-kpi">
+                <span>Total Cash Advance</span>
+                <strong>₱ @totals.Total.ToString("N2")</strong>
+            </div>
+            <div class="ca-kpi">
+                <span>Unpaid Cash Advance</span>
+                <strong>₱ @totals.Unpaid.ToString("N2")</strong>
+            </div>
+            <div class="ca-kpi">
+                <span>Paid Cash Advance</span>
+                <strong>₱ @totals.Paid.ToString("N2")</strong>
+            </div>
+        </div>
+
+        <div class="list-controls-row att-list-toolbar">
+            <div class="list-controls-left">
+                <form method="get" asp-action="Index" class="search-wrap search-wrap-wide">
+                    <i class="bi bi-search"></i>
+                    <input type="hidden" name="projectId" value="@selectedId" />
+                    <input type="hidden" name="status" value="@status" />
+                    <input type="text" name="search" value="@search" placeholder="Search Employee" />
+                </form>
+                <div class="dropdown">
+                    <button type="button" class="btn-outline-blue dropdown-toggle filter-label-btn"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        @filterLabel
+                    </button>
+                    <ul class="dropdown-menu filter-menu">
+                        <li>
+                            <a class="dropdown-item @(status == "all" ? "active" : "")"
+                               asp-action="Index" asp-route-projectId="@selectedId"
+                               asp-route-search="@search" asp-route-status="all">All</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item @(status == "unpaid" ? "active" : "")"
+                               asp-action="Index" asp-route-projectId="@selectedId"
+                               asp-route-search="@search" asp-route-status="unpaid">Unpaid</a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item @(status == "paid" ? "active" : "")"
+                               asp-action="Index" asp-route-projectId="@selectedId"
+                               asp-route-search="@search" asp-route-status="paid">Paid</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="att-table-wrap">
+            <table class="emp-table att-table">
+                <thead>
+                    <tr>
+                        <th>Employee ID</th>
+                        <th>Employee Name</th>
+                        <th>Job</th>
+                        <th>Total Cash Advance</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No employees match this filter.</td>
+                        </tr>
+                    }
+                    @foreach (var row in Model)
+                    {
+                        <tr>
+                            <td>@row.DisplayId</td>
+                            <td>@row.EmployeeName</td>
+                            <td>@row.Job</td>
+                            <td>₱ @row.Total.ToString("N2")</td>
+                            <td>
+                                <a class="pill-btn pill-view"
+                                   asp-action="Employee"
+                                   asp-route-projectId="@selectedId"
+                                   asp-route-employeeId="@row.EmployeeId">
+                                    <i class="bi bi-eye-fill"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <div class="pagination-wrap">
+                @for (var i = 1; i <= totalPages; i++)
+                {
+                    <a class="page-link @(i == currentPage ? "active" : "")"
+                       asp-action="Index"
+                       asp-route-projectId="@selectedId"
+                       asp-route-search="@search"
+                       asp-route-status="@status"
+                       asp-route-page="@i">@i</a>
+                }
+            </div>
+        }
+    }
+</div>

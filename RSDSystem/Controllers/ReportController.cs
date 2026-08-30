@@ -19,7 +19,8 @@ namespace RSDSystem.Controllers
             "Attendance Report",
             "Payslip Report",
             "Payroll Prediction Report",
-            "Payroll Anomaly Report"
+            "Payroll Anomaly Report",
+            "Cash Advance Report"
         };
 
         private static readonly CultureInfo Dates = CultureInfo.InvariantCulture;
@@ -137,6 +138,7 @@ namespace RSDSystem.Controllers
             var start = ParseIso(periodStart);
             var end = ParseIso(periodEnd);
             if (type is not "Project Report" and not "Payroll Prediction Report" and not "Payroll Anomaly Report"
+                and not "Cash Advance Report"
                 && (!start.HasValue || !end.HasValue))
                 return new ReportBuild { Error = "Select a payroll period." };
 
@@ -153,6 +155,7 @@ namespace RSDSystem.Controllers
                 "Attendance Report" => await AttendanceReportAsync(project, start!.Value, end!.Value, periodLabel),
                 "Payslip Report" => await PayslipReportAsync(project, start!.Value, end!.Value, periodLabel),
                 "Payroll Prediction Report" => await PredictionReportAsync(project),
+                "Cash Advance Report" => await CashAdvanceReportAsync(project),
                 _ => await AnomalyReportAsync(project, start, end, periodLabel)
             };
         }
@@ -309,11 +312,11 @@ namespace RSDSystem.Controllers
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Payroll Report", periodLabel));
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Job</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
+            html.Append("<th>Employee</th><th>Job</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Cash Advance</th><th>Net Pay</th><th>Status</th>");
             html.Append("</tr></thead><tbody>");
             if (slips.Count == 0)
             {
-                html.Append("<tr><td colspan=\"8\">No payroll records for this period.</td></tr>");
+                html.Append("<tr><td colspan=\"9\">No payroll records for this period.</td></tr>");
             }
             else
             {
@@ -326,6 +329,7 @@ namespace RSDSystem.Controllers
                     html.Append($"<td>{PayrollComputation.PaidRegularHours(slip):0.##}</td>");
                     html.Append($"<td>{slip.OvertimeHours:0.##}</td>");
                     html.Append($"<td>₱{slip.GrossPay:N2}</td>");
+                    html.Append($"<td>₱{slip.CashAdvance:N2}</td>");
                     html.Append($"<td>₱{slip.NetPay:N2}</td>");
                     html.Append($"<td>{Esc(slip.Status)}</td>");
                     html.Append("</tr>");
@@ -356,11 +360,11 @@ namespace RSDSystem.Controllers
             var html = new StringBuilder();
             html.Append(Header(project.ProjectName, "Monthly Payroll Report", monthLabel));
             html.Append("<table class=\"report-table\"><thead><tr>");
-            html.Append("<th>Employee</th><th>Job</th><th>Period</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Net Pay</th><th>Status</th>");
+            html.Append("<th>Employee</th><th>Job</th><th>Period</th><th>Days</th><th>Hours</th><th>OT Hours</th><th>Gross Pay</th><th>Cash Advance</th><th>Net Pay</th><th>Status</th>");
             html.Append("</tr></thead><tbody>");
             if (slips.Count == 0)
             {
-                html.Append("<tr><td colspan=\"9\">No payroll records for this month.</td></tr>");
+                html.Append("<tr><td colspan=\"10\">No payroll records for this month.</td></tr>");
             }
             else
             {
@@ -376,6 +380,7 @@ namespace RSDSystem.Controllers
                     html.Append($"<td>{PayrollComputation.PaidRegularHours(slip):0.##}</td>");
                     html.Append($"<td>{slip.OvertimeHours:0.##}</td>");
                     html.Append($"<td>₱{slip.GrossPay:N2}</td>");
+                    html.Append($"<td>₱{slip.CashAdvance:N2}</td>");
                     html.Append($"<td>₱{slip.NetPay:N2}</td>");
                     html.Append($"<td>{Esc(slip.Status)}</td>");
                     html.Append("</tr>");
@@ -626,6 +631,49 @@ namespace RSDSystem.Controllers
             return map.Values
                 .OrderByDescending(m => m.Start)
                 .ToList();
+        }
+
+        private async Task<ReportBuild> CashAdvanceReportAsync(Project project)
+        {
+            var rows = await _db.CashAdvances.AsNoTracking()
+                .Include(c => c.Employee)
+                .Where(c => c.ProjectId == project.ProjectId)
+                .OrderBy(c => c.Employee!.LastName)
+                .ThenBy(c => c.Employee!.FirstName)
+                .ThenByDescending(c => c.AdvanceDate)
+                .ToListAsync();
+
+            var html = new StringBuilder();
+            html.Append(Header(project.ProjectName, "Cash Advance Report", PhilippinesTime.FormatLongDate(PhilippinesTime.Today)));
+            html.Append("<div class=\"report-kpis\">");
+            html.Append($"<span>Total: {Money(rows.Sum(r => r.Amount))}</span>");
+            html.Append($"<span>Unpaid: {Money(rows.Where(r => CashAdvanceStatuses.IsUnpaid(r.Status)).Sum(r => r.Amount))}</span>");
+            html.Append($"<span>Paid: {Money(rows.Where(r => CashAdvanceStatuses.IsPaid(r.Status)).Sum(r => r.Amount))}</span>");
+            html.Append($"<span>Entries: {rows.Count}</span>");
+            html.Append("</div>");
+            html.Append("<table class=\"report-table\"><thead><tr>");
+            html.Append("<th>Employee</th><th>Job</th><th>Date</th><th>Amount</th><th>Reason</th><th>Status</th>");
+            html.Append("</tr></thead><tbody>");
+            if (rows.Count == 0)
+            {
+                html.Append("<tr><td colspan=\"6\">No cash advances for this project.</td></tr>");
+            }
+            else
+            {
+                foreach (var row in rows)
+                {
+                    html.Append("<tr>");
+                    html.Append($"<td>{Esc(row.Employee?.FullName)}</td>");
+                    html.Append($"<td>{Esc(row.Employee?.JobClassification)}</td>");
+                    html.Append($"<td>{Esc(row.AdvanceDate.ToString("MMMM dd, yyyy", Dates))}</td>");
+                    html.Append($"<td>{Money(row.Amount)}</td>");
+                    html.Append($"<td>{Esc(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)}</td>");
+                    html.Append($"<td>{Esc(CashAdvanceStatuses.Display(row.Status))}</td>");
+                    html.Append("</tr>");
+                }
+            }
+            html.Append("</tbody></table>");
+            return new ReportBuild { Title = "Cash Advance Report — " + project.ProjectName, Html = html.ToString() };
         }
 
         private static string Header(string? projectName, string reportType, string period) =>

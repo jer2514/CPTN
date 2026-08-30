@@ -1,0 +1,322 @@
+@using RSDSystem.Helpers
+@using RSDSystem.Models
+@model List<CashAdvance>
+@{
+    ViewData["Title"] = "Cash Advance";
+    var project = ViewBag.Project as Project;
+    var employee = ViewBag.Employee as Employee;
+    var isFinished = ViewBag.IsFinished is true;
+    var outstanding = ViewBag.Outstanding is decimal os ? os : 0m;
+    var pending = ViewBag.Pending is decimal pd ? pd : 0m;
+    var paid = ViewBag.Paid is decimal pa ? pa : 0m;
+    int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    var displayId = ViewBag.DisplayId as string ?? "—";
+}
+
+<div class="content-topbar page-sticky-bar">
+    <a asp-action="Index" asp-route-projectId="@project?.ProjectId" class="btn-back">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+    <button type="button" class="bell-btn" aria-label="Notifications"><i class="bi bi-bell-fill"></i></button>
+</div>
+
+<div class="page-card search-stretch-card">
+    <div class="att-page-title">Cash Advance</div>
+
+    <div class="ca-emp-head">
+        <div>
+            <div class="form-lbl">Employee Name</div>
+            <div class="ca-emp-link">@employee?.FullName</div>
+        </div>
+        <div>
+            <div class="form-lbl">Job</div>
+            <div class="slip-value">@(employee?.JobClassification ?? "—")</div>
+        </div>
+        <div>
+            <div class="form-lbl">Assigned to</div>
+            <div class="ca-emp-link">@(project?.ProjectName ?? "—")</div>
+        </div>
+        <div>
+            <div class="form-lbl">Employee ID</div>
+            <div class="slip-value">@displayId</div>
+        </div>
+    </div>
+
+    <div class="ca-kpi-row">
+        <div class="ca-kpi">
+            <span>Unpaid</span>
+            <strong>₱ @outstanding.ToString("N2")</strong>
+        </div>
+        <div class="ca-kpi">
+            <span>For next payroll</span>
+            <strong>₱ @pending.ToString("N2")</strong>
+        </div>
+        <div class="ca-kpi">
+            <span>Paid</span>
+            <strong>₱ @paid.ToString("N2")</strong>
+        </div>
+    </div>
+
+    @if (!isFinished)
+    {
+        <div class="list-controls-row att-list-toolbar">
+            <div class="list-controls-left"></div>
+            <div class="list-controls-actions">
+                @if (outstanding > 0)
+                {
+                    <button type="button" class="btn-outline-blue" id="deductTotalBtn">Deduct total</button>
+                }
+                <button type="button" class="btn-primary-blue" id="addAdvanceBtn">Add Cash Advance</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="genpay-fallback-note">This project is marked Finished. Cash advances can be viewed but not changed.</div>
+    }
+
+    <div class="att-table-wrap">
+        <table class="emp-table att-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    @if (!isFinished)
+                    {
+                        <th>Action</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@(isFinished ? 4 : 5)" class="text-center text-muted py-4">No cash advances yet.</td>
+                    </tr>
+                }
+                @foreach (var row in Model)
+                {
+                    <tr>
+                        <td>@row.AdvanceDate.ToString("MMMM d, yyyy")</td>
+                        <td>₱ @row.Amount.ToString("N2")</td>
+                        <td>@(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)</td>
+                        <td>
+                            <span class="status-pill @(row.Status == CashAdvanceStatuses.Deducted ? "att-status-complete" : row.Status == CashAdvanceStatuses.Pending ? "att-status-late" : "att-status-halfday")">
+                                @CashAdvanceStatuses.Display(row.Status)
+                            </span>
+                        </td>
+                        @if (!isFinished)
+                        {
+                            <td>
+                                @if (row.Status == CashAdvanceStatuses.Outstanding)
+                                {
+                                    <button type="button" class="pill-btn pill-view ca-deduct-one"
+                                            data-id="@row.CashAdvanceId"
+                                            data-amount="@row.Amount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)">
+                                        Deduct
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (totalPages > 1)
+    {
+        <div class="pagination-wrap">
+            @for (var i = 1; i <= totalPages; i++)
+            {
+                <a class="page-link @(i == currentPage ? "active" : "")"
+                   asp-action="Employee"
+                   asp-route-projectId="@project?.ProjectId"
+                   asp-route-employeeId="@employee?.EmployeeId"
+                   asp-route-page="@i">@i</a>
+            }
+        </div>
+    }
+</div>
+
+<div class="ca-overlay" id="addOverlay" hidden>
+    <div class="ca-panel">
+        <div class="ca-panel-title">Add Cash Advance</div>
+        <div class="ca-emp-head ca-emp-head-tight">
+            <div>
+                <div class="form-lbl">Employee Name</div>
+                <div class="ca-emp-link">@employee?.FullName</div>
+            </div>
+            <div>
+                <div class="form-lbl">Job</div>
+                <div class="slip-value">@(employee?.JobClassification ?? "—")</div>
+            </div>
+            <div>
+                <div class="form-lbl">Assigned to</div>
+                <div class="ca-emp-link">@(project?.ProjectName ?? "—")</div>
+            </div>
+        </div>
+        <form id="addForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="projectId" value="@project?.ProjectId" />
+            <input type="hidden" name="employeeId" value="@employee?.EmployeeId" />
+            <div class="form-row form-row-1">
+                <div>
+                    <label class="form-lbl">Cash Advance Date</label>
+                    <input type="date" name="advanceDate" class="form-ctrl" required
+                           min="2000-01-01" max="2099-12-31"
+                           value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                </div>
+            </div>
+            <div class="form-row form-row-1">
+                <div>
+                    <label class="form-lbl">Amount</label>
+                    <div class="ca-amount-wrap">
+                        <span>₱</span>
+                        <input type="number" name="amount" class="form-ctrl" step="0.01" min="0.01"
+                               placeholder="Enter Amount" required />
+                    </div>
+                </div>
+            </div>
+            <div class="form-row form-row-1">
+                <div>
+                    <label class="form-lbl">Reason/Purpose</label>
+                    <textarea name="reason" class="form-ctrl" rows="3"
+                              maxlength="400" placeholder="Enter Reason for Cash Advance"></textarea>
+                </div>
+            </div>
+            <div class="form-hint-box">
+                <i class="bi bi-info-circle-fill"></i>
+                This cash advance will be added to the employee's outstanding balance and deducted from a future payroll.
+            </div>
+            <div class="ca-panel-actions">
+                <button type="button" class="ca-btn-cancel" id="addCancelBtn">Cancel</button>
+                <button type="submit" class="btn-primary-blue" id="addSaveBtn">Add Cash Advance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="ca-overlay" id="confirmOverlay" hidden>
+    <div class="ca-panel ca-panel-sm">
+        <div class="ca-panel-title" id="confirmTitle">Deduct cash advance</div>
+        <div class="form-hint-box" id="confirmMsg"></div>
+        <div class="ca-panel-actions">
+            <button type="button" class="ca-btn-cancel" id="confirmCancelBtn">Cancel</button>
+            <button type="button" class="btn-primary-blue" id="confirmOkBtn">Confirm Deduction</button>
+        </div>
+    </div>
+</div>
+
+<div class="ca-overlay" id="successOverlay" hidden>
+    <div class="ca-panel ca-panel-sm ca-panel-center">
+        <div class="ca-success-icon"><i class="bi bi-check-lg"></i></div>
+        <div class="ca-panel-title">Cash Advance Deducted</div>
+        <div class="ca-success-msg" id="successMsg"></div>
+        <div class="ca-panel-actions ca-panel-actions-center">
+            <button type="button" class="btn-primary-blue" id="successOkBtn">OK</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <form id="__afToken" style="display:none">@Html.AntiForgeryToken()</form>
+    <script>
+        const token = document.querySelector('#__afToken input[name="__RequestVerificationToken"]')?.value || '';
+        const projectId = @(project?.ProjectId ?? 0);
+        const employeeId = @(employee?.EmployeeId ?? 0);
+        const employeeName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(employee?.FullName ?? "the employee"));
+        const outstanding = @outstanding.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        function show(el) { el.hidden = false; }
+        function hide(el) { el.hidden = true; }
+
+        const addOverlay = document.getElementById('addOverlay');
+        const confirmOverlay = document.getElementById('confirmOverlay');
+        const successOverlay = document.getElementById('successOverlay');
+        let deductMode = null;
+
+        document.getElementById('addAdvanceBtn')?.addEventListener('click', () => show(addOverlay));
+        document.getElementById('addCancelBtn')?.addEventListener('click', () => hide(addOverlay));
+        addOverlay?.addEventListener('click', e => { if (e.target === addOverlay) hide(addOverlay); });
+
+        document.getElementById('addForm')?.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('addSaveBtn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/CashAdvance/Add', { method: 'POST', body: new FormData(this) });
+                const data = await res.json();
+                if (!data.success) { showToast(data.message || 'Could not add the cash advance.'); return; }
+                window.location.reload();
+            } catch (err) {
+                showToast('Could not add the cash advance.');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        function openConfirm(mode, amount, id) {
+            deductMode = { mode, amount, id };
+            const whole = mode === 'total';
+            document.getElementById('confirmTitle').textContent = whole
+                ? 'Deduct total cash advance'
+                : 'Deduct cash advance';
+            document.getElementById('confirmMsg').innerHTML = whole
+                ? `<i class="bi bi-info-circle-fill"></i> This will deduct the whole outstanding balance of ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} for ${employeeName} in the next payroll. This action cannot be undone.`
+                : `<i class="bi bi-info-circle-fill"></i> This will deduct ₱ ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} from ${employeeName}'s next payroll. This action cannot be undone.`;
+            show(confirmOverlay);
+        }
+
+        document.getElementById('deductTotalBtn')?.addEventListener('click', () => openConfirm('total', outstanding));
+        document.querySelectorAll('.ca-deduct-one').forEach(btn => {
+            btn.addEventListener('click', () => openConfirm('one', btn.dataset.amount, btn.dataset.id));
+        });
+        document.getElementById('confirmCancelBtn')?.addEventListener('click', () => hide(confirmOverlay));
+        confirmOverlay?.addEventListener('click', e => { if (e.target === confirmOverlay) hide(confirmOverlay); });
+
+        document.getElementById('confirmOkBtn')?.addEventListener('click', async function () {
+            if (!deductMode) return;
+            this.disabled = true;
+            const body = new URLSearchParams();
+            body.set('__RequestVerificationToken', token);
+            let url = '/CashAdvance/DeductTotal';
+            if (deductMode.mode === 'one') {
+                url = '/CashAdvance/Deduct';
+                body.set('id', deductMode.id);
+            } else {
+                body.set('projectId', projectId);
+                body.set('employeeId', employeeId);
+            }
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                    body
+                });
+                const data = await res.json();
+                hide(confirmOverlay);
+                if (!data.success) { showToast(data.message || 'Could not mark the cash advance.'); return; }
+                const amount = Number(data.amount || deductMode.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+                document.getElementById('successMsg').textContent = data.whole
+                    ? `The total cash advance of ₱ ${amount} for ${data.employeeName || employeeName} has been marked for deduction in the next payroll.`
+                    : `The cash advance of ₱ ${amount} for ${data.employeeName || employeeName} has been marked for deduction in the next payroll.`;
+                show(successOverlay);
+            } catch (err) {
+                showToast('Could not mark the cash advance.');
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        document.getElementById('successOkBtn')?.addEventListener('click', () => window.location.reload());
+        successOverlay?.addEventListener('click', e => { if (e.target === successOverlay) window.location.reload(); });
+    </script>
+}

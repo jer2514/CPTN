@@ -177,8 +177,12 @@ else
                 <label class="form-lbl">Cash Advance</label>
                 <input type="number" name="cashAdvance" id="cashAdvance" class="form-ctrl"
                        step="0.01" min="0" value="@cashAdvance.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)"
-                       data-validate="nonNeg" data-label="Cash advance" />
+                       data-validate="nonNeg" data-label="Cash advance" readonly />
                 <span class="field-error" data-error-for="cashAdvance"></span>
+                <div class="form-hint-box" style="margin-top:8px">
+                    <i class="bi bi-info-circle-fill"></i>
+                    Filled from cash advances the admin marked for this payroll.
+                </div>
             </div>
             <button type="submit" id="generateBtn" class="btn-primary-blue-block"
                     @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>

@@ -16,6 +16,7 @@ namespace RSDSystem.Controllers
         private readonly NotificationService _notifications;
         private readonly ActivityLogService _logs;
         private readonly AttendanceImportService _attendance;
+        private readonly CashAdvanceService _advances;
         private static readonly CultureInfo DateCulture = CultureInfo.InvariantCulture;
 
         public PayrollController(
@@ -23,13 +24,15 @@ namespace RSDSystem.Controllers
             PayrollPredictionService predictions,
             NotificationService notifications,
             ActivityLogService logs,
-            AttendanceImportService attendance)
+            AttendanceImportService attendance,
+            CashAdvanceService advances)
         {
             _db = db;
             _predictions = predictions;
             _notifications = notifications;
             _logs = logs;
             _attendance = attendance;
+            _advances = advances;
         }
 
         private IActionResult? RequireAdmin()
@@ -664,6 +667,7 @@ namespace RSDSystem.Controllers
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;
             await _db.SaveChangesAsync();
+            await _advances.ApplyToApprovedPayrollAsync(payroll, HttpContext.RequestAborted);
 
             await _notifications.NotifyPayrollApprovedAsync(payroll, payroll.Project, HttpContext.RequestAborted);
             await _logs.LogAsync(
