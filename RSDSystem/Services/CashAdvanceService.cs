@@ -116,6 +116,27 @@ namespace RSDSystem.Services
                 .SumAsync(c => (decimal?)c.Amount, cancellationToken) ?? 0;
         }
 
+        public async Task<decimal> AvailablePendingAmountAsync(
+            int projectId, int employeeId, int? excludePayrollId = null,
+            CancellationToken cancellationToken = default)
+        {
+            var pending = await PendingAmountAsync(projectId, employeeId, cancellationToken);
+            if (pending <= 0)
+                return 0;
+
+            var othersQuery = _db.Set<Payroll>().AsNoTracking()
+                .Where(p => p.ProjectId == projectId && p.EmployeeId == employeeId);
+            if (excludePayrollId is int id && id > 0)
+                othersQuery = othersQuery.Where(p => p.PayrollId != id);
+
+            var others = await othersQuery
+                .Select(p => new { p.Status, p.CashAdvance })
+                .ToListAsync(cancellationToken);
+
+            return CashAdvanceReservation.AvailableForPayroll(
+                pending, others.Select(p => (p.Status ?? "", p.CashAdvance)));
+        }
+
         public async Task<(string? Error, CashAdvance? Entry)> AddAsync(
             int projectId, int employeeId, DateTime? advanceDate, decimal amount, string? reason, string createdBy,
             CancellationToken cancellationToken = default)
