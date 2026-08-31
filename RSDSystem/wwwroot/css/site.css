@@ -4650,6 +4650,7 @@ button.badge-btn {
 .emp-table td.ca-action-cell {
     text-align: left;
     width: 1%;
+    min-width: 168px;
     white-space: nowrap;
     vertical-align: middle;
 }
