@@ -387,8 +387,9 @@ namespace RSDSystem.Controllers
             ViewBag.AbsentDays = attendance.DaysAbsent;
             ViewBag.OvertimeHours = attendance.OvertimeHours;
             ViewBag.RegularHours = attendance.RegularHours;
-            var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
-            ViewBag.CashAdvance = existing?.CashAdvance ?? pendingAdvance;
+            var pendingAdvance = await _advances.AvailablePendingAmountAsync(
+                projectId, employeeId, existing?.PayrollId, HttpContext.RequestAborted);
+            ViewBag.CashAdvance = pendingAdvance;
             ViewBag.CashAdvanceLocked = true;
             ViewBag.MinDate = activeSchedule != null
                 ? activeSchedule.StartingDate.ToString("yyyy-MM-dd")
@@ -540,7 +541,8 @@ namespace RSDSystem.Controllers
             var overtimeHours = attendance.OvertimeHours;
             var regularHours = attendance.RegularHours;
 
-            var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
+            var pendingAdvance = await _advances.AvailablePendingAmountAsync(
+                projectId, employeeId, payroll?.PayrollId, HttpContext.RequestAborted);
             var hourly = EmployeeRates.HourlyFromDaily(emp.DailyRate);
             var previewGross = PayrollComputation.Compute(hourly, regularHours, overtimeHours, 0).GrossPay;
             cashAdvance = pendingAdvance;
