@@ -4641,8 +4641,18 @@ button.badge-btn {
 .ca-row-actions {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.emp-table th.ca-action-head,
+.emp-table td.ca-action-cell {
+    text-align: left;
+}
+
+.ca-row-actions .pill-btn {
+    margin-left: 0;
 }
 
 .ca-view-btn {

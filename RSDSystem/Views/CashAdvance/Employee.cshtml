@@ -76,7 +76,7 @@
                     <th>Date</th>
                     <th>Amount</th>
                     <th>Status</th>
-                    <th>Deduct to next payroll</th>
+                    <th class="ca-action-head">Deduct to next payroll</th>
                 </tr>
             </thead>
             <tbody>
@@ -98,8 +98,15 @@
                                 @CashAdvanceStatuses.Display(row.Status)
                             </span>
                         </td>
-                        <td>
+                        <td class="ca-action-cell">
                             <div class="ca-row-actions">
+                                <button type="button" class="ca-view-btn ca-view-one"
+                                        data-date="@row.AdvanceDate.ToString("MMMM d, yyyy")"
+                                        data-amount="@row.Amount.ToString("N2")"
+                                        data-reason="@(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)"
+                                        data-status="@CashAdvanceStatuses.Display(row.Status)">
+                                    <i class="bi bi-eye-fill"></i> View
+                                </button>
                                 @if (!isFinished && unpaidRow)
                                 {
                                     <button type="button" class="pill-btn pill-view ca-deduct-one"
@@ -108,13 +115,6 @@
                                         Deduct
                                     </button>
                                 }
-                                <button type="button" class="ca-view-btn ca-view-one"
-                                        data-date="@row.AdvanceDate.ToString("MMMM d, yyyy")"
-                                        data-amount="@row.Amount.ToString("N2")"
-                                        data-reason="@(string.IsNullOrWhiteSpace(row.Reason) ? "—" : row.Reason)"
-                                        data-status="@CashAdvanceStatuses.Display(row.Status)">
-                                    <i class="bi bi-eye-fill"></i> View
-                                </button>
                             </div>
                         </td>
                     </tr>

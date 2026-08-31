@@ -81,7 +81,7 @@
                         <th>Employee Name</th>
                         <th>Job</th>
                         <th>Total Cash Advance</th>
-                        <th>Action</th>
+                        <th class="ca-action-head">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -98,8 +98,14 @@
                             <td>@row.EmployeeName</td>
                             <td>@row.Job</td>
                             <td>₱ @row.Total.ToString("N2")</td>
-                            <td>
+                            <td class="ca-action-cell">
                                 <div class="ca-row-actions">
+                                    <a class="ca-view-btn"
+                                       asp-action="Employee"
+                                       asp-route-projectId="@selectedId"
+                                       asp-route-employeeId="@row.EmployeeId">
+                                        <i class="bi bi-eye-fill"></i> View
+                                    </a>
                                     @if (!isFinished && row.Outstanding > 0)
                                     {
                                         <button type="button" class="pill-btn pill-view ca-list-deduct"
@@ -109,12 +115,6 @@
                                             Deduct
                                         </button>
                                     }
-                                    <a class="ca-view-btn"
-                                       asp-action="Employee"
-                                       asp-route-projectId="@selectedId"
-                                       asp-route-employeeId="@row.EmployeeId">
-                                        <i class="bi bi-eye-fill"></i> View
-                                    </a>
                                 </div>
                             </td>
                         </tr>
