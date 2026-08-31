@@ -4649,6 +4649,9 @@ button.badge-btn {
 .emp-table th.ca-action-head,
 .emp-table td.ca-action-cell {
     text-align: left;
+    width: 1%;
+    white-space: nowrap;
+    vertical-align: middle;
 }
 
 .ca-row-actions .pill-btn {
