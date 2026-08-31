@@ -4643,7 +4643,7 @@ button.badge-btn {
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .emp-table th.ca-action-head,
