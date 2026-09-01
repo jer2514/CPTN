@@ -58,6 +58,7 @@
                         <li><a class="dropdown-item" href="#" data-status="Absent">Absent</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Half-day">Half-day</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="Issues">Issues</a></li>
                     </ul>
                 </div>
             </div>
@@ -73,6 +74,7 @@
                         <th>Absent</th>
                         <th>Late</th>
                         <th>Half-day</th>
+                        <th>Issues</th>
                         <th>Regular Hours</th>
                         <th>Overtime Hours</th>
                     </tr>
@@ -241,6 +243,7 @@
                     chip('Absent', t.daysAbsent) +
                     chip('Late', t.daysLate) +
                     chip('Half-day', t.daysIncomplete) +
+                    chip('Issues', t.issueDays || 0) +
                     chip('Regular hours', Number(t.regularHours || 0).toFixed(2)) +
                     chip('Overtime hours', Number(t.overtimeHours || 0).toFixed(2)) +
                     chip('Unmatched', t.unmatched || 0);
@@ -263,10 +266,11 @@
                         <td>${r.daysAbsent}</td>
                         <td>${r.daysLate}</td>
                         <td>${r.daysIncomplete}</td>
+                        <td>${r.issueDays || 0}</td>
                         <td>${r.regularHours}</td>
                         <td>${r.overtimeHours}</td>
                     </tr>`).join('')
-                    : `<tr><td colspan="8" class="text-center text-muted py-4">No attendance records match this filter.</td></tr>`;
+                    : `<tr><td colspan="9" class="text-center text-muted py-4">No attendance records match this filter.</td></tr>`;
 
                 document.getElementById('summaryPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>

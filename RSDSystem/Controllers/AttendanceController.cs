@@ -314,6 +314,7 @@ namespace RSDSystem.Controllers
                     daysAbsent = summary.DaysAbsent,
                     daysLate = summary.DaysLate,
                     daysIncomplete = summary.DaysIncomplete,
+                    issueDays = summary.IssueDays,
                     regularHours = summary.RegularHours,
                     overtimeHours = summary.OvertimeHours,
                     unmatched = summary.UnmatchedCount
@@ -328,6 +329,7 @@ namespace RSDSystem.Controllers
                     r.DaysAbsent,
                     r.DaysLate,
                     r.DaysIncomplete,
+                    r.IssueDays,
                     regularHours = r.RegularHours.ToString("0.00"),
                     overtimeHours = r.OvertimeHours.ToString("0.00")
                 })
@@ -599,6 +601,7 @@ namespace RSDSystem.Controllers
                 WorkHoursActual = row.WorkHoursActual
             };
             AttendanceRules.Apply(computed);
+            var issues = AttendanceRules.DetectIssues(computed);
             var status = AttendanceStatuses.Display(computed.Status);
             var locked = payrollLocked || correctionApproved;
             string actionLabel;
@@ -626,15 +629,18 @@ namespace RSDSystem.Controllers
                 overtimeIn = AttendanceDisplay.Clock(row.OvertimeIn),
                 overtimeOut = AttendanceDisplay.Clock(row.OvertimeOut),
                 row.WorkHoursNormal,
-                row.WorkHoursActual,
+                workHoursActual = computed.WorkHoursActual,
+                regularHours = computed.WorkHoursActual,
+                overtimeHours = computed.OvertimeHours,
                 row.LateMinutes,
                 row.EarlyMinutes,
-                row.OvertimeHours,
                 row.AbsenceDays,
                 Status = status,
                 statusClass = AttendanceStatuses.CssClass(status),
                 row.Matched,
                 row.Note,
+                issues = issues.Select(i => new { code = i.Code, message = i.Message }).ToList(),
+                hasIssues = issues.Count > 0,
                 format,
                 importedAt = importedAt.HasValue ? PhilippinesTime.FormatDateTime(importedAt.Value) : null,
                 actionLabel,

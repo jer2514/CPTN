@@ -17,7 +17,7 @@
 
 <div class="page-card">
     <div class="att-page-title">Edit Attendance</div>
-    <div class="att-edit-sub">Fix punches on each date in the admin to-do task period. Hours and status update as you type so payroll can use this range.</div>
+    <div class="att-edit-sub">Fix punches on each date in the admin to-do task period. Overtime is paid only from Overtime In/Out after 5:00. A clock-out after 5:00 is not overtime.</div>
 
     <div class="att-edit-meta">
         <div>
@@ -181,9 +181,13 @@
             const [in1, out1, in2, out2, otIn, otOut] = rowTimes(row);
             const regular = hoursBetween(in1, out1) + hoursBetween(in2, out2);
             const ot = hoursBetween(otIn, otOut);
+            const out2Mins = out2 ? (parseInt(out2.split(':')[0], 10) * 60 + parseInt(out2.split(':')[1] || '0', 10)) : null;
+            const linger = out2Mins !== null && out2Mins > 17 * 60 && !otIn && !otOut;
             const status = deriveStatus(in1, out1, in2, out2, otIn, otOut);
             row.querySelector('.js-reg-hours').textContent = regular.toFixed(2);
-            row.querySelector('.js-ot-hours').textContent = 'OT ' + ot.toFixed(2);
+            row.querySelector('.js-ot-hours').textContent = linger
+                ? 'OT 0.00 · not overtime'
+                : 'OT ' + ot.toFixed(2);
             const pill = row.querySelector('.js-status');
             pill.textContent = status;
             pill.className = 'status-pill js-status ' + (statusClass[status] || 'att-status-halfday');

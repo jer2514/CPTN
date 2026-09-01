@@ -99,6 +99,7 @@ namespace RSDSystem.Services
         public int DaysAbsent { get; set; }
         public int DaysLate { get; set; }
         public int DaysIncomplete { get; set; }
+        public int IssueDays { get; set; }
         public decimal RegularHours { get; set; }
         public decimal OvertimeHours { get; set; }
     }
@@ -111,6 +112,7 @@ namespace RSDSystem.Services
         public int DaysAbsent { get; set; }
         public int DaysLate { get; set; }
         public int DaysIncomplete { get; set; }
+        public int IssueDays { get; set; }
         public decimal RegularHours { get; set; }
         public decimal OvertimeHours { get; set; }
         public int UnmatchedCount { get; set; }

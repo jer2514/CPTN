@@ -3477,6 +3477,37 @@ button.badge-btn {
     background: #fff4f4;
 }
 
+.att-row-issue td {
+    background: #fff8f0;
+}
+
+.att-row-unmatched.att-row-issue td {
+    background: #fff4f4;
+}
+
+.att-issue-flag {
+    margin-left: 8px;
+    color: #c05621;
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.att-time-flag {
+    color: #c05621;
+    font-weight: 600;
+}
+
+.att-issue-note {
+    margin-top: 8px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
 .att-status-complete {
     background: #b6f0c9;
     color: #0d7a3e;

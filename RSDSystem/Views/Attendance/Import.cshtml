@@ -284,8 +284,9 @@
 
             document.getElementById('previewBody').innerHTML = pageRows.map(r => {
                 const index = previewRows.indexOf(r);
-                const status = `<span class="status-pill ${statusClass[r.status] || r.statusClass || ''}">${r.status}</span>`;
-                const rowClass = r.matched ? '' : 'att-row-unmatched';
+                const status = `<span class="status-pill ${statusClass[r.status] || r.statusClass || ''}">${r.status}</span>` +
+                    (r.hasIssues ? `<span class="att-issue-flag" title="${(r.issues || []).map(i => i.message).join(' ')}"><i class="bi bi-exclamation-triangle-fill"></i></span>` : '');
+                const rowClass = (r.matched ? '' : 'att-row-unmatched') + (r.hasIssues ? ' att-row-issue' : '');
                 return `<tr class="${rowClass}">
                     <td>${escapeHtml(r.displayId) || '——'}</td>
                     <td>${escapeHtml(r.employeeName) || '——'}</td>

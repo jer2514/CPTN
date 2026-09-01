@@ -236,6 +236,8 @@ namespace RSDSystem.Services
             {
                 if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
                     rows = rows.Where(r => !r.Matched).ToList();
+                else if (string.Equals(status, "Issues", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => AttendanceRules.DetectIssues(r).Count > 0).ToList();
                 else
                     rows = rows.Where(r => AttendanceStatuses.MatchesFilter(r.Status, status)).ToList();
             }
@@ -344,6 +346,7 @@ namespace RSDSystem.Services
                     "Late" => groups.Where(r => r.DaysLate > 0).ToList(),
                     "Incomplete" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
                     "Half-day" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
+                    "Issues" => groups.Where(r => r.IssueDays > 0).ToList(),
                     _ => groups
                 };
             }
@@ -360,6 +363,7 @@ namespace RSDSystem.Services
                 DaysAbsent = groups.Sum(r => r.DaysAbsent),
                 DaysLate = groups.Sum(r => r.DaysLate),
                 DaysIncomplete = groups.Sum(r => r.DaysIncomplete),
+                IssueDays = groups.Sum(r => r.IssueDays),
                 RegularHours = groups.Sum(r => r.RegularHours),
                 OvertimeHours = groups.Sum(r => r.OvertimeHours),
                 UnmatchedCount = groups.Count(r => !r.Matched),
@@ -535,6 +539,7 @@ namespace RSDSystem.Services
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),
+                IssueDays = rows.Count(r => AttendanceRules.DetectIssues(r).Count > 0),
                 RegularHours = rows.Sum(DayRegularHours),
                 OvertimeHours = rows.Sum(DayOvertimeHours)
             };

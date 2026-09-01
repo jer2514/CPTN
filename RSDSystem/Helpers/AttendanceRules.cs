@@ -52,16 +52,74 @@ namespace RSDSystem.Helpers
         public static string? CountedMorningIn(string? timeIn) =>
             CountedSessionIn(timeIn, MorningStart);
 
+        /// <summary>
+        /// Overtime is paid only from Overtime In / Overtime Out after 17:00.
+        /// A regular clock-out after 5:00 (lingering on site) is not overtime.
+        /// </summary>
         public static decimal OvertimeHours(
             string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
         {
-            var dayEnd = TimeSpan.FromDays(1);
-            var punchedOt = CountedWindowHours(overtimeIn, overtimeOut, ShiftEnd, dayEnd);
-            if (punchedOt > 0)
-                return punchedOt;
+            _ = (in1, out1, in2, out2);
+            return CountedWindowHours(overtimeIn, overtimeOut, ShiftEnd, TimeSpan.FromDays(1));
+        }
 
-            return CountedWindowHours(in1, out1, ShiftEnd, dayEnd)
-                + CountedWindowHours(in2, out2, ShiftEnd, dayEnd);
+        public static IReadOnlyList<AttendanceIssue> DetectIssues(AttendanceRecord row) =>
+            DetectIssues(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
+
+        public static IReadOnlyList<AttendanceIssue> DetectIssues(
+            string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
+        {
+            var issues = new List<AttendanceIssue>();
+            var hasOtIn = !string.IsNullOrWhiteSpace(overtimeIn);
+            var hasOtOut = !string.IsNullOrWhiteSpace(overtimeOut);
+            var paidOt = OvertimeHours(in1, out1, in2, out2, overtimeIn, overtimeOut);
+            var lastRegularOut = LastRegularOut(out1, out2);
+
+            if (hasOtIn ^ hasOtOut)
+            {
+                issues.Add(new AttendanceIssue(
+                    AttendanceIssueCodes.IncompleteOvertime,
+                    "Overtime in and overtime out must both be filled. Incomplete overtime is not paid."));
+            }
+
+            if (hasOtIn
+                && AttendanceDisplay.TryParseTime(overtimeIn, out var otIn)
+                && otIn < ShiftEnd)
+            {
+                issues.Add(new AttendanceIssue(
+                    AttendanceIssueCodes.OvertimeBeforeFive,
+                    "Overtime in is before 5:00. Overtime only starts after the regular shift."));
+            }
+
+            if (lastRegularOut > ShiftEnd)
+            {
+                if (paidOt > 0)
+                {
+                    issues.Add(new AttendanceIssue(
+                        AttendanceIssueCodes.AfternoonOutConflictsWithOt,
+                        "Afternoon time-out is after 5:00 while overtime punches also exist. Afternoon out should be 5:00; extra time belongs in Overtime In/Out."));
+                }
+                else
+                {
+                    issues.Add(new AttendanceIssue(
+                        AttendanceIssueCodes.LingerAfterShift,
+                        "Timed out after 5:00 without overtime in/out. Staying on site is not overtime and is not paid."));
+                }
+            }
+
+            AddReversedSession(issues, in1, out1, "Before noon");
+            AddReversedSession(issues, in2, out2, "After noon");
+
+            if (AttendanceDisplay.TryParseTime(out1, out var morningOut)
+                && AttendanceDisplay.TryParseTime(in2, out var afternoonIn)
+                && morningOut > afternoonIn)
+            {
+                issues.Add(new AttendanceIssue(
+                    AttendanceIssueCodes.OverlappingSessions,
+                    "Before-noon out is after after-noon in. The two sessions overlap."));
+            }
+
+            return issues;
         }
 
         public static int LateMinutes(string? timeIn)
@@ -124,6 +182,28 @@ namespace RSDSystem.Helpers
             return AttendanceStatuses.HalfDay;
         }
 
+        private static TimeSpan LastRegularOut(string? timeOut1, string? timeOut2)
+        {
+            if (AttendanceDisplay.TryParseTime(timeOut2, out var out2))
+                return out2;
+            if (AttendanceDisplay.TryParseTime(timeOut1, out var out1) && out1 >= AfternoonStart)
+                return out1;
+            return TimeSpan.Zero;
+        }
+
+        private static void AddReversedSession(
+            List<AttendanceIssue> issues, string? timeIn, string? timeOut, string label)
+        {
+            if (!AttendanceDisplay.TryParseTime(timeIn, out var start)
+                || !AttendanceDisplay.TryParseTime(timeOut, out var end)
+                || end >= start)
+                return;
+
+            issues.Add(new AttendanceIssue(
+                AttendanceIssueCodes.SessionOutBeforeIn,
+                $"{label} time-out is earlier than time-in."));
+        }
+
         private static bool HasAnyPunch(AttendanceRecord row) =>
             !string.IsNullOrWhiteSpace(row.TimeIn1)
             || !string.IsNullOrWhiteSpace(row.TimeOut1)
@@ -179,5 +259,27 @@ namespace RSDSystem.Helpers
 
         private static string FormatClock(TimeSpan value) =>
             DateTime.Today.Add(value).ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public static class AttendanceIssueCodes
+    {
+        public const string LingerAfterShift = "linger_after_shift";
+        public const string IncompleteOvertime = "incomplete_overtime";
+        public const string OvertimeBeforeFive = "overtime_before_five";
+        public const string AfternoonOutConflictsWithOt = "afternoon_out_conflicts_with_ot";
+        public const string SessionOutBeforeIn = "session_out_before_in";
+        public const string OverlappingSessions = "overlapping_sessions";
+    }
+
+    public sealed class AttendanceIssue
+    {
+        public AttendanceIssue(string code, string message)
+        {
+            Code = code;
+            Message = message;
+        }
+
+        public string Code { get; }
+        public string Message { get; }
     }
 }
