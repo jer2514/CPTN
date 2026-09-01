@@ -361,3 +361,19 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# VS Code / JetBrains
+.vscode/
+.idea/
+*.code-workspace
+
+# Local secrets and machine-specific config
+**/secrets.json
+appsettings.*.local.json
+*.local.json
+
+# User-uploaded photos (keep the project logo tracked)
+RSDSystem/wwwroot/Uploads/employees/*
+RSDSystem/wwwroot/Uploads/users/*
+!RSDSystem/wwwroot/Uploads/employees/.gitkeep
+!RSDSystem/wwwroot/Uploads/users/.gitkeep
