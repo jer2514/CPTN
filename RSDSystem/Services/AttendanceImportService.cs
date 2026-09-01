@@ -8,6 +8,12 @@ namespace RSDSystem.Services
     {
         private readonly PayrollDbContext _db;
 
+        public const string PendingOvertimeBlocksPayrollMessage =
+            "This employee has overtime waiting for admin authorization. Authorize or reject it before generating or submitting payroll.";
+
+        public const string PendingOvertimeBlocksApprovalMessage =
+            "This employee still has overtime waiting for authorization. Authorize or reject it before approving payroll.";
+
         public AttendanceImportService(PayrollDbContext db)
         {
             _db = db;
@@ -416,6 +422,40 @@ namespace RSDSystem.Services
             return ToEmployeeSummary(rows);
         }
 
+        public async Task<bool> HasPendingOvertimeAsync(
+            int projectId,
+            int employeeId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var totals = await GetEmployeePeriodTotalsAsync(
+                projectId, employeeId, periodStart, periodEnd, cancellationToken);
+            return totals != null && totals.PendingOvertimeDays > 0;
+        }
+
+        public async Task<HashSet<int>> EmployeeIdsWithPendingOvertimeAsync(
+            int projectId,
+            DateTime? periodStart,
+            DateTime? periodEnd,
+            CancellationToken cancellationToken = default)
+        {
+            var rows = DeduplicateStoredRows(await ApplyRecordFilters(
+                    RecordsForProject(projectId), null, null, periodStart, periodEnd)
+                .Where(r => r.EmployeeId != null)
+                .ToListAsync(cancellationToken));
+
+            var ids = new HashSet<int>();
+            foreach (var row in rows)
+            {
+                AttendanceRules.Apply(row);
+                if (row.EmployeeId is int id && OvertimeDecisions.IsPending(row.OvertimeDecision))
+                    ids.Add(id);
+            }
+
+            return ids;
+        }
+
         public async Task<HashSet<int>> EmployeeIdsWithAttendanceAsync(
             int projectId,
             DateTime? periodStart,
@@ -767,9 +807,9 @@ namespace RSDSystem.Services
             if (ProjectStatusOptions.IsFinished(project?.Status))
                 return "Finished projects cannot change overtime.";
 
-            if (await PayrollAttendanceLock.IsLockedAsync(
+            if (await PayrollAttendanceLock.BlocksOvertimeReviewAsync(
                     _db, record.ProjectId, record.EmployeeId, record.WorkDate, cancellationToken))
-                return "Payroll for this employee is already approved. Overtime cannot be changed.";
+                return "Payroll for this employee has been submitted or approved. Return it for correction before changing overtime.";
 
             AttendanceRules.Apply(record);
             if (record.OvertimeClaimHours <= 0)

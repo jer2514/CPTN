@@ -125,6 +125,7 @@ namespace RSDSystem.Controllers
             var generatedBy = HttpContext.Session.GetString("FullName") ?? "Admin";
             var created = 0;
             var skippedNoAttendance = 0;
+            var skippedPendingOvertime = 0;
 
             foreach (var emp in employees)
             {
@@ -138,6 +139,11 @@ namespace RSDSystem.Controllers
                 if (attendance == null)
                 {
                     skippedNoAttendance++;
+                    continue;
+                }
+                if (attendance.PendingOvertimeDays > 0)
+                {
+                    skippedPendingOvertime++;
                     continue;
                 }
 
@@ -177,9 +183,18 @@ namespace RSDSystem.Controllers
 
             if (created > 0)
             {
-                TempData["Success"] = skippedNoAttendance > 0
-                    ? $"Generated {created} payslip(s) for {project.ProjectName}. Skipped {skippedNoAttendance} employee(s) with no matched attendance."
-                    : $"Generated {created} payslip(s) for {project.ProjectName}.";
+                var extra = new List<string>();
+                if (skippedNoAttendance > 0)
+                    extra.Add($"Skipped {skippedNoAttendance} employee(s) with no matched attendance");
+                if (skippedPendingOvertime > 0)
+                    extra.Add($"Skipped {skippedPendingOvertime} employee(s) with overtime waiting for authorization");
+                TempData["Success"] = extra.Count == 0
+                    ? $"Generated {created} payslip(s) for {project.ProjectName}."
+                    : $"Generated {created} payslip(s) for {project.ProjectName}. {string.Join(". ", extra)}.";
+            }
+            else if (skippedPendingOvertime > 0)
+            {
+                TempData["Error"] = "No payslips generated. Authorize or reject overtime before generating payroll.";
             }
             else if (skippedNoAttendance > 0)
             {
@@ -663,6 +678,13 @@ namespace RSDSystem.Controllers
 
             if (!PayrollStatusOptions.IsSubmitted(payroll.Status))
                 return Json(new { success = false, message = "Only submitted payroll can be approved." });
+
+            if (await _attendance.HasPendingOvertimeAsync(
+                    payroll.ProjectId, payroll.EmployeeId, payroll.PayPeriodStart, payroll.PayPeriodEnd,
+                    HttpContext.RequestAborted))
+            {
+                return Json(new { success = false, message = AttendanceImportService.PendingOvertimeBlocksApprovalMessage });
+            }
 
             payroll.Status = PayrollStatusOptions.Approved;
             payroll.CorrectionReason = null;

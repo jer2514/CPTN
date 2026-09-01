@@ -133,6 +133,7 @@ namespace RSDSystem.Controllers
                       .ToListAsync();
 
                 var pendingCorrectionIds = await PendingCorrectionEmployeeIdsAsync(projectId);
+                var pendingOvertimeIds = new HashSet<int>();
                 var attendanceEmployeeIds = new HashSet<int>();
 
                 var schedules = await _db.Set<PayrollSchedule>()
@@ -146,6 +147,8 @@ namespace RSDSystem.Controllers
                 if (openSchedule != null && hasAttendance)
                 {
                     attendanceEmployeeIds = await _attendance.EmployeeIdsWithAttendanceAsync(
+                        projectId, openSchedule.StartingDate, openSchedule.EndDate, HttpContext.RequestAborted);
+                    pendingOvertimeIds = await _attendance.EmployeeIdsWithPendingOvertimeAsync(
                         projectId, openSchedule.StartingDate, openSchedule.EndDate, HttpContext.RequestAborted);
                 }
 
@@ -177,7 +180,8 @@ namespace RSDSystem.Controllers
                     e.IsActive,
                     HasAttendance = attendanceEmployeeIds.Contains(e.EmployeeId),
                     AlreadyGenerated = generatedEmployeeIds.Contains(e.EmployeeId),
-                    PendingCorrection = pendingCorrectionIds.Contains(e.EmployeeId)
+                    PendingCorrection = pendingCorrectionIds.Contains(e.EmployeeId),
+                    PendingOvertime = pendingOvertimeIds.Contains(e.EmployeeId)
                 });
 
                 string? message = null;
@@ -367,6 +371,12 @@ namespace RSDSystem.Controllers
                 return RedirectToAction(nameof(GeneratePayroll), new { projectId });
             }
 
+            if (existing == null && attendance.PendingOvertimeDays > 0)
+            {
+                TempData["Error"] = AttendanceImportService.PendingOvertimeBlocksPayrollMessage;
+                return RedirectToAction(nameof(GeneratePayroll), new { projectId });
+            }
+
             ViewBag.PageTitle = existing != null ? "Edit Payroll Slip" : "Generate Payroll Slip";
             ViewBag.IsEdit = existing != null;
             ViewBag.PayrollId = existing?.PayrollId ?? 0;
@@ -535,6 +545,8 @@ namespace RSDSystem.Controllers
                 projectId, employeeId, periodStart, periodEnd, HttpContext.RequestAborted);
             if (attendance == null)
                 return Json(new { success = false, message = EmployeeAttendanceRequiredMessage });
+            if (attendance.PendingOvertimeDays > 0)
+                return Json(new { success = false, message = AttendanceImportService.PendingOvertimeBlocksPayrollMessage });
 
             var regularDaysWorked = attendance.DaysPresent > 0
                 ? attendance.DaysPresent
@@ -792,6 +804,13 @@ namespace RSDSystem.Controllers
                  payroll.Status == PayrollStatusOptions.Approved)
              {
                  return Json(new { success = false, message = "Submitted or approved payroll cannot be changed." });
+             }
+
+             if (await _attendance.HasPendingOvertimeAsync(
+                     payroll.ProjectId, payroll.EmployeeId, payroll.PayPeriodStart, payroll.PayPeriodEnd,
+                     HttpContext.RequestAborted))
+             {
+                 return Json(new { success = false, message = AttendanceImportService.PendingOvertimeBlocksPayrollMessage });
              }
 
              var resubmitted = payroll.Status == PayrollStatusOptions.Correction;
