@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RSDSystem.Models;
 using RSDSystem.Services;
 
@@ -12,11 +13,19 @@ namespace RSDSystem.Controllers
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx", ".csv", ".txt" };
 
         private readonly AttendanceImportService _imports;
+        private readonly NotificationService _notifications;
+        private readonly PayrollDbContext _db;
         private readonly IConfiguration _config;
 
-        public AttendanceApiController(AttendanceImportService imports, IConfiguration config)
+        public AttendanceApiController(
+            AttendanceImportService imports,
+            NotificationService notifications,
+            PayrollDbContext db,
+            IConfiguration config)
         {
             _imports = imports;
+            _notifications = notifications;
+            _db = db;
             _config = config;
         }
 
@@ -67,6 +76,17 @@ namespace RSDSystem.Controllers
                 if (result.Error != null)
                     return BadRequest(new { success = false, message = result.Error });
 
+                if (result.PendingOvertimeCount > 0)
+                {
+                    var importedProject = await _db.Projects.AsNoTracking()
+                        .FirstOrDefaultAsync(p => p.ProjectId == result.ProjectId, HttpContext.RequestAborted);
+                    if (importedProject != null)
+                    {
+                        await _notifications.NotifyOvertimePendingAsync(
+                            importedProject, result.PendingOvertimeCount, HttpContext.RequestAborted);
+                    }
+                }
+
                 return Ok(new
                 {
                     success = true,
@@ -80,7 +100,8 @@ namespace RSDSystem.Controllers
                     periodEnd = result.PeriodEnd,
                     rowCount = result.RowCount,
                     matchedCount = result.MatchedCount,
-                    unmatchedCount = result.UnmatchedCount
+                    unmatchedCount = result.UnmatchedCount,
+                    pendingOvertimeCount = result.PendingOvertimeCount
                 });
             }
             catch (Exception ex)
@@ -107,6 +128,11 @@ namespace RSDSystem.Controllers
             if (result.SkippedLockedCount > 0)
             {
                 message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+            }
+
+            if (result.PendingOvertimeCount > 0)
+            {
+                message += $" {result.PendingOvertimeCount} overtime row(s) need admin authorization before they are paid.";
             }
 
             return message;

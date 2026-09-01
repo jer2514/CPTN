@@ -66,6 +66,10 @@
                         <li><button type="button" class="dropdown-item" data-status="Half-day">Half-day</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Late">Late</button></li>
                         <li><button type="button" class="dropdown-item" data-status="Absent">Absent</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="Issues">Issues</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="OtPending">Pending OT</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="OtApproved">Authorized OT</button></li>
+                        <li><button type="button" class="dropdown-item" data-status="OtRejected">Unauthorized OT</button></li>
                     </ul>
                 </div>
             </div>
@@ -84,11 +88,9 @@
                         <th>Time Out</th>
                         <th>Overtime In</th>
                         <th>Overtime Out</th>
+                        <th>Hours</th>
                         <th>Status</th>
-                        @if (!isAdmin)
-                        {
-                            <th>Action</th>
-                        }
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="recordsBody"></tbody>
@@ -112,7 +114,7 @@
 <div id="recordEditOverlay" class="att-edit-overlay" hidden>
     <div class="page-card att-edit-panel">
         <div class="att-page-title" id="recordEditTitle">Request Edit</div>
-        <div class="att-edit-sub">Morning 8:00–12:00 · Afternoon 13:00–17:00 · Overtime from 17:00. Late after 8:30. Early out before 16:45.</div>
+        <div class="att-edit-sub">Morning 8:00–12:00 · Afternoon 1:00–5:00 · Time after 5:00 is overtime only if admin authorizes it.</div>
         <div class="att-edit-meta">
             <div>
                 <div class="form-lbl">Employee ID</div>
@@ -143,7 +145,8 @@
             Reason
             <input type="text" id="reReason" class="form-ctrl" placeholder="Why does this row need a correction?" maxlength="250" />
         </label>
-        <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime</div>
+        <div class="att-edit-live" id="reHours">0.00 regular hours · 0.00 overtime (unpaid until admin authorizes)</div>
+        <div class="att-issue-note" id="reIssues" hidden></div>
         <div class="att-preview-footer">
             <div class="att-edit-actions">
                 <button type="button" class="att-quick-btn" id="reStandard">8–5</button>
@@ -154,6 +157,42 @@
             <div class="att-edit-actions">
                 <button type="button" class="del-btn-cancel" id="reCancel">Cancel</button>
                 <button type="button" class="btn-primary-blue-solid" id="reSave">Submit Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@if (isAdmin)
+{
+<div id="otReviewOverlay" class="att-edit-overlay" hidden>
+    <div class="page-card att-edit-panel">
+        <div class="att-page-title" id="otReviewTitle">Authorize overtime</div>
+        <p id="otReviewLead" class="att-edit-sub">Authorize only if the worker was told to stay past 5:00. Reject if they only timed out late.</p>
+        <div class="att-edit-meta">
+            <div>
+                <div class="form-lbl">Employee</div>
+                <div class="slip-value" id="otReviewName"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Date</div>
+                <div class="slip-value" id="otReviewDate"></div>
+            </div>
+            <div>
+                <div class="form-lbl">Claimed OT</div>
+                <div class="slip-value" id="otReviewHours"></div>
+            </div>
+        </div>
+        <label class="form-lbl" style="display:block;margin-top:12px">
+            Note <span style="font-weight:500;color:#7a93c4">(optional)</span>
+            <textarea id="otReviewNote" class="form-ctrl" rows="3" maxlength="400"
+                      placeholder="Why this overtime is authorized, or why it is unauthorized staying late."></textarea>
+        </label>
+        <div class="att-preview-footer">
+            <div class="att-footer-spacer"></div>
+            <div class="att-edit-actions">
+                <button type="button" class="del-btn-cancel" id="otReviewCancel">Cancel</button>
+                <button type="button" class="btn-primary-blue-solid" id="otReviewConfirm">Confirm</button>
             </div>
         </div>
     </div>
@@ -176,6 +215,8 @@
         let currentPage = 1;
         let loadedPeriod = null;
         let lastRows = [];
+        let recordsFinished = false;
+        let overtimeReview = null;
 
         function projectLabel(p) {
             return p.isFinished ? `${p.name} (Finished)` : p.name;
@@ -250,9 +291,60 @@
             return v == null || v === '' || v === '—' ? '——' : v;
         }
 
-        function timeCell(v) {
+        function timeCell(v, flagged) {
             const text = dash(v);
-            return text === '——' ? `<span class="att-empty">${text}</span>` : text;
+            if (text === '——') return `<span class="att-empty">${text}</span>`;
+            return flagged ? `<span class="att-time-flag" title="Clock-out after 5:00">${text}</span>` : text;
+        }
+
+        function escapeAttr(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/</g, '&lt;');
+        }
+
+        function hasIssue(row, code) {
+            return (row.issues || []).some(i => i.code === code);
+        }
+
+        function issueMark(row) {
+            if (!row.hasIssues || !(row.issues || []).length) return '';
+            const title = row.issues.map(i => i.message).join(' ');
+            return `<span class="att-issue-flag" title="${escapeAttr(title)}"><i class="bi bi-exclamation-triangle-fill"></i></span>`;
+        }
+
+        function hoursCell(row) {
+            const regular = Number(row.regularHours || 0).toFixed(2);
+            const claim = Number(row.overtimeClaimHours || 0);
+            const paid = Number(row.overtimeHours || 0);
+            if (claim <= 0) return regular;
+            if (paid > 0)
+                return `${regular} <span class="att-ot-hours">/ ${paid.toFixed(2)} OT</span>`;
+            if (row.overtimePending)
+                return `${regular} <span class="att-ot-hours att-ot-pending-hours">/ ${claim.toFixed(2)} pending</span>`;
+            if (row.overtimeRejected)
+                return `${regular} <span class="att-ot-hours att-ot-rejected-hours">/ 0.00 OT</span>`;
+            return `${regular} <span class="att-ot-hours">/ ${claim.toFixed(2)} OT</span>`;
+        }
+
+        function actionCell(row) {
+            if (isAdmin) {
+                if (row.canReviewOvertime) {
+                    return `<td class="att-action-cell"><div class="att-ot-actions">
+                        <button type="button" class="att-ot-btn att-ot-authorize" data-record-id="${row.recordId}">Authorize</button>
+                        <button type="button" class="att-ot-btn att-ot-reject" data-record-id="${row.recordId}">Reject</button>
+                    </div></td>`;
+                }
+                if (row.overtimeDecisionLabel) {
+                    return `<td class="att-action-cell"><span class="att-ot-status ${row.overtimeDecisionClass || ''}">${escapeAttr(row.overtimeDecisionLabel)}</span></td>`;
+                }
+                return `<td class="att-action-cell"><span class="att-empty">——</span></td>`;
+            }
+            const actionLabel = recordsFinished ? 'View only' : (row.actionLabel || 'Request Edit');
+            const locked = recordsFinished || row.locked;
+            const cls = 'att-action-link' + (locked ? ' is-locked' : '');
+            return `<td><button type="button" class="${cls}" data-record-id="${row.recordId}"${locked ? ' disabled' : ''}>${actionLabel}</button></td>`;
         }
 
         function selectedPeriod() {
@@ -337,6 +429,7 @@
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
                 const filterNote = statusFilter !== 'all' ? ` · ${statusFilter}` : '';
                 const finished = data.isFinished === true;
+                recordsFinished = finished;
                 const finishedNote = document.getElementById('finishedNote');
                 if (finishedNote)
                     finishedNote.style.display = finished ? 'block' : 'none';
@@ -344,27 +437,22 @@
                     `${data.projectName} · ${data.periodLabel || period.label} · ${data.total} row(s)${filterNote}${byline}${finished ? ' · View only' : ''}`;
                 document.getElementById('recordsBody').innerHTML = data.rows.length
                     ? data.rows.map(r => {
-                        const action = isAdmin ? '' : (() => {
-                            const actionLabel = finished ? 'View only' : (r.actionLabel || 'Request Edit');
-                            const locked = finished || r.locked;
-                            const cls = 'att-action-link' + (locked ? ' is-locked' : '');
-                            return `<td><button type="button" class="${cls}" data-record-id="${r.recordId}"${locked ? ' disabled' : ''}>${actionLabel}</button></td>`;
-                        })();
-                        return `<tr class="${r.matched ? '' : 'att-row-unmatched'}">
+                        return `<tr class="${r.matched ? '' : 'att-row-unmatched'}${r.hasIssues ? ' att-row-issue' : ''}${r.overtimePending ? ' att-row-ot-pending' : ''}">
                             <td>${r.displayId || '——'}</td>
                             <td>${r.employeeName || '——'}</td>
                             <td>${dash(r.workDate)}</td>
                             <td>${timeCell(r.timeIn1)}</td>
                             <td>${timeCell(r.timeOut1)}</td>
                             <td>${timeCell(r.timeIn2)}</td>
-                            <td>${timeCell(r.timeOut2)}</td>
+                            <td>${timeCell(r.timeOut2, hasIssue(r, 'linger_after_shift') || hasIssue(r, 'afternoon_out_conflicts_with_ot'))}</td>
                             <td>${timeCell(r.overtimeIn)}</td>
                             <td>${timeCell(r.overtimeOut)}</td>
-                            <td><span class="status-pill ${r.statusClass}">${r.status}</span></td>
-                            ${action}
+                            <td>${hoursCell(r)}</td>
+                            <td><span class="status-pill ${r.statusClass}">${r.status}</span>${issueMark(r)}</td>
+                            ${actionCell(r)}
                         </tr>`;
                     }).join('')
-                    : `<tr><td colspan="${isAdmin ? 10 : 11}" class="text-center text-muted py-4">No attendance rows match this filter.</td></tr>`;
+                    : `<tr><td colspan="12" class="text-center text-muted py-4">No attendance rows match this filter.</td></tr>`;
 
                 document.getElementById('recordsPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>
@@ -454,9 +542,36 @@
             const afternoon = overlapHours(in1, draft.timeOut1, 13 * 60, 17 * 60)
                 + overlapHours(draft.timeIn2, draft.timeOut2, 13 * 60, 17 * 60);
             const punchedOt = overlapHours(draft.overtimeIn, draft.overtimeOut, 17 * 60, 24 * 60);
-            const shiftOt = overlapHours(in1, draft.timeOut1, 17 * 60, 24 * 60)
-                + overlapHours(draft.timeIn2, draft.timeOut2, 17 * 60, 24 * 60);
-            return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt > 0 ? punchedOt : shiftOt };
+            return { regular: Math.round((morning + afternoon) * 100) / 100, ot: punchedOt };
+        }
+
+        function draftIssues(draft) {
+            const notes = [];
+            const otIn = minutesOf(draft.overtimeIn);
+            const otOut = minutesOf(draft.overtimeOut);
+            const lastOut = minutesOf(draft.timeOut2) ?? (minutesOf(draft.timeOut1) !== null && minutesOf(draft.timeOut1) >= 13 * 60
+                ? minutesOf(draft.timeOut1) : null);
+            if ((!!draft.overtimeIn) !== (!!draft.overtimeOut))
+                notes.push('Overtime in and overtime out must both be filled. Incomplete overtime is not paid.');
+            if (otIn !== null && otIn < 17 * 60)
+                notes.push('Overtime in is before 5:00. Overtime only starts after the regular shift.');
+            if (lastOut !== null && lastOut > 17 * 60) {
+                if (overlapHours(draft.overtimeIn, draft.overtimeOut, 17 * 60, 24 * 60) > 0)
+                    notes.push('Afternoon time-out is after 5:00 while overtime punches also exist. Afternoon out should be 5:00; extra time belongs in Overtime In/Out.');
+                else
+                    notes.push('Timed out after 5:00 without overtime in/out. Admin must authorize this as overtime or reject it as staying late.');
+            }
+            const out1 = minutesOf(draft.timeOut1);
+            const in1 = minutesOf(draft.timeIn1);
+            const in2 = minutesOf(draft.timeIn2);
+            if (in1 !== null && out1 !== null && out1 < in1)
+                notes.push('Before noon time-out is earlier than time-in.');
+            const out2 = minutesOf(draft.timeOut2);
+            if (in2 !== null && out2 !== null && out2 < in2)
+                notes.push('After noon time-out is earlier than time-in.');
+            if (out1 !== null && in2 !== null && out1 > in2)
+                notes.push('Before-noon out is after after-noon in. The two sessions overlap.');
+            return notes;
         }
 
         function draftStatus(draft) {
@@ -501,7 +616,16 @@
             pill.className = 'status-pill ' + (statusClass[status] || 'att-status-halfday');
             const hours = draftHours(draft);
             document.getElementById('reHours').textContent =
-                hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime';
+                hours.regular.toFixed(2) + ' regular hours · ' + hours.ot.toFixed(2) + ' overtime (unpaid until admin authorizes)';
+            const issues = draftIssues(draft);
+            const box = document.getElementById('reIssues');
+            if (issues.length) {
+                box.hidden = false;
+                box.textContent = issues.join(' ');
+            } else {
+                box.hidden = true;
+                box.textContent = '';
+            }
         }
 
         function openRecordEdit(row) {
@@ -615,6 +739,69 @@
                 closeRecordEdit();
             }
         });
+        }
+
+        if (isAdmin) {
+            const otOverlay = document.getElementById('otReviewOverlay');
+            function closeOvertimeReview() {
+                if (otOverlay) otOverlay.hidden = true;
+                overtimeReview = null;
+            }
+
+            function openOvertimeReview(row, authorize) {
+                if (!row || !row.canReviewOvertime) return;
+                overtimeReview = { row, authorize };
+                const hours = Number(row.overtimeClaimHours || 0).toFixed(2);
+                document.getElementById('otReviewTitle').textContent = authorize ? 'Authorize overtime' : 'Reject overtime';
+                document.getElementById('otReviewLead').textContent = authorize
+                    ? `Authorize ${hours} hour(s) after 5:00 as paid overtime for this worker.`
+                    : `Reject ${hours} hour(s) after 5:00 as unauthorized staying late. Regular 8:00–5:00 hours stay paid.`;
+                document.getElementById('otReviewName').textContent = row.employeeName || '——';
+                document.getElementById('otReviewDate').textContent = row.workDate || '——';
+                document.getElementById('otReviewHours').textContent = hours + ' hours';
+                document.getElementById('otReviewNote').value = '';
+                const confirmBtn = document.getElementById('otReviewConfirm');
+                confirmBtn.textContent = authorize ? 'Authorize' : 'Reject';
+                confirmBtn.classList.toggle('att-ot-confirm-reject', !authorize);
+                otOverlay.hidden = false;
+            }
+
+            document.getElementById('recordsBody').addEventListener('click', function (e) {
+                const btn = e.target.closest('.att-ot-authorize, .att-ot-reject');
+                if (!btn) return;
+                e.preventDefault();
+                const row = lastRows.find(r => String(r.recordId) === String(btn.dataset.recordId));
+                if (row) openOvertimeReview(row, btn.classList.contains('att-ot-authorize'));
+            });
+
+            document.getElementById('otReviewCancel').addEventListener('click', closeOvertimeReview);
+            otOverlay.addEventListener('click', function (e) {
+                if (e.target.id === 'otReviewOverlay') closeOvertimeReview();
+            });
+            document.getElementById('otReviewConfirm').addEventListener('click', async function () {
+                if (!overtimeReview) return;
+                const body = new FormData();
+                body.set('recordId', overtimeReview.row.recordId);
+                body.set('authorize', overtimeReview.authorize ? 'true' : 'false');
+                body.set('note', document.getElementById('otReviewNote').value.trim());
+                if (token) body.set('__RequestVerificationToken', token);
+                const res = await fetch('/Attendance/ReviewOvertime', {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'RequestVerificationToken': token },
+                    body
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    showToast(data.message || 'Could not review overtime.');
+                    return;
+                }
+                closeOvertimeReview();
+                showToast(data.message || 'Overtime reviewed.', 'success');
+                loadRecords();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && otOverlay && !otOverlay.hidden) closeOvertimeReview();
+            });
         }
     </script>
 }

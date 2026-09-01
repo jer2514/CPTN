@@ -150,13 +150,11 @@ namespace RSDSystem.Services
             foreach (var row in preview.Rows)
             {
                 var workDate = AttendanceDisplay.UsableDate(row.WorkDate);
-                batch.Records.Add(new AttendanceRecord
+                var record = new AttendanceRecord
                 {
                     ProjectId = preview.Project.ProjectId,
                     EmployeeId = row.EmployeeId,
                     ExternalUserId = Clip(row.ExternalUserId, 40) ?? "",
-                    // Store the matched system name when we have one; otherwise keep the raw file name
-                    // so unmatched rows are still traceable in Attendance Records.
                     EmployeeName = Clip(row.MatchedEmployeeName ?? row.EmployeeName, 150) ?? "",
                     WorkDate = workDate,
                     PeriodStart = AttendanceDisplay.UsableDate(preview.PeriodStart),
@@ -171,11 +169,12 @@ namespace RSDSystem.Services
                     WorkHoursActual = row.WorkHoursActual,
                     LateMinutes = row.LateMinutes,
                     EarlyMinutes = row.EarlyMinutes,
-                    OvertimeHours = row.OvertimeHours,
                     AbsenceDays = row.AbsenceDays,
-                    Status = Clip(AttendanceStatuses.Display(row.Status), 20) ?? AttendanceStatuses.HalfDay,
                     Matched = row.Matched
-                });
+                };
+                AttendanceRules.Apply(record);
+                record.Status = Clip(AttendanceStatuses.Display(record.Status), 20) ?? AttendanceStatuses.HalfDay;
+                batch.Records.Add(record);
             }
 
             _db.AttendanceImports.Add(batch);
@@ -201,7 +200,8 @@ namespace RSDSystem.Services
                 MatchedCount = preview.Rows.Count(r => r.Matched),
                 UnmatchedCount = preview.Rows.Count(r => !r.Matched),
                 ReplacedPrevious = replaced,
-                SkippedLockedCount = skippedLocked
+                SkippedLockedCount = skippedLocked,
+                PendingOvertimeCount = batch.Records.Count(r => OvertimeDecisions.IsPending(r.OvertimeDecision))
             };
         }
 
@@ -236,6 +236,14 @@ namespace RSDSystem.Services
             {
                 if (string.Equals(status, "Unmatched", StringComparison.OrdinalIgnoreCase))
                     rows = rows.Where(r => !r.Matched).ToList();
+                else if (string.Equals(status, "Issues", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => AttendanceRules.DetectIssues(r).Count > 0).ToList();
+                else if (string.Equals(status, "OtPending", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => OvertimeDecisions.IsPending(r.OvertimeDecision)).ToList();
+                else if (string.Equals(status, "OtApproved", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => OvertimeDecisions.IsApproved(r.OvertimeDecision)).ToList();
+                else if (string.Equals(status, "OtRejected", StringComparison.OrdinalIgnoreCase))
+                    rows = rows.Where(r => OvertimeDecisions.IsRejected(r.OvertimeDecision)).ToList();
                 else
                     rows = rows.Where(r => AttendanceStatuses.MatchesFilter(r.Status, status)).ToList();
             }
@@ -344,6 +352,8 @@ namespace RSDSystem.Services
                     "Late" => groups.Where(r => r.DaysLate > 0).ToList(),
                     "Incomplete" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
                     "Half-day" => groups.Where(r => r.DaysIncomplete > 0).ToList(),
+                    "Issues" => groups.Where(r => r.IssueDays > 0).ToList(),
+                    "OtPending" => groups.Where(r => r.PendingOvertimeDays > 0).ToList(),
                     _ => groups
                 };
             }
@@ -360,8 +370,11 @@ namespace RSDSystem.Services
                 DaysAbsent = groups.Sum(r => r.DaysAbsent),
                 DaysLate = groups.Sum(r => r.DaysLate),
                 DaysIncomplete = groups.Sum(r => r.DaysIncomplete),
+                IssueDays = groups.Sum(r => r.IssueDays),
                 RegularHours = groups.Sum(r => r.RegularHours),
                 OvertimeHours = groups.Sum(r => r.OvertimeHours),
+                PendingOvertimeHours = groups.Sum(r => r.PendingOvertimeHours),
+                PendingOvertimeDays = groups.Sum(r => r.PendingOvertimeDays),
                 UnmatchedCount = groups.Count(r => !r.Matched),
                 ImportedBy = all.Select(r => r.Import?.ImportedBy)
                     .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)),
@@ -535,8 +548,13 @@ namespace RSDSystem.Services
                 DaysAbsent = rows.Count(r => r.Status == AttendanceStatuses.Absent),
                 DaysLate = rows.Count(r => AttendanceStatuses.CountsAsLate(r.Status)),
                 DaysIncomplete = rows.Count(r => AttendanceStatuses.IsHalfDay(r.Status)),
+                IssueDays = rows.Count(r => AttendanceRules.DetectIssues(r).Count > 0),
                 RegularHours = rows.Sum(DayRegularHours),
-                OvertimeHours = rows.Sum(DayOvertimeHours)
+                OvertimeHours = rows.Sum(DayOvertimeHours),
+                OvertimeClaimHours = rows.Sum(r => r.OvertimeClaimHours),
+                PendingOvertimeDays = rows.Count(r => OvertimeDecisions.IsPending(r.OvertimeDecision)),
+                PendingOvertimeHours = rows.Where(r => OvertimeDecisions.IsPending(r.OvertimeDecision))
+                    .Sum(r => r.OvertimeClaimHours)
             };
         }
 
@@ -544,8 +562,7 @@ namespace RSDSystem.Services
             AttendanceRules.RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
 
         private static decimal DayOvertimeHours(AttendanceRecord row) =>
-            AttendanceRules.OvertimeHours(
-                row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
+            AttendanceRules.PaidOvertimeHours(row);
 
         private static string PeriodKey(DateTime start, DateTime end) =>
             start.ToString("yyyy-MM-dd") + "|" + end.ToString("yyyy-MM-dd");
@@ -732,6 +749,53 @@ namespace RSDSystem.Services
             return null;
         }
 
+        public async Task<string?> ReviewOvertimeAsync(
+            int recordId,
+            bool authorize,
+            string? note,
+            string reviewedBy,
+            CancellationToken cancellationToken = default)
+        {
+            var record = await _db.AttendanceRecords
+                .Include(r => r.Import)
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId, cancellationToken);
+            if (record == null)
+                return "Attendance row not found.";
+
+            var project = await _db.Projects.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProjectId == record.ProjectId, cancellationToken);
+            if (ProjectStatusOptions.IsFinished(project?.Status))
+                return "Finished projects cannot change overtime.";
+
+            if (await PayrollAttendanceLock.IsLockedAsync(
+                    _db, record.ProjectId, record.EmployeeId, record.WorkDate, cancellationToken))
+                return "Payroll for this employee is already approved. Overtime cannot be changed.";
+
+            AttendanceRules.Apply(record);
+            if (record.OvertimeClaimHours <= 0)
+                return "This row has no overtime to review.";
+
+            if (authorize)
+            {
+                AttendanceRules.FillAuthorizedOvertimePunches(record);
+                record.OvertimeDecision = OvertimeDecisions.Approved;
+                record.OvertimeReviewNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+            }
+            else
+            {
+                record.OvertimeDecision = OvertimeDecisions.Rejected;
+                record.OvertimeReviewNote = string.IsNullOrWhiteSpace(note)
+                    ? "Unauthorized. Worker was staying late."
+                    : note.Trim();
+            }
+
+            record.OvertimeReviewedBy = reviewedBy;
+            record.OvertimeReviewedAt = PhilippinesTime.Now;
+            AttendanceRules.Apply(record);
+            await _db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+
         public async Task<AttendanceMonthEdit?> GetMonthEditAsync(int recordId, CancellationToken cancellationToken = default)
         {
             var focus = await _db.AttendanceRecords
@@ -796,8 +860,7 @@ namespace RSDSystem.Services
                         ? AttendanceStatuses.Absent
                         : AttendanceStatuses.Display(row.Status),
                     RegularHours = AttendanceRules.RegularHours(row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2),
-                    OvertimeHours = AttendanceRules.OvertimeHours(
-                        row?.TimeIn1, row?.TimeOut1, row?.TimeIn2, row?.TimeOut2, row?.OvertimeIn, row?.OvertimeOut)
+                    OvertimeHours = row == null ? 0 : AttendanceRules.PaidOvertimeHours(row)
                 });
             }
 
@@ -1006,6 +1069,8 @@ namespace RSDSystem.Services
                     LateMinutes = row.LateMinutes,
                     EarlyMinutes = row.EarlyMinutes,
                     OvertimeHours = row.OvertimeHours,
+                    OvertimeClaimHours = row.OvertimeClaimHours,
+                    OvertimeDecision = row.OvertimeDecision ?? "",
                     AbsenceDays = row.AbsenceDays,
                     Status = row.Status,
                     Matched = employeeId.HasValue,

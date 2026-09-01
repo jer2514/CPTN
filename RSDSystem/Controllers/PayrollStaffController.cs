@@ -386,6 +386,7 @@ namespace RSDSystem.Controllers
                 : attendance.DaysWorked;
             ViewBag.AbsentDays = attendance.DaysAbsent;
             ViewBag.OvertimeHours = attendance.OvertimeHours;
+            ViewBag.PendingOvertimeHours = attendance.PendingOvertimeHours;
             ViewBag.RegularHours = attendance.RegularHours;
             var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
             ViewBag.CashAdvance = existing?.CashAdvance ?? pendingAdvance;
@@ -429,6 +430,7 @@ namespace RSDSystem.Controllers
                     daysWorked = 0,
                     daysAbsent = 0,
                     overtimeHours = 0m,
+                    pendingOvertimeHours = 0m,
                     regularHours = 0m
                 });
             }
@@ -440,6 +442,7 @@ namespace RSDSystem.Controllers
                 daysWorked = attendance.DaysPresent > 0 ? attendance.DaysPresent : attendance.DaysWorked,
                 daysAbsent = attendance.DaysAbsent,
                 overtimeHours = attendance.OvertimeHours,
+                pendingOvertimeHours = attendance.PendingOvertimeHours,
                 regularHours = attendance.RegularHours
             });
         }

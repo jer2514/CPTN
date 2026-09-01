@@ -127,7 +127,14 @@ namespace RSDSystem.Controllers
                 var importedProject = await _db.Projects.AsNoTracking()
                     .FirstOrDefaultAsync(p => p.ProjectId == result.ProjectId, HttpContext.RequestAborted);
                 if (importedProject != null)
+                {
                     await _notifications.NotifyAttendanceImportedAsync(importedProject, ImportedBy(), HttpContext.RequestAborted);
+                    if (result.PendingOvertimeCount > 0)
+                    {
+                        await _notifications.NotifyOvertimePendingAsync(
+                            importedProject, result.PendingOvertimeCount, HttpContext.RequestAborted);
+                    }
+                }
 
                 await _logs.LogAsync(
                     ActivityTypes.ImportAttendance,
@@ -141,6 +148,8 @@ namespace RSDSystem.Controllers
                     : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
                 if (result.SkippedLockedCount > 0)
                     message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+                if (result.PendingOvertimeCount > 0)
+                    message += $" {result.PendingOvertimeCount} overtime row(s) need admin authorization before they are paid.";
 
                 return Json(new
                 {
@@ -263,6 +272,8 @@ namespace RSDSystem.Controllers
                     LateMinutes = r.LateMinutes,
                     EarlyMinutes = r.EarlyMinutes,
                     OvertimeHours = r.OvertimeHours,
+                    OvertimeClaimHours = r.OvertimeClaimHours,
+                    OvertimeDecision = r.OvertimeDecision,
                     AbsenceDays = r.AbsenceDays,
                     Status = r.Status,
                     Matched = r.Matched,
@@ -270,7 +281,8 @@ namespace RSDSystem.Controllers
                 }, r.AttendanceRecordId, r.Import?.Format ?? AttendanceFormats.Daily, r.Import?.ImportedAt,
                     pendingIds.Contains(r.AttendanceRecordId),
                     approvedIds.Contains(r.AttendanceRecordId),
-                    PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate)))
+                    PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate),
+                    ProjectStatusOptions.IsFinished(project.Status)))
             });
         }
 
@@ -314,8 +326,11 @@ namespace RSDSystem.Controllers
                     daysAbsent = summary.DaysAbsent,
                     daysLate = summary.DaysLate,
                     daysIncomplete = summary.DaysIncomplete,
+                    issueDays = summary.IssueDays,
                     regularHours = summary.RegularHours,
                     overtimeHours = summary.OvertimeHours,
+                    pendingOvertimeHours = summary.PendingOvertimeHours,
+                    pendingOvertimeDays = summary.PendingOvertimeDays,
                     unmatched = summary.UnmatchedCount
                 },
                 rows = summary.Rows.Select(r => new
@@ -328,6 +343,9 @@ namespace RSDSystem.Controllers
                     r.DaysAbsent,
                     r.DaysLate,
                     r.DaysIncomplete,
+                    r.IssueDays,
+                    pendingOvertimeDays = r.PendingOvertimeDays,
+                    pendingOvertimeHours = r.PendingOvertimeHours.ToString("0.00"),
                     regularHours = r.RegularHours.ToString("0.00"),
                     overtimeHours = r.OvertimeHours.ToString("0.00")
                 })
@@ -359,9 +377,51 @@ namespace RSDSystem.Controllers
             });
         }
 
-        public IActionResult Edit(int id)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReviewOvertime(int recordId, bool authorize, string? note)
         {
-            return RedirectToAction(nameof(Records));
+            if (!IsAdmin)
+                return Json(new { success = false, message = "Only admin can authorize or reject overtime." });
+
+            var record = await _db.AttendanceRecords.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId, HttpContext.RequestAborted);
+            if (record == null)
+                return Json(new { success = false, message = "Attendance row not found." });
+
+            var (project, blocked) = await RequireOngoingProjectAsync(record.ProjectId);
+            if (blocked != null)
+                return blocked;
+
+            var error = await _imports.ReviewOvertimeAsync(
+                recordId, authorize, note, ImportedBy(), HttpContext.RequestAborted);
+            if (error != null)
+                return Json(new { success = false, message = error });
+
+            var updated = await _db.AttendanceRecords.AsNoTracking()
+                .Include(r => r.Employee)
+                .FirstOrDefaultAsync(r => r.AttendanceRecordId == recordId, HttpContext.RequestAborted);
+            var name = updated?.Employee?.FullName ?? updated?.EmployeeName ?? "the worker";
+            var date = AttendanceDisplay.LongDate(updated?.WorkDate);
+            var hours = updated?.OvertimeClaimHours ?? 0;
+            var message = authorize
+                ? $"Authorized {hours:0.##} overtime hour(s) for {name} on {date}."
+                : $"Rejected overtime for {name} on {date}. Time after 5:00 is treated as staying late and is not paid.";
+
+            await _logs.LogAsync(
+                authorize ? ActivityTypes.AuthorizeOvertime : ActivityTypes.RejectOvertime,
+                ActivityModules.Attendance,
+                message,
+                record.ProjectId,
+                recordId);
+
+            if (project != null)
+            {
+                await _notifications.NotifyOvertimeReviewedAsync(
+                    project, name, date, hours, authorize, HttpContext.RequestAborted);
+            }
+
+            return Json(new { success = true, message });
         }
 
         [HttpPost]
@@ -586,7 +646,8 @@ namespace RSDSystem.Controllers
             DateTime? importedAt = null,
             bool pendingCorrection = false,
             bool correctionApproved = false,
-            bool payrollLocked = false)
+            bool payrollLocked = false,
+            bool projectFinished = false)
         {
             var computed = new AttendanceRecord
             {
@@ -596,10 +657,14 @@ namespace RSDSystem.Controllers
                 TimeOut2 = row.TimeOut2,
                 OvertimeIn = row.OvertimeIn,
                 OvertimeOut = row.OvertimeOut,
-                WorkHoursActual = row.WorkHoursActual
+                WorkHoursActual = row.WorkHoursActual,
+                OvertimeClaimHours = row.OvertimeClaimHours,
+                OvertimeDecision = row.OvertimeDecision ?? ""
             };
             AttendanceRules.Apply(computed);
+            var issues = AttendanceRules.DetectIssues(computed);
             var status = AttendanceStatuses.Display(computed.Status);
+            var otDecision = OvertimeDecisions.Normalize(computed.OvertimeDecision);
             var locked = payrollLocked || correctionApproved;
             string actionLabel;
             if (payrollLocked || correctionApproved)
@@ -626,22 +691,33 @@ namespace RSDSystem.Controllers
                 overtimeIn = AttendanceDisplay.Clock(row.OvertimeIn),
                 overtimeOut = AttendanceDisplay.Clock(row.OvertimeOut),
                 row.WorkHoursNormal,
-                row.WorkHoursActual,
+                workHoursActual = computed.WorkHoursActual,
+                regularHours = computed.WorkHoursActual,
+                overtimeHours = computed.OvertimeHours,
+                overtimeClaimHours = computed.OvertimeClaimHours,
+                overtimeDecision = otDecision,
+                overtimeDecisionLabel = OvertimeDecisions.Display(otDecision),
+                overtimeDecisionClass = OvertimeDecisions.CssClass(otDecision),
+                overtimePending = OvertimeDecisions.IsPending(otDecision),
+                overtimeAuthorized = OvertimeDecisions.IsApproved(otDecision),
+                overtimeRejected = OvertimeDecisions.IsRejected(otDecision),
                 row.LateMinutes,
                 row.EarlyMinutes,
-                row.OvertimeHours,
                 row.AbsenceDays,
                 Status = status,
                 statusClass = AttendanceStatuses.CssClass(status),
                 row.Matched,
                 row.Note,
+                issues = issues.Select(i => new { code = i.Code, message = i.Message }).ToList(),
+                hasIssues = issues.Count > 0,
                 format,
                 importedAt = importedAt.HasValue ? PhilippinesTime.FormatDateTime(importedAt.Value) : null,
                 actionLabel,
                 pendingCorrection,
                 payrollLocked,
                 requestEdit = !locked,
-                locked
+                locked,
+                canReviewOvertime = OvertimeDecisions.IsPending(otDecision) && !payrollLocked && !projectFinished
             };
         }
     }

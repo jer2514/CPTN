@@ -57,6 +57,8 @@ namespace RSDSystem.Models
         public const string RequestCorrection = "Request Correction";
         public const string ApproveCorrection = "Approve Correction";
         public const string ReturnCorrection = "Return Correction";
+        public const string AuthorizeOvertime = "Authorize Overtime";
+        public const string RejectOvertime = "Reject Overtime";
         public const string CreateUser = "Create User";
         public const string EditUser = "Edit User";
         public const string GeneratePrediction = "Load Prediction";

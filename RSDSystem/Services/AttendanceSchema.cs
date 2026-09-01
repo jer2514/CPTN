@@ -254,6 +254,16 @@ BEGIN
         ALTER TABLE [dbo].[AttendanceRecords] ADD [Matched] bit NOT NULL CONSTRAINT [DF_AttendanceRecords_Matched] DEFAULT(0);
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'EmployeeId') IS NULL
         ALTER TABLE [dbo].[AttendanceRecords] ADD [EmployeeId] int NULL;
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeClaimHours') IS NULL
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [OvertimeClaimHours] decimal(10,2) NOT NULL CONSTRAINT [DF_AttendanceRecords_OvertimeClaimHours] DEFAULT(0);
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeDecision') IS NULL
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [OvertimeDecision] nvarchar(20) NOT NULL CONSTRAINT [DF_AttendanceRecords_OvertimeDecision] DEFAULT(N'');
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeReviewedBy') IS NULL
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [OvertimeReviewedBy] nvarchar(150) NULL;
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeReviewedAt') IS NULL
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [OvertimeReviewedAt] datetime2 NULL;
+    IF COL_LENGTH(N'dbo.AttendanceRecords', N'OvertimeReviewNote') IS NULL
+        ALTER TABLE [dbo].[AttendanceRecords] ADD [OvertimeReviewNote] nvarchar(250) NULL;
 
     IF COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') IS NOT NULL AND COL_LENGTH(N'dbo.AttendanceRecords', N'TimeIn1') < 80
         ALTER TABLE [dbo].[AttendanceRecords] ALTER COLUMN [TimeIn1] nvarchar(40) NULL;
