@@ -39,6 +39,34 @@ namespace RSDSystem.Helpers
             DateTime? workDate,
             CancellationToken cancellationToken = default)
         {
+            return await HasPayrollInPeriodAsync(
+                db, projectId, employeeId, workDate, approvedOnly: true, cancellationToken);
+        }
+
+        /// <summary>
+        /// Submitted payroll has already snapshotted overtime. Changing the decision
+        /// after that would leave the slip paying hours admin later rejected, or
+        /// omitting hours they later authorized.
+        /// </summary>
+        public static async Task<bool> BlocksOvertimeReviewAsync(
+            PayrollDbContext db,
+            int projectId,
+            int? employeeId,
+            DateTime? workDate,
+            CancellationToken cancellationToken = default)
+        {
+            return await HasPayrollInPeriodAsync(
+                db, projectId, employeeId, workDate, approvedOnly: false, cancellationToken);
+        }
+
+        private static async Task<bool> HasPayrollInPeriodAsync(
+            PayrollDbContext db,
+            int projectId,
+            int? employeeId,
+            DateTime? workDate,
+            bool approvedOnly,
+            CancellationToken cancellationToken)
+        {
             if (employeeId is not int id || id <= 0 || workDate is not DateTime day)
                 return false;
 
@@ -46,7 +74,10 @@ namespace RSDSystem.Helpers
             return await db.Payrolls.AsNoTracking()
                 .AnyAsync(p => p.ProjectId == projectId
                     && p.EmployeeId == id
-                    && p.Status == PayrollStatusOptions.Approved
+                    && (approvedOnly
+                        ? p.Status == PayrollStatusOptions.Approved
+                        : (p.Status == PayrollStatusOptions.Approved
+                            || p.Status == PayrollStatusOptions.Submitted))
                     && p.PayPeriodStart.Date <= date
                     && p.PayPeriodEnd.Date >= date, cancellationToken);
         }

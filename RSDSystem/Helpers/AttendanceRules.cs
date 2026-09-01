@@ -88,6 +88,23 @@ namespace RSDSystem.Helpers
             return ClaimedOvertimeHours(row);
         }
 
+        public static bool HasPendingOvertime(IEnumerable<AttendanceRecord> rows)
+        {
+            if (rows == null)
+                return false;
+
+            foreach (var row in rows)
+            {
+                if (row == null)
+                    continue;
+                Apply(row);
+                if (OvertimeDecisions.IsPending(row.OvertimeDecision))
+                    return true;
+            }
+
+            return false;
+        }
+
         public static string? LastRegularOutClock(string? timeOut1, string? timeOut2)
         {
             if (!string.IsNullOrWhiteSpace(timeOut2))

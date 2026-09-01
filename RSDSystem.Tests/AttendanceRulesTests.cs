@@ -210,4 +210,50 @@ public class AttendanceRulesTests
         Assert.Equal(3, row.OvertimeClaimHours);
         Assert.Equal(0, row.OvertimeHours);
     }
+
+    [Fact]
+    public void PendingOvertime_BlocksPayrollUntilReviewed()
+    {
+        var linger = new AttendanceRecord
+        {
+            TimeIn1 = "08:00",
+            TimeOut1 = "12:00",
+            TimeIn2 = "13:00",
+            TimeOut2 = "19:00"
+        };
+        var punched = new AttendanceRecord
+        {
+            TimeIn1 = "08:00",
+            TimeOut1 = "12:00",
+            TimeIn2 = "13:00",
+            TimeOut2 = "17:00",
+            OvertimeIn = "17:00",
+            OvertimeOut = "19:00"
+        };
+        var approved = new AttendanceRecord
+        {
+            TimeIn1 = "08:00",
+            TimeOut1 = "12:00",
+            TimeIn2 = "13:00",
+            TimeOut2 = "17:00",
+            OvertimeIn = "17:00",
+            OvertimeOut = "19:00",
+            OvertimeClaimHours = 2,
+            OvertimeDecision = OvertimeDecisions.Approved
+        };
+        var regular = new AttendanceRecord
+        {
+            TimeIn1 = "08:00",
+            TimeOut1 = "12:00",
+            TimeIn2 = "13:00",
+            TimeOut2 = "17:00"
+        };
+
+        Assert.True(AttendanceRules.HasPendingOvertime(new[] { linger, regular }));
+        Assert.True(AttendanceRules.HasPendingOvertime(new[] { punched }));
+        Assert.False(AttendanceRules.HasPendingOvertime(new[] { approved, regular }));
+        Assert.Equal(0, AttendanceRules.PaidOvertimeHours(linger));
+        Assert.Equal(0, AttendanceRules.PaidOvertimeHours(punched));
+        Assert.Equal(2, AttendanceRules.PaidOvertimeHours(approved));
+    }
 }

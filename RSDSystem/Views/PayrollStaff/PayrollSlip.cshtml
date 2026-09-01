@@ -21,6 +21,7 @@
     var regularHours = ViewBag.RegularHours is decimal rh ? rh : daysWorked * 8m;
     var cashAdvance = ViewBag.CashAdvance is decimal ca ? ca : 0m;
     var returnUrl = ViewBag.ReturnUrl as string ?? "";
+    var canGenerate = ViewBag.HasPayrollSchedule is true && pendingOvertimeHours <= 0;
     var startLabel = DateTime.TryParse(defaultStart, out var startDt)
         ? startDt.ToString("MMMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture)
         : defaultStart;
@@ -173,8 +174,8 @@ else
                 @if (pendingOvertimeHours > 0)
                 {
                     <div class="form-hint-box" style="margin-top:8px">
-                        <i class="bi bi-info-circle-fill"></i>
-                        @pendingOvertimeHours.ToString("0.##") overtime hour(s) are waiting for admin authorization and are not paid.
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        @pendingOvertimeHours.ToString("0.##") overtime hour(s) are waiting for admin authorization. Payroll cannot be saved until overtime is authorized or rejected.
                     </div>
                 }
             </div>
@@ -193,7 +194,7 @@ else
                 </div>
             </div>
             <button type="submit" id="generateBtn" class="btn-primary-blue-block"
-                    @(ViewBag.HasPayrollSchedule is true ? null : "disabled")>
+                    @(canGenerate ? null : "disabled")>
                 @(isEdit ? "Save Changes" : "Generate Payroll")
             </button>
         </div>

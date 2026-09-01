@@ -200,12 +200,15 @@
             tbody.innerHTML = list.map(e => {
                 const generated = e.alreadyGenerated === true;
                 const pending = e.pendingCorrection === true;
+                const pendingOt = e.pendingOvertime === true;
                 const hasAttendance = e.hasAttendance !== false;
                 let action;
                 if (generated) {
                     action = `<span class="btn-generate-pill btn-generate-disabled">Generate</span>`;
                 } else if (pending) {
                     action = `<span class="btn-generate-pill btn-generate-disabled" title="Pending attendance correction">Pending</span>`;
+                } else if (pendingOt) {
+                    action = `<span class="btn-generate-pill btn-generate-disabled" title="Overtime waiting for admin authorization">Pending OT</span>`;
                 } else if (!hasAttendance) {
                     action = `<span class="btn-generate-pill btn-generate-disabled" title="No attendance matched to this employee ID">No attendance</span>`;
                 } else {
