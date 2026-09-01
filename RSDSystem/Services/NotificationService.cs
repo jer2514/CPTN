@@ -203,6 +203,55 @@ namespace RSDSystem.Services
                 cancellationToken);
         }
 
+        public async Task NotifyOvertimePendingAsync(
+            Project project, int count, CancellationToken cancellationToken = default)
+        {
+            var name = ProjectName(project);
+            var rows = count == 1 ? "1 overtime row" : count + " overtime rows";
+            await NotifyAdminsAsync(
+                NotificationKinds.OvertimePending,
+                "Overtime needs review",
+                $"{rows} on {name} need to be authorized or rejected. Overtime is not paid until admin authorizes it.",
+                project.ProjectId,
+                null,
+                "/Attendance/Records",
+                cancellationToken);
+        }
+
+        public async Task NotifyOvertimeReviewedAsync(
+            Project project, string employeeName, string workDate, decimal hours, bool authorized,
+            CancellationToken cancellationToken = default)
+        {
+            var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
+            if (string.IsNullOrWhiteSpace(staff))
+                return;
+
+            var name = ProjectName(project);
+            if (authorized)
+            {
+                await NotifyStaffAsync(
+                    staff,
+                    NotificationKinds.OvertimeReviewed,
+                    "Overtime authorized",
+                    $"Admin authorized {hours:0.##} overtime hour(s) for {employeeName} on {workDate} ({name}).",
+                    project.ProjectId,
+                    null,
+                    "/Attendance/Records",
+                    cancellationToken);
+                return;
+            }
+
+            await NotifyStaffAsync(
+                staff,
+                NotificationKinds.OvertimeReviewed,
+                "Overtime rejected",
+                $"Admin rejected overtime for {employeeName} on {workDate} ({name}). Time after 5:00 is staying late and is not paid.",
+                project.ProjectId,
+                null,
+                "/Attendance/Records",
+                cancellationToken);
+        }
+
         public async Task NotifyStaffAssignedAsync(Project project, CancellationToken cancellationToken = default)
         {
             var staff = await ResolveStaffRecipientAsync(project.AssignedPayrollStaff, cancellationToken);
@@ -576,7 +625,9 @@ namespace RSDSystem.Services
                 || kind == NotificationKinds.AttendanceCorrectionResubmitted
                 || kind == NotificationKinds.TaskCompletionRequested
                 || kind == NotificationKinds.CashAdvanceAdded
-                || kind == NotificationKinds.CashAdvanceDeduction)
+                || kind == NotificationKinds.CashAdvanceDeduction
+                || kind == NotificationKinds.OvertimePending
+                || kind == NotificationKinds.OvertimeReviewed)
                 return false;
 
             var since = PhilippinesTime.Now.AddMinutes(-10);

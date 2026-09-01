@@ -3789,6 +3789,97 @@ button.badge-btn {
     color: #7a93c4;
 }
 
+.att-ot-pending-hours {
+    color: #b45309;
+}
+
+.att-ot-rejected-hours {
+    color: #b42318;
+}
+
+.att-ot-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.att-ot-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 20px;
+    border: 1px solid #c5d0e6;
+    background: #fff;
+    color: #163F8B;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.att-ot-btn:hover {
+    background: #f4f7ff;
+}
+
+.att-ot-authorize {
+    border-color: #86d3a8;
+    color: #0d7a3e;
+}
+
+.att-ot-authorize:hover {
+    background: #e8f8ee;
+}
+
+.att-ot-reject {
+    border-color: #f0b4b4;
+    color: #b42318;
+}
+
+.att-ot-reject:hover {
+    background: #fff4f4;
+}
+
+.att-ot-status {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.att-ot-pending {
+    background: #fff4de;
+    color: #9a6700;
+}
+
+.att-ot-approved {
+    background: #d4f7e0;
+    color: #0d7a3e;
+}
+
+.att-ot-rejected {
+    background: #ffc9c9;
+    color: #b42318;
+}
+
+.att-row-ot-pending td {
+    background: #fffaf0;
+}
+
+.att-ot-confirm-reject {
+    background: #b42318 !important;
+}
+
+.att-action-cell {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 .att-quick-cell {
     display: flex;
     flex-wrap: wrap;

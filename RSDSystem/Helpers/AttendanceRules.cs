@@ -22,12 +22,11 @@ namespace RSDSystem.Helpers
             if (HasAnyPunch(row))
             {
                 row.WorkHoursActual = RegularHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2);
-                row.OvertimeHours = OvertimeHours(
-                    row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
                 row.LateMinutes = LateMinutes(row.TimeIn1);
                 row.EarlyMinutes = EarlyMinutes(row.TimeOut1, row.TimeOut2);
             }
 
+            ApplyOvertimeDecision(row);
             row.Status = Status(row);
         }
 
@@ -53,14 +52,92 @@ namespace RSDSystem.Helpers
             CountedSessionIn(timeIn, MorningStart);
 
         /// <summary>
-        /// Overtime is paid only from Overtime In / Overtime Out after 17:00.
-        /// A regular clock-out after 5:00 (lingering on site) is not overtime.
+        /// Hours after 5:00 from Overtime In/Out, or from a regular clock-out after 5:00.
+        /// These hours are not paid until an admin authorizes the overtime.
+        /// </summary>
+        public static decimal ClaimedOvertimeHours(
+            string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
+        {
+            var dayEnd = TimeSpan.FromDays(1);
+            var punched = CountedWindowHours(overtimeIn, overtimeOut, ShiftEnd, dayEnd);
+            if (punched > 0)
+                return punched;
+
+            return CountedWindowHours(in1, out1, ShiftEnd, dayEnd)
+                + CountedWindowHours(in2, out2, ShiftEnd, dayEnd);
+        }
+
+        public static decimal ClaimedOvertimeHours(AttendanceRecord row) =>
+            ClaimedOvertimeHours(row.TimeIn1, row.TimeOut1, row.TimeIn2, row.TimeOut2, row.OvertimeIn, row.OvertimeOut);
+
+        /// <summary>
+        /// Overtime punches after 17:00. Linger clock-outs are not included.
+        /// Paid overtime uses <see cref="PaidOvertimeHours"/>.
         /// </summary>
         public static decimal OvertimeHours(
             string? in1, string? out1, string? in2, string? out2, string? overtimeIn, string? overtimeOut)
         {
             _ = (in1, out1, in2, out2);
             return CountedWindowHours(overtimeIn, overtimeOut, ShiftEnd, TimeSpan.FromDays(1));
+        }
+
+        public static decimal PaidOvertimeHours(AttendanceRecord row)
+        {
+            if (!OvertimeDecisions.IsApproved(row.OvertimeDecision))
+                return 0;
+            return ClaimedOvertimeHours(row);
+        }
+
+        public static string? LastRegularOutClock(string? timeOut1, string? timeOut2)
+        {
+            if (!string.IsNullOrWhiteSpace(timeOut2))
+                return timeOut2;
+            if (AttendanceDisplay.TryParseTime(timeOut1, out var out1) && out1 >= AfternoonStart)
+                return timeOut1;
+            return null;
+        }
+
+        public static void FillAuthorizedOvertimePunches(AttendanceRecord row)
+        {
+            if (!string.IsNullOrWhiteSpace(row.OvertimeIn) && !string.IsNullOrWhiteSpace(row.OvertimeOut))
+                return;
+
+            var lastOut = LastRegularOutClock(row.TimeOut1, row.TimeOut2);
+            if (string.IsNullOrWhiteSpace(lastOut))
+                return;
+
+            row.OvertimeIn = FormatClock(ShiftEnd);
+            row.OvertimeOut = lastOut;
+            if (AttendanceDisplay.TryParseTime(row.TimeOut2, out var out2) && out2 > ShiftEnd)
+                row.TimeOut2 = FormatClock(ShiftEnd);
+        }
+
+        private static void ApplyOvertimeDecision(AttendanceRecord row)
+        {
+            var claimed = ClaimedOvertimeHours(row);
+            var previousClaim = row.OvertimeClaimHours;
+            var previousDecision = OvertimeDecisions.Normalize(row.OvertimeDecision);
+            row.OvertimeClaimHours = claimed;
+
+            if (claimed <= 0)
+            {
+                row.OvertimeDecision = OvertimeDecisions.None;
+                row.OvertimeHours = 0;
+                if (previousDecision != OvertimeDecisions.None)
+                {
+                    row.OvertimeReviewedBy = null;
+                    row.OvertimeReviewedAt = null;
+                    row.OvertimeReviewNote = null;
+                }
+                return;
+            }
+
+            if (OvertimeDecisions.IsFinal(previousDecision) && previousClaim == claimed)
+                row.OvertimeDecision = previousDecision;
+            else
+                row.OvertimeDecision = OvertimeDecisions.Pending;
+
+            row.OvertimeHours = OvertimeDecisions.IsApproved(row.OvertimeDecision) ? claimed : 0;
         }
 
         public static IReadOnlyList<AttendanceIssue> DetectIssues(AttendanceRecord row) =>
@@ -103,7 +180,7 @@ namespace RSDSystem.Helpers
                 {
                     issues.Add(new AttendanceIssue(
                         AttendanceIssueCodes.LingerAfterShift,
-                        "Timed out after 5:00 without overtime in/out. Staying on site is not overtime and is not paid."));
+                        "Timed out after 5:00 without overtime in/out. Admin must authorize this as overtime or reject it as staying late."));
                 }
             }
 

@@ -84,6 +84,20 @@ namespace RSDSystem.Models
         public decimal OvertimeHours { get; set; }
 
         [Column(TypeName = "decimal(10,2)")]
+        public decimal OvertimeClaimHours { get; set; }
+
+        [MaxLength(20)]
+        public string OvertimeDecision { get; set; } = OvertimeDecisions.None;
+
+        [MaxLength(150)]
+        public string? OvertimeReviewedBy { get; set; }
+
+        public DateTime? OvertimeReviewedAt { get; set; }
+
+        [MaxLength(250)]
+        public string? OvertimeReviewNote { get; set; }
+
+        [Column(TypeName = "decimal(10,2)")]
         public decimal AbsenceDays { get; set; }
 
         [MaxLength(20)]
@@ -169,5 +183,52 @@ namespace RSDSystem.Models
                 _ => "att-status-halfday"
             };
         }
+    }
+
+    public static class OvertimeDecisions
+    {
+        public const string None = "";
+        public const string Pending = "Pending";
+        public const string Approved = "Approved";
+        public const string Rejected = "Rejected";
+
+        public static string Normalize(string? value)
+        {
+            if (string.Equals(value, Approved, StringComparison.OrdinalIgnoreCase))
+                return Approved;
+            if (string.Equals(value, Rejected, StringComparison.OrdinalIgnoreCase))
+                return Rejected;
+            if (string.Equals(value, Pending, StringComparison.OrdinalIgnoreCase))
+                return Pending;
+            return None;
+        }
+
+        public static bool IsApproved(string? value) =>
+            Normalize(value) == Approved;
+
+        public static bool IsRejected(string? value) =>
+            Normalize(value) == Rejected;
+
+        public static bool IsPending(string? value) =>
+            Normalize(value) == Pending;
+
+        public static bool IsFinal(string? value) =>
+            IsApproved(value) || IsRejected(value);
+
+        public static string Display(string? value) => Normalize(value) switch
+        {
+            Approved => "Authorized",
+            Rejected => "Unauthorized",
+            Pending => "Pending review",
+            _ => ""
+        };
+
+        public static string CssClass(string? value) => Normalize(value) switch
+        {
+            Approved => "att-ot-approved",
+            Rejected => "att-ot-rejected",
+            Pending => "att-ot-pending",
+            _ => ""
+        };
     }
 }

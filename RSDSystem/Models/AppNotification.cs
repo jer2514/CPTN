@@ -64,6 +64,8 @@ namespace RSDSystem.Models
         public const string StaffAssigned = "StaffAssigned";
         public const string CashAdvanceAdded = "CashAdvanceAdded";
         public const string CashAdvanceDeduction = "CashAdvanceDeduction";
+        public const string OvertimePending = "OvertimePending";
+        public const string OvertimeReviewed = "OvertimeReviewed";
 
         public static string Icon(string? kind) => (kind ?? "").Trim() switch
         {
@@ -87,6 +89,8 @@ namespace RSDSystem.Models
             StaffAssigned => "bi-person-check-fill",
             CashAdvanceAdded => "bi-bell-fill",
             CashAdvanceDeduction => "bi-bell-fill",
+            OvertimePending => "bi-clock-history",
+            OvertimeReviewed => "bi-check-circle-fill",
             _ => "bi-bell-fill"
         };
 
@@ -112,6 +116,8 @@ namespace RSDSystem.Models
             StaffAssigned => "notif-icon-task",
             CashAdvanceAdded => "notif-icon-bell",
             CashAdvanceDeduction => "notif-icon-bell",
+            OvertimePending => "notif-icon-warn",
+            OvertimeReviewed => "notif-icon-ok",
             _ => "notif-icon-task"
         };
     }

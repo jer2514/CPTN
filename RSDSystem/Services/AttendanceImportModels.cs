@@ -35,6 +35,8 @@ namespace RSDSystem.Services
         public int LateMinutes { get; set; }
         public int EarlyMinutes { get; set; }
         public decimal OvertimeHours { get; set; }
+        public decimal OvertimeClaimHours { get; set; }
+        public string OvertimeDecision { get; set; } = "";
         public decimal AbsenceDays { get; set; }
         public string Status { get; set; } = AttendanceStatuses.HalfDay;
         public bool Matched { get; set; }
@@ -77,6 +79,7 @@ namespace RSDSystem.Services
         public int UnmatchedCount { get; set; }
         public bool ReplacedPrevious { get; set; }
         public int SkippedLockedCount { get; set; }
+        public int PendingOvertimeCount { get; set; }
     }
 
     public class AttendancePeriodOption
@@ -102,6 +105,9 @@ namespace RSDSystem.Services
         public int IssueDays { get; set; }
         public decimal RegularHours { get; set; }
         public decimal OvertimeHours { get; set; }
+        public decimal OvertimeClaimHours { get; set; }
+        public int PendingOvertimeDays { get; set; }
+        public decimal PendingOvertimeHours { get; set; }
     }
 
     public class AttendanceSummaryResult
@@ -115,6 +121,8 @@ namespace RSDSystem.Services
         public int IssueDays { get; set; }
         public decimal RegularHours { get; set; }
         public decimal OvertimeHours { get; set; }
+        public decimal PendingOvertimeHours { get; set; }
+        public int PendingOvertimeDays { get; set; }
         public int UnmatchedCount { get; set; }
         public string? ImportedBy { get; set; }
         public DateTime? PeriodStart { get; set; }

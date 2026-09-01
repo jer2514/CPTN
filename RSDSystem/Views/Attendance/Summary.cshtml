@@ -59,6 +59,7 @@
                         <li><a class="dropdown-item" href="#" data-status="Late">Late</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Half-day">Half-day</a></li>
                         <li><a class="dropdown-item" href="#" data-status="Issues">Issues</a></li>
+                        <li><a class="dropdown-item" href="#" data-status="OtPending">Pending OT</a></li>
                     </ul>
                 </div>
             </div>
@@ -77,6 +78,7 @@
                         <th>Issues</th>
                         <th>Regular Hours</th>
                         <th>Overtime Hours</th>
+                        <th>Pending OT</th>
                     </tr>
                 </thead>
                 <tbody id="summaryBody"></tbody>
@@ -246,6 +248,7 @@
                     chip('Issues', t.issueDays || 0) +
                     chip('Regular hours', Number(t.regularHours || 0).toFixed(2)) +
                     chip('Overtime hours', Number(t.overtimeHours || 0).toFixed(2)) +
+                    chip('Pending OT', Number(t.pendingOvertimeHours || 0).toFixed(2)) +
                     chip('Unmatched', t.unmatched || 0);
 
                 const byline = data.importedBy ? ` · Imported by ${data.importedBy}` : '';
@@ -269,8 +272,9 @@
                         <td>${r.issueDays || 0}</td>
                         <td>${r.regularHours}</td>
                         <td>${r.overtimeHours}</td>
+                        <td>${r.pendingOvertimeHours || '0.00'}</td>
                     </tr>`).join('')
-                    : `<tr><td colspan="9" class="text-center text-muted py-4">No attendance records match this filter.</td></tr>`;
+                    : `<tr><td colspan="10" class="text-center text-muted py-4">No attendance records match this filter.</td></tr>`;
 
                 document.getElementById('summaryPager').innerHTML =
                     `<button type="button" class="att-page-btn" ${data.page <= 1 ? 'disabled' : ''} data-dir="-1">&lsaquo;</button>

@@ -17,6 +17,7 @@
     var daysWorked = ViewBag.DefaultDaysWorked is int dw ? dw : 1;
     var absentDays = ViewBag.AbsentDays is int ad ? ad : 0;
     var overtimeHours = ViewBag.OvertimeHours is decimal ot ? ot : 0m;
+    var pendingOvertimeHours = ViewBag.PendingOvertimeHours is decimal pot ? pot : 0m;
     var regularHours = ViewBag.RegularHours is decimal rh ? rh : daysWorked * 8m;
     var cashAdvance = ViewBag.CashAdvance is decimal ca ? ca : 0m;
     var returnUrl = ViewBag.ReturnUrl as string ?? "";
@@ -169,6 +170,13 @@ else
             <div>
                 <div class="form-lbl">Overtime (Hours)</div>
                 <div class="slip-value">@overtimeHours.ToString("0.##")</div>
+                @if (pendingOvertimeHours > 0)
+                {
+                    <div class="form-hint-box" style="margin-top:8px">
+                        <i class="bi bi-info-circle-fill"></i>
+                        @pendingOvertimeHours.ToString("0.##") overtime hour(s) are waiting for admin authorization and are not paid.
+                    </div>
+                }
             </div>
         </div>
 
