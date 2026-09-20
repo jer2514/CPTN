@@ -546,9 +546,7 @@ namespace RSDSystem.Controllers
             var pendingAdvance = await _advances.PendingAmountAsync(projectId, employeeId, HttpContext.RequestAborted);
             var hourly = EmployeeRates.HourlyFromDaily(emp.DailyRate);
             var previewGross = PayrollComputation.Compute(hourly, regularHours, overtimeHours, 0).GrossPay;
-            cashAdvance = pendingAdvance;
-            if (cashAdvance > previewGross)
-                cashAdvance = previewGross;
+            cashAdvance = PayrollComputation.CappedCashAdvance(pendingAdvance, previewGross);
 
             var errors = new Dictionary<string, string>();
             if (cashAdvance < 0)
