@@ -146,8 +146,14 @@ namespace RSDSystem.Controllers
                     : attendance.DaysWorked;
                 var regularHours = attendance.RegularHours;
                 var overtimeHours = attendance.OvertimeHours;
+                var hourly = EmployeeRates.HourlyFromDaily(emp.DailyRate);
+                var pendingAdvance = await _advances.PendingAmountAsync(
+                    projectId, emp.EmployeeId, HttpContext.RequestAborted);
+                var cashAdvance = PayrollComputation.CappedCashAdvance(
+                    pendingAdvance,
+                    PayrollComputation.Compute(hourly, regularHours, overtimeHours, 0).GrossPay);
                 var (regularPay, overtimePay, gross, net) = PayrollComputation.Compute(
-                    EmployeeRates.HourlyFromDaily(emp.DailyRate), regularHours, overtimeHours, 0);
+                    hourly, regularHours, overtimeHours, cashAdvance);
 
                 _db.Set<Payroll>().Add(new Payroll
                 {
@@ -163,7 +169,7 @@ namespace RSDSystem.Controllers
                     RegularPay = regularPay,
                     OvertimePay = overtimePay,
                     GrossPay = gross,
-                    CashAdvance = 0,
+                    CashAdvance = cashAdvance,
                     NetPay = net,
                     Status = PayrollStatusOptions.Draft,
                     GeneratedBy = generatedBy,
