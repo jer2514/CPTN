@@ -179,6 +179,7 @@ namespace RSDSystem.Services
                         existing.PeriodStart = rangeStart;
                         existing.PeriodEnd = rangeEnd;
                         existing.WorkDate = day;
+                        existing.FilledFromTaskWindow = false;
                         if (string.IsNullOrWhiteSpace(existing.Status))
                             existing.Status = DeriveStatus(existing);
                         expanded.Add(existing);
@@ -192,7 +193,8 @@ namespace RSDSystem.Services
                         WorkDate = day,
                         PeriodStart = rangeStart,
                         PeriodEnd = rangeEnd,
-                        Status = AttendanceStatuses.Absent
+                        Status = AttendanceStatuses.Absent,
+                        FilledFromTaskWindow = true
                     });
                 }
             }

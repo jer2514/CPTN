@@ -104,6 +104,12 @@ namespace RSDSystem.Models
         public string Status { get; set; } = AttendanceStatuses.HalfDay;
 
         public bool Matched { get; set; }
+
+        /// <summary>
+        /// Day invented to fill the payroll task window. Preview-only; not saved.
+        /// </summary>
+        [NotMapped]
+        public bool FilledFromTaskWindow { get; set; }
     }
 
     public static class AttendanceImportSources

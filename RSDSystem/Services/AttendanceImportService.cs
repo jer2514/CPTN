@@ -45,6 +45,7 @@ namespace RSDSystem.Services
                 return new AttendancePreviewResult { Error = parsed.Error, Project = project };
             }
 
+            var (fileStart, fileEnd) = FileCoverage(parsed);
             await ApplyAdminTaskWindowAsync(project.ProjectId, parsed, cancellationToken);
 
             // Extract the raw rows first, unmatched — matching is applied on top of that raw data.
@@ -58,6 +59,8 @@ namespace RSDSystem.Services
                 Format = parsed.Format,
                 PeriodStart = parsed.PeriodStart,
                 PeriodEnd = parsed.PeriodEnd,
+                FilePeriodStart = fileStart,
+                FilePeriodEnd = fileEnd,
                 Rows = rows,
                 CandidateEmployees = employees,
                 MatchedCount = rows.Count(r => r.Matched),
@@ -87,7 +90,8 @@ namespace RSDSystem.Services
             // then apply any punch-time edits made in the preview.
             ApplyManualMatches(preview.Rows, manualMatchesJson, preview.CandidateEmployees);
             ApplyOverrides(preview.Rows, overridesJson);
-            preview.Rows = DeduplicateRows(preview.Rows);
+            preview.Rows = DeduplicateRows(preview.Rows.Where(r => r.ShouldPersist()).ToList());
+            RestrictImportPeriodToPersistedRows(preview);
 
             if (preview.Error != null || preview.Project == null)
             {
@@ -662,6 +666,42 @@ namespace RSDSystem.Services
                 _db.AttendanceRecords.RemoveRange(existing);
         }
 
+        public static (DateTime? Start, DateTime? End) FileCoverage(AttendanceParseResult parsed)
+        {
+            var start = AttendanceDisplay.UsableDate(parsed.PeriodStart);
+            var end = AttendanceDisplay.UsableDate(parsed.PeriodEnd);
+            var dates = parsed.Rows
+                .Select(r => AttendanceDisplay.UsableDate(r.WorkDate))
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .ToList();
+            if (dates.Count == 0)
+                return (start, end);
+            if (!start.HasValue)
+                start = dates.Min();
+            if (!end.HasValue)
+                end = dates.Max();
+            return (start, end);
+        }
+
+        public static void RestrictImportPeriodToPersistedRows(AttendancePreviewResult preview)
+        {
+            var dates = preview.Rows
+                .Select(r => AttendanceDisplay.UsableDate(r.WorkDate))
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value.Date)
+                .ToList();
+            if (dates.Count > 0)
+            {
+                preview.PeriodStart = dates.Min();
+                preview.PeriodEnd = dates.Max();
+                return;
+            }
+
+            preview.PeriodStart = preview.FilePeriodStart;
+            preview.PeriodEnd = preview.FilePeriodEnd;
+        }
+
         private static List<AttendancePreviewRow> DeduplicateRows(List<AttendancePreviewRow> rows)
         {
             foreach (var row in rows)
@@ -1074,6 +1114,7 @@ namespace RSDSystem.Services
                     AbsenceDays = row.AbsenceDays,
                     Status = row.Status,
                     Matched = employeeId.HasValue,
+                    FilledFromTaskWindow = row.FilledFromTaskWindow,
                     Note = employeeId.HasValue
                         ? null
                         : "This name does not match any employee in the system. Select the correct employee to match this record."

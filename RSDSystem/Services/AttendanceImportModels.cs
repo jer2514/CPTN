@@ -10,6 +10,8 @@ namespace RSDSystem.Services
         public string Format { get; set; } = AttendanceFormats.Daily;
         public DateTime? PeriodStart { get; set; }
         public DateTime? PeriodEnd { get; set; }
+        public DateTime? FilePeriodStart { get; set; }
+        public DateTime? FilePeriodEnd { get; set; }
         public List<AttendancePreviewRow> Rows { get; set; } = new();
         public List<Employee> CandidateEmployees { get; set; } = new();
         public int MatchedCount { get; set; }
@@ -41,6 +43,21 @@ namespace RSDSystem.Services
         public string Status { get; set; } = AttendanceStatuses.HalfDay;
         public bool Matched { get; set; }
         public string? Note { get; set; }
+        public bool FilledFromTaskWindow { get; set; }
+
+        public bool HasPunches() =>
+            !string.IsNullOrWhiteSpace(TimeIn1)
+            || !string.IsNullOrWhiteSpace(TimeOut1)
+            || !string.IsNullOrWhiteSpace(TimeIn2)
+            || !string.IsNullOrWhiteSpace(TimeOut2)
+            || !string.IsNullOrWhiteSpace(OvertimeIn)
+            || !string.IsNullOrWhiteSpace(OvertimeOut);
+
+        /// <summary>
+        /// Schedule-filled Absent days are preview-only unless staff entered punches.
+        /// Saving them would replace earlier imported days on the next file.
+        /// </summary>
+        public bool ShouldPersist() => !FilledFromTaskWindow || HasPunches();
     }
 
     public class AttendanceDayOverride
