@@ -79,6 +79,7 @@ namespace RSDSystem.Services
         public int UnmatchedCount { get; set; }
         public bool ReplacedPrevious { get; set; }
         public int SkippedLockedCount { get; set; }
+        public int SkippedOtherProjectCount { get; set; }
         public int PendingOvertimeCount { get; set; }
     }
 
