@@ -106,9 +106,7 @@ namespace RSDSystem.Services
             {
                 return new AttendanceImportResult
                 {
-                    Error = skippedLocked > 0
-                        ? "Payroll for these employees is already approved. Attendance cannot be imported again for that period."
-                        : "The file did not contain any attendance rows."
+                    Error = ImportEmptyError(skippedLocked, 0)
                 };
             }
 
@@ -121,6 +119,24 @@ namespace RSDSystem.Services
                 return new AttendanceImportResult
                 {
                     Error = "Could not prepare the attendance tables. " + DescribeSaveError(ex)
+                };
+            }
+
+            var otherProjectKeys = await FindOtherProjectConflictKeysAsync(
+                preview.Project.ProjectId, preview.Rows, cancellationToken);
+            var skippedOtherProject = preview.Rows.Count(r =>
+                AttendanceImportConflicts.IncomingConflictsWithOtherProject(
+                    r.EmployeeId, r.WorkDate, otherProjectKeys));
+            preview.Rows = preview.Rows
+                .Where(r => !AttendanceImportConflicts.IncomingConflictsWithOtherProject(
+                    r.EmployeeId, r.WorkDate, otherProjectKeys))
+                .ToList();
+
+            if (preview.Rows.Count == 0)
+            {
+                return new AttendanceImportResult
+                {
+                    Error = ImportEmptyError(skippedLocked, skippedOtherProject)
                 };
             }
 
@@ -201,6 +217,7 @@ namespace RSDSystem.Services
                 UnmatchedCount = preview.Rows.Count(r => !r.Matched),
                 ReplacedPrevious = replaced,
                 SkippedLockedCount = skippedLocked,
+                SkippedOtherProjectCount = skippedOtherProject,
                 PendingOvertimeCount = batch.Records.Count(r => OvertimeDecisions.IsPending(r.OvertimeDecision))
             };
         }
@@ -617,10 +634,48 @@ namespace RSDSystem.Services
             return removedUnlocked;
         }
 
+        private async Task<HashSet<string>> FindOtherProjectConflictKeysAsync(
+            int projectId,
+            List<AttendancePreviewRow> rows,
+            CancellationToken cancellationToken)
+        {
+            var existing = await LoadConflictingRecordsAsync(rows, cancellationToken);
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var record in existing)
+            {
+                if (record.EmployeeId is not int employeeId)
+                    continue;
+                if (AttendanceImportConflicts.BelongsToProject(
+                        record.ProjectId, record.Import?.ProjectId, projectId))
+                    continue;
+                keys.Add(AttendanceImportConflicts.EmployeeDateKey(employeeId, record.WorkDate));
+            }
+
+            return keys;
+        }
+
         private async Task RemoveConflictingRecordsAsync(
             int projectId,
             List<AttendancePreviewRow> rows,
             List<ClosedPayrollWindow> closedPayrolls,
+            CancellationToken cancellationToken)
+        {
+            var existing = await LoadConflictingRecordsAsync(rows, cancellationToken);
+
+            // Only this project's unlocked rows may be replaced. Other projects keep
+            // their days so a later import cannot wipe transferred employees' history.
+            existing = existing
+                .Where(r => AttendanceImportConflicts.BelongsToProject(
+                    r.ProjectId, r.Import?.ProjectId, projectId))
+                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
+                .ToList();
+
+            if (existing.Count > 0)
+                _db.AttendanceRecords.RemoveRange(existing);
+        }
+
+        private async Task<List<AttendanceRecord>> LoadConflictingRecordsAsync(
+            List<AttendancePreviewRow> rows,
             CancellationToken cancellationToken)
         {
             var employeeIds = rows
@@ -628,6 +683,8 @@ namespace RSDSystem.Services
                 .Select(r => r.EmployeeId!.Value)
                 .Distinct()
                 .ToList();
+            if (employeeIds.Count == 0)
+                return new List<AttendanceRecord>();
 
             var dates = rows
                 .Select(r => AttendanceDisplay.UsableDate(r.WorkDate))
@@ -642,8 +699,8 @@ namespace RSDSystem.Services
                 .Distinct()
                 .ToList();
 
-            // The unique employee+date index is global, so conflicts are not limited to this project.
-            var existing = await _db.AttendanceRecords
+            return await _db.AttendanceRecords
+                .Include(r => r.Import)
                 .Where(r =>
                     r.EmployeeId != null && employeeIds.Contains(r.EmployeeId.Value) &&
                     (
@@ -653,13 +710,29 @@ namespace RSDSystem.Services
                          (r.WorkDate == null || r.WorkDate.Value.Year < 1900))
                     ))
                 .ToListAsync(cancellationToken);
+        }
 
-            existing = existing
-                .Where(r => !PayrollAttendanceLock.IsLocked(closedPayrolls, r.EmployeeId, r.WorkDate))
-                .ToList();
+        private static string ImportEmptyError(int skippedLocked, int skippedOtherProject)
+        {
+            if (skippedOtherProject > 0 && skippedLocked == 0)
+            {
+                return "These dates already have attendance on another project. " +
+                       "Import did not replace those rows.";
+            }
 
-            if (existing.Count > 0)
-                _db.AttendanceRecords.RemoveRange(existing);
+            if (skippedLocked > 0 && skippedOtherProject == 0)
+            {
+                return "Payroll for these employees is already approved. " +
+                       "Attendance cannot be imported again for that period.";
+            }
+
+            if (skippedLocked > 0)
+            {
+                return "No rows could be imported. Some dates are locked by approved payroll, " +
+                       "and others already belong to another project.";
+            }
+
+            return "The file did not contain any attendance rows.";
         }
 
         private static List<AttendancePreviewRow> DeduplicateRows(List<AttendancePreviewRow> rows)

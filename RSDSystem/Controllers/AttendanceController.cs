@@ -148,6 +148,8 @@ namespace RSDSystem.Controllers
                     : $"Imported {result.RowCount} row(s) for {result.ProjectName}.";
                 if (result.SkippedLockedCount > 0)
                     message += $" Skipped {result.SkippedLockedCount} row(s) because payroll is already approved.";
+                if (result.SkippedOtherProjectCount > 0)
+                    message += $" Skipped {result.SkippedOtherProjectCount} row(s) that already belong to another project.";
                 if (result.PendingOvertimeCount > 0)
                     message += $" {result.PendingOvertimeCount} overtime row(s) need admin authorization before they are paid.";
 
